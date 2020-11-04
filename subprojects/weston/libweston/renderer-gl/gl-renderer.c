@@ -3206,7 +3206,7 @@ gl_renderer_output_set_border(struct weston_output *output,
 }
 
 static int
-gl_renderer_setup(struct weston_compositor *ec, EGLSurface egl_surface);
+gl_renderer_setup(struct weston_compositor *ec);
 
 static EGLSurface
 gl_renderer_create_window_surface(struct gl_renderer *gr,
@@ -3554,7 +3554,7 @@ gl_renderer_display_create(struct weston_compositor *ec,
 
 	wl_signal_init(&gr->destroy_signal);
 
-	if (gl_renderer_setup(ec, gr->dummy_surface) < 0) {
+	if (gl_renderer_setup(ec) < 0) {
 		if (gr->dummy_surface != EGL_NO_SURFACE)
 			weston_platform_destroy_egl_surface(gr->egl_display,
 							    gr->dummy_surface);
@@ -3665,7 +3665,7 @@ get_gl_version(void)
 }
 
 static int
-gl_renderer_setup(struct weston_compositor *ec, EGLSurface egl_surface)
+gl_renderer_setup(struct weston_compositor *ec)
 {
 	struct gl_renderer *gr = get_renderer(ec);
 	const char *extensions;
@@ -3727,8 +3727,8 @@ gl_renderer_setup(struct weston_compositor *ec, EGLSurface egl_surface)
 		}
 	}
 
-	ret = eglMakeCurrent(gr->egl_display, egl_surface,
-			     egl_surface, gr->egl_context);
+	ret = eglMakeCurrent(gr->egl_display, gr->dummy_surface,
+			     gr->dummy_surface, gr->egl_context);
 	if (ret == EGL_FALSE) {
 		weston_log("Failed to make EGL context current.\n");
 		gl_renderer_print_egl_error_state();
