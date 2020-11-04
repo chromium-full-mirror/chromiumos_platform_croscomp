@@ -260,6 +260,25 @@ out:
 }
 
 #ifdef BUILD_DRM_GBM
+__attribute__((weak)) int
+gbm_bo_write(struct gbm_bo *bo, const void *buf, size_t count)
+{
+	void *ptr, *map_data;
+	uint32_t stride;
+
+	uint32_t width = gbm_bo_get_width(bo);
+	uint32_t height = gbm_bo_get_height(bo);
+
+	ptr = gbm_bo_map(bo, 0, 0, width, height,
+			 GBM_BO_TRANSFER_WRITE, &stride, &map_data);
+
+	memcpy(ptr, buf, count);
+
+	gbm_bo_unmap(bo, map_data);
+
+	return 0;
+}
+
 /**
  * Update the image for the current cursor surface
  *
