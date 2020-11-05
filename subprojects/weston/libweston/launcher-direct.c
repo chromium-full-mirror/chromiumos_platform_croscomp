@@ -300,7 +300,7 @@ launcher_direct_connect(struct weston_launcher **out, struct weston_compositor *
 	launcher->base.iface = &launcher_direct_iface;
 	launcher->compositor = compositor;
 
-	if (strcmp("seat0", seat_id) == 0) {
+	if (strcmp("seat0", seat_id) == 0 && tty >= 0) {
 		if (setup_tty(launcher, tty) == -1) {
 			free(launcher);
 			return -1;

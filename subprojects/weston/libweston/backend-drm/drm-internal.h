@@ -315,6 +315,7 @@ enum drm_fb_type {
 	BUFFER_DMABUF, /**< imported from linux_dmabuf client */
 	BUFFER_PIXMAN_DUMB, /**< internal Pixman rendering */
 	BUFFER_GBM_SURFACE, /**< internal EGL rendering */
+	BUFFER_DMA_BUF_SURFACE, /**< internal EGL rendering */
 	BUFFER_CURSOR, /**< internal cursor buffer */
 };
 
@@ -338,6 +339,10 @@ struct drm_fb {
 	/* Used by gbm fbs */
 	struct gbm_bo *bo;
 	struct gbm_surface *gbm_surface;
+
+	/* Used by dma buf surface fbs */
+	struct drm_output *output;
+	uint32_t buffer_index;
 
 	/* Used by dumb fbs */
 	void *map;
@@ -508,6 +513,9 @@ struct drm_output {
 	struct gbm_surface *gbm_surface;
 	uint32_t gbm_format;
 	uint32_t gbm_bo_flags;
+
+	struct gbm_bo *surface_bos[8];
+	uint32_t free_mask;
 
 	/* Plane being displayed directly on the CRTC */
 	struct drm_plane *scanout_plane;

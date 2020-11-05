@@ -98,6 +98,26 @@ struct gl_renderer_pbuffer_options {
 	unsigned drm_formats_count;
 };
 
+struct gl_renderer_dma_buf_pool {
+	uint32_t free_mask;
+	uint32_t current;
+};
+
+struct gl_renderer_dma_buf_options {
+	/* all must be single plane, offset 0 */
+	uint32_t width;
+	uint32_t height;
+	uint32_t format;
+	uint32_t stride;
+	uint64_t modifier;
+
+	struct gl_render_dma_buf_pool *pool;
+
+	/** Array of dma buf fds */
+	uint32_t dma_bufs[8];
+	unsigned count;
+};
+
 struct gl_renderer_interface {
 	/**
 	 * Initialize GL-renderer with the given EGL platform and native display
@@ -178,6 +198,9 @@ struct gl_renderer_interface {
 	int (*output_pbuffer_create)(struct weston_output *output,
 				     const struct gl_renderer_pbuffer_options *options);
 
+	int (*output_dma_buf_create)(struct weston_output *output,
+				     const struct gl_renderer_dma_buf_options *options);
+
 	void (*output_destroy)(struct weston_output *output);
 
 	/* Sets the output border.
@@ -218,4 +241,6 @@ struct gl_renderer_interface {
 	 * EGL_ANDROID_native_fence_sync extension.
 	 */
 	int (*create_fence_fd)(struct weston_output *output);
+
+	void (*set_front)(struct weston_output *output, int front);
 };

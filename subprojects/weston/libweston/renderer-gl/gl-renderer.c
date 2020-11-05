@@ -83,7 +83,15 @@ struct gl_border_image {
 	void *data;
 };
 
+struct gl_dma_buf_surface {
+	EGLImageKHR images[8];
+	GLuint textures[8];
+	GLuint fbo;
+	uint32_t front, count;
+};
+
 struct gl_output_state {
+	struct gl_dma_buf_surface *dma_buf_surface;
 	EGLSurface egl_surface;
 	pixman_region32_t buffer_damage[BUFFER_DAMAGE_COUNT];
 	int buffer_damage_index;
@@ -328,6 +336,86 @@ timeline_submit_render_sync(struct gl_renderer *gr,
 						 trp);
 
 	wl_list_insert(&go->timeline_render_point_list, &trp->link);
+}
+
+static struct gl_dma_buf_surface *
+gl_dma_buf_surface_create(struct gl_renderer *gr,
+			  const struct gl_renderer_dma_buf_options *options)
+{
+	struct gl_dma_buf_surface *surface;
+
+	surface = zalloc(sizeof *surface);
+	if (surface == NULL)
+		return NULL;
+
+	EGLint attribs[] = {
+		EGL_DMA_BUF_PLANE0_FD_EXT,
+		-1,
+		EGL_WIDTH,
+		options->width,
+		EGL_HEIGHT,
+		options->height,
+		EGL_LINUX_DRM_FOURCC_EXT,
+		options->format,
+		EGL_DMA_BUF_PLANE0_OFFSET_EXT,
+		0,
+		EGL_DMA_BUF_PLANE0_PITCH_EXT,
+		options->stride,
+		EGL_DMA_BUF_PLANE0_MODIFIER_LO_EXT,
+		options->modifier & 0xFFFFFFFF,
+		EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT,
+		options->modifier >> 32,
+		EGL_NONE,
+	};
+
+	glGenFramebuffers(1, &surface->fbo);
+	glGenTextures(options->count, surface->textures);
+	for (uint32_t i = 0; i < options->count; i++) {
+		attribs[1] = options->dma_bufs[i];
+		surface->images[i] = gr->create_image(gr->egl_display,
+						 EGL_NO_CONTEXT,
+						 EGL_LINUX_DMA_BUF_EXT,
+						 NULL, attribs);
+
+		glBindTexture(GL_TEXTURE_2D, surface->textures[i]);
+		glTexParameteri(GL_TEXTURE_2D,
+				GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D,
+				GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, surface->textures[i]);
+		gr->image_target_texture_2d(GL_TEXTURE_2D, surface->images[i]);
+	}
+
+	surface->count = options->count;
+
+	return surface;
+}
+
+static void
+gl_dma_buf_surface_destroy(struct gl_renderer *gr, struct gl_dma_buf_surface *surface)
+{
+	uint32_t i;
+
+	glDeleteTextures(surface->count, surface->textures);
+	glDeleteFramebuffers(1, &surface->fbo);
+
+	for (i = 0; i < surface->count; i++)
+		gr->destroy_image(gr->egl_display, surface->images[i]);
+
+	free(surface);
+}
+
+static void
+gl_dma_buf_surface_bind(struct gl_dma_buf_surface *surface)
+{
+	glBindFramebuffer(GL_FRAMEBUFFER, surface->fbo);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+			       surface->textures[surface->front], 0);
+
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+		weston_log("failed framebuffer check for created target buffer\n");
 }
 
 static struct egl_image*
@@ -697,6 +785,14 @@ repaint_region(struct weston_view *ev, pixman_region32_t *region,
 	gr->vtxcnt.size = 0;
 }
 
+static void
+gl_renderer_set_front(struct weston_output *output, int front)
+{
+	struct gl_output_state *go = get_output_state(output);
+
+	go->dma_buf_surface->front = front;
+}
+
 static int
 use_output(struct weston_output *output)
 {
@@ -705,16 +801,20 @@ use_output(struct weston_output *output)
 	struct gl_renderer *gr = get_renderer(output->compositor);
 	EGLBoolean ret;
 
-	ret = eglMakeCurrent(gr->egl_display, go->egl_surface,
-			     go->egl_surface, gr->egl_context);
+	if (go->dma_buf_surface) {
+		gl_dma_buf_surface_bind(go->dma_buf_surface);
+	} else {
+		ret = eglMakeCurrent(gr->egl_display, go->egl_surface,
+				     go->egl_surface, gr->egl_context);
 
-	if (ret == EGL_FALSE) {
-		if (errored)
+		if (ret == EGL_FALSE) {
+			if (errored)
+				return -1;
+			errored = 1;
+			weston_log("Failed to make EGL context current.\n");
+			gl_renderer_print_egl_error_state();
 			return -1;
-		errored = 1;
-		weston_log("Failed to make EGL context current.\n");
-		gl_renderer_print_egl_error_state();
-		return -1;
+		}
 	}
 
 	return 0;
@@ -1426,7 +1526,7 @@ gl_renderer_repaint_output(struct weston_output *output,
 				-(output->current_mode->height / 2.0), 0);
 	weston_matrix_scale(&go->output_matrix,
 			    2.0 / output->current_mode->width,
-			    -2.0 / output->current_mode->height, 1);
+			    2.0 / output->current_mode->height, 1);
 
 	/* In fan debug mode, redraw everything to make sure that we clear any
 	 * fans left over from previous draws on this buffer.
@@ -1484,7 +1584,11 @@ gl_renderer_repaint_output(struct weston_output *output,
 
 	go->end_render_sync = create_render_sync(gr);
 
-	if (gr->swap_buffers_with_damage && !gr->fan_debug) {
+	if (go->dma_buf_surface) {
+		glFlush();
+		glFinish();
+		ret = EGL_TRUE;
+	} else if (gr->swap_buffers_with_damage && !gr->fan_debug) {
 		int n_egl_rects;
 		EGLint *egl_rects;
 
@@ -3240,7 +3344,7 @@ gl_renderer_create_window_surface(struct gl_renderer *gr,
 
 static int
 gl_renderer_output_create(struct weston_output *output,
-			  EGLSurface surface)
+			  EGLSurface surface, struct gl_dma_buf_surface *dma_buf_surface)
 {
 	struct gl_output_state *go;
 	int i;
@@ -3250,6 +3354,7 @@ gl_renderer_output_create(struct weston_output *output,
 		return -1;
 
 	go->egl_surface = surface;
+	go->dma_buf_surface = dma_buf_surface;
 
 	for (i = 0; i < BUFFER_DAMAGE_COUNT; i++)
 		pixman_region32_init(&go->buffer_damage[i]);
@@ -3283,7 +3388,7 @@ gl_renderer_output_window_create(struct weston_output *output,
 		return -1;
 	}
 
-	ret = gl_renderer_output_create(output, egl_surface);
+	ret = gl_renderer_output_create(output, egl_surface, NULL);
 	if (ret < 0)
 		weston_platform_destroy_egl_surface(gr->egl_display, egl_surface);
 
@@ -3322,9 +3427,32 @@ gl_renderer_output_pbuffer_create(struct weston_output *output,
 		return -1;
 	}
 
-	ret = gl_renderer_output_create(output, egl_surface);
+	ret = gl_renderer_output_create(output, egl_surface, NULL);
 	if (ret < 0)
 		eglDestroySurface(gr->egl_display, egl_surface);
+
+	return ret;
+}
+
+static int
+gl_renderer_output_dma_buf_create(struct weston_output *output,
+				  const struct gl_renderer_dma_buf_options *options)
+{
+	struct weston_compositor *ec = output->compositor;
+	struct gl_renderer *gr = get_renderer(ec);
+	struct gl_dma_buf_surface *surface;
+	int ret;
+
+	surface = gl_dma_buf_surface_create(gr, options);
+	if (surface ==NULL) {
+		weston_log("failed to create egl surface\n");
+		gl_renderer_print_egl_error_state();
+		return -1;
+	}
+
+	ret = gl_renderer_output_create(output, NULL, surface);
+	if (ret < 0)
+		gl_dma_buf_surface_destroy(gr, surface);
 
 	return ret;
 }
@@ -3808,7 +3936,9 @@ WL_EXPORT struct gl_renderer_interface gl_renderer_interface = {
 	.display_create = gl_renderer_display_create,
 	.output_window_create = gl_renderer_output_window_create,
 	.output_pbuffer_create = gl_renderer_output_pbuffer_create,
+	.output_dma_buf_create = gl_renderer_output_dma_buf_create,
 	.output_destroy = gl_renderer_output_destroy,
 	.output_set_border = gl_renderer_output_set_border,
 	.create_fence_fd = gl_renderer_create_fence_fd,
+	.set_front = gl_renderer_set_front,
 };

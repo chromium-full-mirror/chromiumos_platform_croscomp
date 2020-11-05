@@ -99,7 +99,7 @@ drm_backend_create_gl_renderer(struct drm_backend *b)
 		0,
 	};
 	struct gl_renderer_display_options options = {
-		.egl_platform = EGL_PLATFORM_GBM_KHR,
+		.egl_platform = EGL_PLATFORM_SURFACELESS_MESA,
 		.egl_native_display = b->gbm,
 		.egl_surface_type = EGL_WINDOW_BIT,
 		.drm_formats = format,
@@ -181,14 +181,6 @@ err:
 int
 drm_output_init_egl(struct drm_output *output, struct drm_backend *b)
 {
-	uint32_t format[2] = {
-		output->gbm_format,
-		fallback_format_for(output->gbm_format),
-	};
-	struct gl_renderer_output_options options = {
-		.drm_formats = format,
-		.drm_formats_count = 1,
-	};
 	struct weston_mode *mode = output->base.current_mode;
 	struct drm_plane *plane = output->scanout_plane;
 	unsigned int i;
@@ -206,43 +198,89 @@ drm_output_init_egl(struct drm_output *output, struct drm_backend *b)
 		return -1;
 	}
 
+	if (true) {
+		struct gl_renderer_dma_buf_options options = {
+			.width = mode->width,
+			.height = mode->height,
+			.format = output->gbm_format,
+			.count = 4
+		};
+
+		for (uint32_t i = 0; i < options.count; i++) {
+			output->surface_bos[i] =
+				gbm_bo_create_with_modifiers(b->gbm,
+							     mode->width,
+							     mode->height,
+							     output->gbm_format,
+							     plane->formats[i].modifiers,
+							     plane->formats[i].count_modifiers);
+			options.dma_bufs[i] = gbm_bo_get_fd(output->surface_bos[i]);
+		}
+
+		options.stride = gbm_bo_get_stride(output->surface_bos[0]);
+		options.modifier = gbm_bo_get_modifier(output->surface_bos[0]);
+		if (gl_renderer->output_dma_buf_create(&output->base, &options) < 0) {
+			weston_log("failed to create gl renderer dma buf state\n");
+			for (uint32_t i = 0; i < options.count; i++) {
+				gbm_bo_destroy(output->surface_bos[i]);
+				output->surface_bos[i] = NULL;
+			}
+			return -1;
+		}
+
+		output->free_mask  = (1 << options.count) - 1;
+
+		for (uint32_t i = 0; i < options.count; i++)
+			close(options.dma_bufs[i]);
+
+	} else {
+		uint32_t format[2] = {
+			output->gbm_format,
+			fallback_format_for(output->gbm_format),
+		};
+		struct gl_renderer_output_options options = {
+			.drm_formats = format,
+			.drm_formats_count = 1,
+		};
+
 #ifdef HAVE_GBM_MODIFIERS
-	if (plane->formats[i].count_modifiers > 0) {
-		output->gbm_surface =
-			gbm_surface_create_with_modifiers(b->gbm,
-							  mode->width,
-							  mode->height,
-							  output->gbm_format,
-							  plane->formats[i].modifiers,
-							  plane->formats[i].count_modifiers);
-	}
+		if (plane->formats[i].count_modifiers > 0) {
+			output->gbm_surface =
+				gbm_surface_create_with_modifiers(b->gbm,
+								  mode->width,
+								  mode->height,
+								  output->gbm_format,
+								  plane->formats[i].modifiers,
+								  plane->formats[i].count_modifiers);
+		}
 
-	/* If allocating with modifiers fails, try again without. This can
-	 * happen when the KMS display device supports modifiers but the
-	 * GBM driver does not, e.g. the old i915 Mesa driver. */
-	if (!output->gbm_surface)
+		/* If allocating with modifiers fails, try again without. This can
+		 * happen when the KMS display device supports modifiers but the
+		 * GBM driver does not, e.g. the old i915 Mesa driver. */
+		if (!output->gbm_surface)
 #endif
-	{
-		output->gbm_surface =
-		    gbm_surface_create(b->gbm, mode->width, mode->height,
-				       output->gbm_format,
-				       output->gbm_bo_flags);
-	}
+			{
+				output->gbm_surface =
+					gbm_surface_create(b->gbm, mode->width, mode->height,
+							   output->gbm_format,
+							   output->gbm_bo_flags);
+			}
 
-	if (!output->gbm_surface) {
-		weston_log("failed to create gbm surface\n");
-		return -1;
-	}
+		if (!output->gbm_surface) {
+			weston_log("failed to create gbm surface\n");
+			return -1;
+		}
 
-	if (options.drm_formats[1])
-		options.drm_formats_count = 2;
-	options.window_for_legacy = (EGLNativeWindowType) output->gbm_surface;
-	options.window_for_platform = output->gbm_surface;
-	if (gl_renderer->output_window_create(&output->base, &options) < 0) {
-		weston_log("failed to create gl renderer output state\n");
-		gbm_surface_destroy(output->gbm_surface);
-		output->gbm_surface = NULL;
-		return -1;
+		if (options.drm_formats[1])
+			options.drm_formats_count = 2;
+		options.window_for_legacy = (EGLNativeWindowType) output->gbm_surface;
+		options.window_for_platform = output->gbm_surface;
+		if (gl_renderer->output_window_create(&output->base, &options) < 0) {
+			weston_log("failed to create gl renderer output state\n");
+			gbm_surface_destroy(output->gbm_surface);
+			output->gbm_surface = NULL;
+			return -1;
+		}
 	}
 
 	drm_output_init_cursor_egl(output, b);
@@ -276,25 +314,39 @@ drm_output_render_gl(struct drm_output_state *state, pixman_region32_t *damage)
 	struct drm_backend *b = to_drm_backend(output->base.compositor);
 	struct gbm_bo *bo;
 	struct drm_fb *ret;
+	uint32_t front;
+
+	if (!output->gbm_surface) {
+		front = ffs(output->free_mask) - 1;
+		output->free_mask &= ~(1 << front);
+		gl_renderer->set_front(&output->base, front);
+		bo = output->surface_bos[front];
+		ret = drm_fb_get_from_bo(bo, b, true, BUFFER_DMA_BUF_SURFACE);
+		ret->output = output;
+		ret->buffer_index = front;
+	}
 
 	output->base.compositor->renderer->repaint_output(&output->base,
 							  damage);
 
-	bo = gbm_surface_lock_front_buffer(output->gbm_surface);
-	if (!bo) {
-		weston_log("failed to lock front buffer: %s\n",
-			   strerror(errno));
-		return NULL;
-	}
+	if (output->gbm_surface) {
+		bo = gbm_surface_lock_front_buffer(output->gbm_surface);
+		if (!bo) {
+			weston_log("failed to lock front buffer: %s\n",
+				   strerror(errno));
+			return NULL;
+		}
 
-	/* The renderer always produces an opaque image. */
-	ret = drm_fb_get_from_bo(bo, b, true, BUFFER_GBM_SURFACE);
-	if (!ret) {
-		weston_log("failed to get drm_fb for bo\n");
-		gbm_surface_release_buffer(output->gbm_surface, bo);
-		return NULL;
+		/* The renderer always produces an opaque image. */
+		ret = drm_fb_get_from_bo(bo, b, true, BUFFER_GBM_SURFACE);
+		if (!ret) {
+			weston_log("failed to get drm_fb for bo\n");
+			if (output->gbm_surface)
+				gbm_surface_release_buffer(output->gbm_surface, bo);
+			return NULL;
+		}
+		ret->gbm_surface = output->gbm_surface;
 	}
-	ret->gbm_surface = output->gbm_surface;
 
 	return ret;
 }

@@ -494,6 +494,9 @@ drm_fb_unref(struct drm_fb *fb)
 	case BUFFER_GBM_SURFACE:
 		gbm_surface_release_buffer(fb->gbm_surface, fb->bo);
 		break;
+	case BUFFER_DMA_BUF_SURFACE:
+		fb->output->free_mask |= (1 << fb->buffer_index);
+		break;
 	case BUFFER_DMABUF:
 		drm_fb_destroy_dmabuf(fb);
 		break;
