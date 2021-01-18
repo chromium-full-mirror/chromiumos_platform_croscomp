@@ -672,6 +672,7 @@ usage(int error_code)
 #if defined(BUILD_DRM_COMPOSITOR)
 	fprintf(out,
 		"Options for drm-backend.so:\n\n"
+		"  --scale=SCALE\t\tScale factor of output\n"
 		"  --seat=SEAT\t\tThe seat that weston should run on, instead of the seat defined in XDG_SEAT\n"
 		"  --tty=TTY\t\tThe tty to use\n"
 		"  --drm-device=CARD\tThe DRM device to use, e.g. \"card0\".\n"
@@ -1713,6 +1714,8 @@ drm_backend_output_configure(struct weston_output *output,
 	char *gbm_format = NULL;
 	char *seat = NULL;
 
+	struct wet_output_config *parsed_options = wet->parsed_options;
+
 	api = weston_drm_output_get_api(output->compositor);
 	if (!api) {
 		weston_log("Cannot use weston_drm_output_api.\n");
@@ -1744,7 +1747,7 @@ drm_backend_output_configure(struct weston_output *output,
 		transform = weston_head_get_transform(head);
 	}
 
-	wet_output_set_scale(output, section, 1, 0);
+	wet_output_set_scale(output, section, 1, parsed_options->scale);
 	if (wet_output_set_transform(output, section, transform,
 				     UINT32_MAX) < 0) {
 		return -1;
@@ -2514,6 +2517,8 @@ load_drm_backend(struct weston_compositor *c,
 
 	wet->drm_use_current_mode = false;
 
+	struct wet_output_config *parsed_options = wet_init_parsed_options(c);
+
 	section = weston_config_get_section(wc, "core", NULL, NULL);
 	weston_config_section_get_bool(section, "use-pixman", &config.use_pixman,
 				       false);
@@ -2525,6 +2530,7 @@ load_drm_backend(struct weston_compositor *c,
 		{ WESTON_OPTION_BOOLEAN, "current-mode", 0, &wet->drm_use_current_mode },
 		{ WESTON_OPTION_BOOLEAN, "use-pixman", 0, &config.use_pixman },
 		{ WESTON_OPTION_BOOLEAN, "continue-without-input", 0, &config.continue_without_input },
+		{ WESTON_OPTION_INTEGER, "scale", 0, &parsed_options->scale },
 	};
 
 	parse_options(options, ARRAY_LENGTH(options), argc, argv);
