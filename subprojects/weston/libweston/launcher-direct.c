@@ -290,9 +290,6 @@ launcher_direct_connect(struct weston_launcher **out, struct weston_compositor *
 {
 	struct launcher_direct *launcher;
 
-	if (geteuid() != 0)
-		return -EINVAL;
-
 	launcher = zalloc(sizeof(*launcher));
 	if (launcher == NULL)
 		return -ENOMEM;
