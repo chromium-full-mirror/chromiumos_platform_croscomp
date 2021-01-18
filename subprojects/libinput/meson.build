@@ -124,7 +124,10 @@ endif
 pkgconfig = import('pkgconfig')
 dep_udev = dependency('libudev')
 dep_mtdev = dependency('mtdev', version : '>= 1.1.0')
-dep_libevdev = dependency('libevdev')
+
+proj_libevdev = subproject('libevdev', default_options: ['tests=disabled', 'documentation=disabled'])
+dep_libevdev = proj_libevdev.get_variable('dep_libevdev')
+
 dep_lm = cc.find_library('m', required : false)
 dep_rt = cc.find_library('rt', required : false)
 
@@ -396,7 +399,8 @@ lib_libinput = shared_library('input',
 
 dep_libinput = declare_dependency(
 		link_with : lib_libinput,
-		dependencies : deps_libinput)
+		dependencies : deps_libinput,
+		include_directories : [include_directories('src')])
 
 pkgconfig.generate(
 	filebase : 'libinput',

@@ -6,8 +6,8 @@ project('libevdev', 'c',
 
 libevdev_version = meson.project_version().split('.')
 
-dir_src         = join_paths(meson.source_root(), 'libevdev')
-dir_src_test    = join_paths(meson.source_root(), 'test')
+dir_src         = join_paths(meson.source_root(), 'subprojects', 'libevdev', 'libevdev')
+dir_src_test    = join_paths(meson.source_root(), 'subprojects', 'libevdev', 'test')
 
 # Include directories
 includes_include = include_directories('include')
@@ -38,9 +38,9 @@ config_h.set('_GNU_SOURCE', '1')
 pkgconfig = import('pkgconfig')
 dep_lm = cc.find_library('m')
 
-input_h = join_paths(meson.source_root(), 'include', 'linux', host_machine.system(), 'input.h')
-uinput_h = join_paths(meson.source_root(), 'include', 'linux', host_machine.system(), 'uinput.h')
-input_event_codes_h = join_paths(meson.source_root(), 'include', 'linux', host_machine.system(), 'input-event-codes.h')
+input_h = join_paths(meson.source_root(), 'subprojects', 'libevdev', 'include', 'linux', host_machine.system(), 'input.h')
+uinput_h = join_paths(meson.source_root(), 'subprojects', 'libevdev', 'include', 'linux', host_machine.system(), 'uinput.h')
+input_event_codes_h = join_paths(meson.source_root(), 'subprojects', 'libevdev', 'include', 'linux', host_machine.system(), 'input-event-codes.h')
 
 # event-names.h
 make_event_names = find_program('libevdev/make-event-names.py')
@@ -73,7 +73,7 @@ src_libevdev = [
 
 mapfile = join_paths(dir_src, 'libevdev.sym')
 version_flag = '-Wl,--version-script,@0@'.format(mapfile)
-lib_libevdev = library('evdev',
+lib_libevdev = library('evdev-fdo',
 	src_libevdev,
 	include_directories: [includes_include],
 	dependencies: [],
@@ -83,7 +83,8 @@ lib_libevdev = library('evdev',
 	install: true
 )
 
-dep_libevdev = declare_dependency(link_with: lib_libevdev)
+dep_libevdev = declare_dependency(link_with: lib_libevdev,
+	include_directories : include_directories('.'))
 
 pkgconfig.generate(
 	filebase: 'libevdev',

@@ -70,7 +70,7 @@ foreach a : global_args_maybe
 		global_args += a
 	endif
 endforeach
-add_global_arguments(global_args, language: 'c')
+# add_global_arguments(global_args, language: 'c')
 
 if cc.has_header_symbol('sys/sysmacros.h', 'major')
 	config_h.set('MAJOR_IN_SYSMACROS', 1)
@@ -140,13 +140,17 @@ endif
 dep_wayland_server = dependency('wayland-server', version: '>= 1.17.0')
 dep_wayland_client = dependency('wayland-client', version: '>= 1.17.0')
 dep_pixman = dependency('pixman-1', version: '>= 0.25.2')
-dep_libinput = dependency('libinput', version: '>= 0.8.0')
-dep_libevdev = dependency('libevdev')
 dep_libm = cc.find_library('m')
 dep_libdl = cc.find_library('dl')
 dep_libdrm = dependency('libdrm', version: '>= 2.4.86')
 dep_libdrm_headers = dep_libdrm.partial_dependency(compile_args: true)
 dep_threads = dependency('threads')
+
+proj_libevdev = subproject('libevdev', default_options: ['tests=disabled', 'documentation=disabled'])
+dep_libevdev = proj_libevdev.get_variable('dep_libevdev')
+
+proj_libinput = subproject('libinput', default_options: ['libwacom=false', 'documentation=false', 'debug-gui=false', 'tests=false'])
+dep_libinput = proj_libinput.get_variable('dep_libinput')
 
 subdir('include')
 subdir('protocol')

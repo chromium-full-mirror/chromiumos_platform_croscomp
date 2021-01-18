@@ -1,5 +1,7 @@
-dep_scanner = dependency('wayland-scanner', native: true)
-prog_scanner = find_program(dep_scanner.get_pkgconfig_variable('wayland_scanner'))
+#dep_scanner = dependency('wayland-scanner', native: true)
+#prog_scanner = find_program(dep_scanner.get_pkgconfig_variable('wayland_scanner'))
+
+prog_scanner = find_program('wayland-scanner')
 
 dep_wp = dependency('wayland-protocols', version: '>= 1.18')
 dir_wp_base = dep_wp.get_pkgconfig_variable('pkgdatadir')
@@ -59,9 +61,9 @@ foreach proto: generated_protocols
 			output_file = '@0@-server-protocol.h'.format(base_file)
 		else
 			output_file = '@0@-protocol.c'.format(base_file)
-			if dep_scanner.version().version_compare('< 1.14.91')
-				output_type = 'code'
-			endif
+#			if dep_scanner.version().version_compare('< 1.14.91')
+#				output_type = 'code'
+#			endif
 		endif
 
 		var_name = output_file.underscorify()
