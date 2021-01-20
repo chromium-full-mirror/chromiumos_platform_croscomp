@@ -56,22 +56,6 @@ config_h = configuration_data()
 
 cc = meson.get_compiler('c')
 
-global_args = []
-global_args_maybe = [
-	'-Wmissing-prototypes',
-	'-Wno-unused-parameter',
-	'-Wno-shift-negative-value', # required due to Pixman
-	'-Wno-missing-field-initializers',
-	'-Wno-pedantic',
-	'-fvisibility=hidden',
-]
-foreach a : global_args_maybe
-	if cc.has_argument(a)
-		global_args += a
-	endif
-endforeach
-# add_global_arguments(global_args, language: 'c')
-
 if cc.has_header_symbol('sys/sysmacros.h', 'major')
 	config_h.set('MAJOR_IN_SYSMACROS', 1)
 elif cc.has_header_symbol('sys/mkdev.h', 'major')
