@@ -93,6 +93,8 @@ weston_desktop_create(struct weston_compositor *compositor,
 
 	weston_desktop_xwayland_init(desktop);
 
+	exo_extensions_init(desktop, display);
+
 	return desktop;
 }
 

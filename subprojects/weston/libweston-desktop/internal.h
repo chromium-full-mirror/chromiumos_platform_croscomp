@@ -239,4 +239,9 @@ weston_desktop_wl_shell_create(struct weston_desktop *desktop,
 void
 weston_desktop_xwayland_init(struct weston_desktop *desktop);
 
+int
+exo_extensions_init(struct weston_desktop *desktop,
+		    struct wl_display *display);
+
+
 #endif /* WESTON_DESKTOP_INTERNAL_H */

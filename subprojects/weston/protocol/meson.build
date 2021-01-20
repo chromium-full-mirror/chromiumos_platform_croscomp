@@ -15,6 +15,21 @@ install_data(
 )
 
 generated_protocols = [
+	# exo extensions
+	[ 'alpha-compositing-unstable-v1', 'internal' ],
+	[ 'aura-shell', 'internal' ],
+	[ 'cursor-shapes-unstable-v1', 'internal' ],
+	[ 'gaming-input-unstable-v2', 'internal' ],
+	[ 'keyboard-configuration-unstable-v1', 'internal' ],
+	[ 'keyboard-extension-unstable-v1', 'internal' ],
+	[ 'pointer-gestures-unstable-v1', 'internal' ],
+	[ 'remote-shell-unstable-v1', 'internal' ],
+	[ 'secure-output-unstable-v1', 'internal' ],
+	[ 'stylus-tools-unstable-v1', 'internal' ],
+	[ 'stylus-unstable-v2', 'internal' ],
+	[ 'vsync-feedback-unstable-v1', 'internal' ],
+
+	# upstream weston extensions
 	[ 'input-method', 'v1' ],
 	[ 'input-timestamps', 'v1' ],
 	[ 'ivi-application', 'internal' ],
