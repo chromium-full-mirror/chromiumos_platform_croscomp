@@ -45,6 +45,7 @@
 #include <linux/input.h>
 #include <sys/time.h>
 #include <linux/limits.h>
+#include <grp.h>
 
 #include "weston.h"
 #include <libweston/libweston.h>
@@ -842,6 +843,37 @@ weston_create_listening_socket(struct wl_display *display, const char *socket_na
 	}
 
 	setenv("WAYLAND_DISPLAY", socket_name, 1);
+
+	char path[256];
+	const char *runtime_dir = getenv("XDG_RUNTIME_DIR");
+	assert(runtime_dir != NULL);
+	int name_size = snprintf(path, sizeof(path),
+				 "%s/%s", runtime_dir, socket_name);
+	if (name_size >= (int) sizeof(path)) {
+		weston_log("fatal: socket path too long\n");
+		return -1;
+	}
+
+	struct group wayland_group;
+	struct group* wayland_group_res = NULL;
+	char buf[1024];
+	if (getgrnam_r("wayland", &wayland_group, buf,
+		       sizeof(buf), &wayland_group_res) < 0 ||
+	    wayland_group_res == NULL) {
+		weston_log("fatal: failed to get group name: %s\n",
+			   strerror(errno));
+		return -1;
+	}
+	if (chown(path, -1, wayland_group.gr_gid) < 0) {
+		weston_log("fatal: failed to chown socket: %s\n",
+			   strerror(errno));
+		return -1;
+	}
+	if (chmod(path, 0660) < 0) {
+		weston_log("fatal: failed to chmod socket: %s\n",
+			   strerror(errno));
+		return -1;
+	}
 
 	return 0;
 }
