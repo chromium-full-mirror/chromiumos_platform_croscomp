@@ -1129,7 +1129,8 @@ weston_seat_send_selection(struct weston_seat *seat, struct wl_client *client)
 							      data_device);
 			wl_data_device_send_selection(data_device, offer->resource);
 		} else {
-			wl_data_device_send_selection(data_device, NULL);
+			/* arc++ freaks out if we send a NULL offer. */
+			/*wl_data_device_send_selection(data_device, NULL);*/
 		}
 	}
 }
