@@ -4418,13 +4418,15 @@ subsurface_place_above(struct wl_client *client,
 	if (!sub)
 		return;
 
-	sibling = subsurface_sibling_check(sub, surface, "place_above");
-	if (!sibling)
-		return;
+	sibling = subsurface_find_sibling(sub, surface);
 
 	wl_list_remove(&sub->parent_link_pending);
-	wl_list_insert(sibling->parent_link_pending.prev,
-		       &sub->parent_link_pending);
+	if (sibling)
+		wl_list_insert(sibling->parent_link_pending.prev,
+			       &sub->parent_link_pending);
+	else
+		wl_list_insert(sub->parent->subsurface_list_pending.next,
+			       &sub->parent_link_pending);
 
 	sub->reordered = true;
 }
