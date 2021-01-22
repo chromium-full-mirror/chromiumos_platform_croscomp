@@ -2441,6 +2441,9 @@ drm_destroy(struct weston_compositor *ec)
 
 	close(b->drm.fd);
 	free(b->drm.filename);
+
+	free(b->seat_id);
+
 	free(b);
 }
 
@@ -2819,6 +2822,21 @@ recorder_binding(struct weston_keyboard *keyboard, const struct timespec *time,
 #endif
 
 
+static int
+drm_init_input(struct weston_compositor *compositor)
+{
+	struct drm_backend *b = to_drm_backend(compositor);
+
+	if (udev_input_init(&b->input,
+			    compositor, b->udev, b->seat_id,
+			    b->configure_device) < 0) {
+		weston_log("failed to create input devices\n");
+		return -1;
+	}
+
+	return 0;
+}	
+
 static const struct weston_drm_output_api api = {
 	drm_output_set_mode,
 	drm_output_set_gbm_format,
@@ -2848,6 +2866,9 @@ drm_backend_create(struct weston_compositor *compositor,
 	b = zalloc(sizeof *b);
 	if (b == NULL)
 		return NULL;
+
+	b->seat_id = strdup(seat_id);
+	b->configure_device = config->configure_device;
 
 	b->state_invalid = true;
 	b->drm.fd = -1;
@@ -2920,15 +2941,16 @@ drm_backend_create(struct weston_compositor *compositor,
 	b->base.create_output = drm_output_create;
 	b->base.device_changed = drm_device_changed;
 	b->base.can_scanout_dmabuf = drm_can_scanout_dmabuf;
+	b->base.init_input = drm_init_input;
 
 	weston_setup_vt_switch_bindings(compositor);
 
 	wl_list_init(&b->plane_list);
 	create_sprites(b);
 
-	if (udev_input_init(&b->input,
-			    compositor, b->udev, seat_id,
-			    config->configure_device) < 0) {
+	if (0 && udev_input_init(&b->input,
+				 compositor, b->udev, seat_id,
+				 config->configure_device) < 0) {
 		weston_log("failed to create input devices\n");
 		goto err_sprite;
 	}

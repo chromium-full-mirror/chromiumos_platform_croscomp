@@ -218,6 +218,7 @@ struct desktop_shell {
 	char *client;
 
 	struct timespec startup_time;
+	bool initialized_inputs;
 };
 
 struct weston_output *

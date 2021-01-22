@@ -301,6 +301,10 @@ struct drm_backend {
 	bool fb_modifiers;
 
 	struct weston_log_scope *debug;
+
+	char *seat_id;
+	void (*configure_device)(struct weston_compositor *compositor,
+				 struct libinput_device *device);
 };
 
 struct drm_mode {

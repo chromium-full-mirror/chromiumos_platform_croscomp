@@ -1794,6 +1794,8 @@ int
 weston_compositor_load_backend(struct weston_compositor *compositor,
 			       enum weston_compositor_backend backend,
 			       struct weston_backend_config *config_base);
+int
+weston_compositor_init_input(struct weston_compositor *compositor);
 void
 weston_compositor_exit(struct weston_compositor *ec);
 void *

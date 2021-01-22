@@ -4045,6 +4045,11 @@ shell_fade_done_for_output(struct weston_view_animation *animation, void *data)
 	default:
 		break;
 	}
+
+	if (!shell->initialized_inputs) {
+		weston_compositor_init_input(shell->compositor);
+		shell->initialized_inputs = true;
+	}
 }
 
 static struct weston_view *
@@ -4066,7 +4071,7 @@ shell_fade_create_surface_for_output(struct desktop_shell *shell, struct shell_o
 
 	weston_surface_set_size(surface, shell_output->output->width, shell_output->output->height);
 	weston_view_set_position(view, shell_output->output->x, shell_output->output->y);
-	weston_surface_set_color(surface, 0.0, 0.0, 0.0, 1.0);
+	weston_surface_set_color(surface, 1.0, 1.0, 1.0, 1.0);
 	weston_layer_entry_insert(&compositor->fade_layer.view_list,
 				  &view->layer_link);
 	pixman_region32_init(&surface->input);

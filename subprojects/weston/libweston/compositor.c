@@ -7898,6 +7898,12 @@ weston_compositor_load_backend(struct weston_compositor *compositor,
 	return 0;
 }
 
+WL_EXPORT int
+weston_compositor_init_input(struct weston_compositor *compositor)
+{
+	return compositor->backend->init_input(compositor);
+}
+
 /** weston_compositor_load_xwayland
  * \ingroup compositor
  */
