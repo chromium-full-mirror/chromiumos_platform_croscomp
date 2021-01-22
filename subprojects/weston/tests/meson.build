@@ -1,13 +1,3 @@
-plugin_test_shell_desktop = shared_library(
-	'weston-test-desktop-shell',
-	'weston-test-desktop-shell.c',
-	include_directories: common_inc,
-	dependencies: [ dep_lib_desktop, dep_libweston_public ],
-	name_prefix: '',
-	install: false
-)
-env_modmap += 'weston-test-desktop-shell.so=@0@;'.format(plugin_test_shell_desktop.full_path())
-
 lib_test_runner = static_library(
 	'test-runner',
 	'weston-test-runner.c',
