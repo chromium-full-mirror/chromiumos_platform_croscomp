@@ -122,6 +122,16 @@ simple_clients = [
 		],
 		'dep_objs': [ dep_wayland_client, dep_libshared ]
 	},
+	{
+		'name': 'splash',
+		'sources': [
+			'splash.c',
+			xdg_shell_client_protocol_h,
+			xdg_shell_protocol_c,
+		],
+		'dep_objs': [ dep_wayland_client, dep_libshared, dep_lib_cairo_shared ]
+	},
+
 ]
 
 simple_clients_enabled = get_option('simple-clients')

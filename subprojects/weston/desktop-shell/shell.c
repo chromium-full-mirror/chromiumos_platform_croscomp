@@ -4428,6 +4428,8 @@ launch_desktop_shell_process(void *data)
 {
 	struct desktop_shell *shell = data;
 
+	weston_client_start(shell->compositor, "/usr/bin/weston-simple-splash");
+
 	shell->child.client = weston_client_start(shell->compositor,
 						  shell->client);
 
