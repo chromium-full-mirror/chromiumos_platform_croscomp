@@ -5,7 +5,6 @@ if get_option('shell-desktop')
 		'shell.c',
 		'exposay.c',
 		'input-panel.c',
-		'libweston-desktop.c',
 		'client.c',
 		'seat.c',
 		'surface.c',

@@ -37,7 +37,7 @@
 #include "vsync-feedback-unstable-v1-server-protocol.h"
 
 #include <libweston/libweston.h>
-#include <libweston-desktop/libweston-desktop.h>
+#include "libweston-desktop.h"
 #include "internal.h"
 
 
