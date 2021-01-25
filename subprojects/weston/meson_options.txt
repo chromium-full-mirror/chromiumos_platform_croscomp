@@ -73,19 +73,6 @@ option(
 )
 
 option(
-	'xwayland',
-	type: 'boolean',
-	value: true,
-	description: 'Xwayland: support for X11 clients inside Weston'
-)
-option(
-	'xwayland-path',
-	type: 'string',
-	value: '/usr/bin/Xwayland',
-	description: 'Xwayland: path to installed Xwayland binary'
-)
-
-option(
 	'systemd',
 	type: 'boolean',
 	value: true,

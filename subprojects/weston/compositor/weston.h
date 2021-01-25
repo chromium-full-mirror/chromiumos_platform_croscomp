@@ -84,9 +84,6 @@ wet_get_libexec_path(const char *name);
 char *
 wet_get_bindir_path(const char *name);
 
-int
-wet_load_xwayland(struct weston_compositor *comp);
-
 struct text_backend;
 
 struct text_backend *

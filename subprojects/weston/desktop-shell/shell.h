@@ -28,7 +28,6 @@
 #include <time.h>
 
 #include <libweston/libweston.h>
-#include <libweston/xwayland-api.h>
 
 #include "weston-desktop-shell-server-protocol.h"
 
@@ -132,11 +131,9 @@ struct weston_desktop;
 struct desktop_shell {
 	struct weston_compositor *compositor;
 	struct weston_desktop *desktop;
-	const struct weston_xwayland_surface_api *xwayland_surface_api;
 
 	struct wl_listener idle_listener;
 	struct wl_listener wake_listener;
-	struct wl_listener transform_listener;
 	struct wl_listener resized_listener;
 	struct wl_listener destroy_listener;
 	struct wl_listener show_input_panel_listener;

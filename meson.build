@@ -57,5 +57,4 @@ proj_weston = subproject('weston', default_options: [
 	'test-gl-renderer=true',
 	'test-junit-xml=false',
 	'wcap-decode=false',
-	'weston-launch=false',
-	'xwayland=false'])
+	'weston-launch=false'])

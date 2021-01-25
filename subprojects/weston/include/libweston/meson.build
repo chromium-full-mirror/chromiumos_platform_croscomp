@@ -16,8 +16,6 @@ backend_rdp_h =      files('backend-rdp.h')
 backend_wayland_h =  files('backend-wayland.h')
 backend_x11_h =      files('backend-x11.h')
 
-xwayland_api_h = files('xwayland-api.h')
-
 libweston_version_h = configuration_data()
 libweston_version_h.set('WESTON_VERSION_MAJOR', version_weston_arr[0])
 libweston_version_h.set('WESTON_VERSION_MINOR', version_weston_arr[1])

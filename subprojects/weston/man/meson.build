@@ -5,7 +5,6 @@ man_conf.set('libweston_modules_dir', dir_module_libweston)
 man_conf.set('weston_shell_client', get_option('desktop-shell-client-default'))
 man_conf.set('weston_libexecdir', dir_libexec)
 man_conf.set('weston_bindir', dir_bin)
-man_conf.set('xserver_path', get_option('xwayland-path'))
 man_conf.set('version', version_weston)
 
 configure_file(

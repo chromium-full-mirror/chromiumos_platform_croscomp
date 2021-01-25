@@ -653,9 +653,6 @@ usage(int error_code)
 		"  --shell=MODULE\tShell module, defaults to desktop-shell.so\n"
 		"  -S, --socket=NAME\tName of socket to listen on\n"
 		"  -i, --idle-time=SECS\tIdle time in seconds\n"
-#if defined(BUILD_XWAYLAND)
-		"  --xwayland\t\tLoad the xwayland module\n"
-#endif
 		"  --modules\t\tLoad the comma-separated list of modules\n"
 		"  --log=FILE\t\tLog to the given file\n"
 		"  -c, --config=FILE\tConfig file to load, defaults to weston.ini\n"
@@ -986,7 +983,7 @@ wet_get_bindir_path(const char *name)
 
 static int
 load_modules(struct weston_compositor *ec, const char *modules,
-	     int *argc, char *argv[], bool *xwayland)
+	     int *argc, char *argv[])
 {
 	const char *p, *end;
 	char buffer[256];
@@ -999,16 +996,8 @@ load_modules(struct weston_compositor *ec, const char *modules,
 		end = strchrnul(p, ',');
 		snprintf(buffer, sizeof buffer, "%.*s", (int) (end - p), p);
 
-		if (strstr(buffer, "xwayland.so")) {
-			weston_log("Old Xwayland module loading detected: "
-				   "Please use --xwayland command line option "
-				   "or set xwayland=true in the [core] section "
-				   "in weston.ini\n");
-			*xwayland = true;
-		} else {
-			if (wet_load_module(ec, buffer, argc, argv) < 0)
-				return -1;
-		}
+		if (wet_load_module(ec, buffer, argc, argv) < 0)
+			return -1;
 
 		p = end;
 		while (*p == ',')
@@ -3097,14 +3086,6 @@ copy_command_line(int argc, char * const argv[])
 	return str;
 }
 
-#if !defined(BUILD_XWAYLAND)
-int
-wet_load_xwayland(struct weston_compositor *comp)
-{
-	return -1;
-}
-#endif
-
 static void
 weston_log_setup_scopes(struct weston_log_context *log_ctx,
 			struct weston_log_subscriber *subscriber,
@@ -3163,7 +3144,6 @@ wet_main(int argc, char *argv[])
 	int i, fd;
 	char *backend = NULL;
 	char *shell = NULL;
-	bool xwayland = false;
 	char *modules = NULL;
 	char *option_modules = NULL;
 	char *log = NULL;
@@ -3197,9 +3177,6 @@ wet_main(int argc, char *argv[])
 		{ WESTON_OPTION_STRING, "shell", 0, &shell },
 		{ WESTON_OPTION_STRING, "socket", 'S', &socket_name },
 		{ WESTON_OPTION_INTEGER, "idle-time", 'i', &idle_time },
-#if defined(BUILD_XWAYLAND)
-		{ WESTON_OPTION_BOOLEAN, "xwayland", 0, &xwayland },
-#endif
 		{ WESTON_OPTION_STRING, "modules", 0, &option_modules },
 		{ WESTON_OPTION_STRING, "log", 0, &log },
 		{ WESTON_OPTION_BOOLEAN, "help", 'h', &help },
@@ -3397,20 +3374,11 @@ wet_main(int argc, char *argv[])
 		goto out;
 
 	weston_config_section_get_string(section, "modules", &modules, "");
-	if (load_modules(wet.compositor, modules, &argc, argv, &xwayland) < 0)
+	if (load_modules(wet.compositor, modules, &argc, argv) < 0)
 		goto out;
 
-	if (load_modules(wet.compositor, option_modules, &argc, argv, &xwayland) < 0)
+	if (load_modules(wet.compositor, option_modules, &argc, argv) < 0)
 		goto out;
-
-	if (!xwayland) {
-		weston_config_section_get_bool(section, "xwayland", &xwayland,
-					       false);
-	}
-	if (xwayland) {
-		if (wet_load_xwayland(wet.compositor) < 0)
-			goto out;
-	}
 
 	section = weston_config_get_section(config, "keyboard", NULL, NULL);
 	weston_config_section_get_bool(section, "numlock-on", &numlock_on, false);

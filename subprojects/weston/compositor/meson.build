@@ -20,13 +20,6 @@ deps_weston = [
 	dep_threads,
 ]
 
-if get_option('xwayland')
-	config_h.set('BUILD_XWAYLAND', '1')
-
-	srcs_weston += 'xwayland.c'
-	config_h.set_quoted('XSERVER_PATH', get_option('xwayland-path'))
-endif
-
 libexec_weston = shared_library(
 	'exec_weston',
 	sources: srcs_weston,

@@ -998,8 +998,6 @@ typedef int (*weston_touch_calibration_save_func)(
 	const struct weston_touch_device_matrix *calibration);
 struct weston_touch_calibrator;
 
-struct weston_desktop_xwayland;
-struct weston_desktop_xwayland_interface;
 struct weston_debug_compositor;
 
 /** Main object, container-like structure which aggregates all other objects.
@@ -1010,8 +1008,6 @@ struct weston_compositor {
 	struct wl_signal destroy_signal;
 
 	struct wl_display *wl_display;
-	struct weston_desktop_xwayland *xwayland;
-	const struct weston_desktop_xwayland_interface *xwayland_interface;
 
 	/* surface signals */
 	struct wl_signal create_surface_signal;
@@ -1935,9 +1931,6 @@ weston_seat_set_keyboard_focus(struct weston_seat *seat,
 void
 weston_keyboard_send_keymap(struct weston_keyboard *kbd,
 			    struct wl_resource *resource);
-
-int
-weston_compositor_load_xwayland(struct weston_compositor *compositor);
 
 bool
 weston_head_is_connected(struct weston_head *head);

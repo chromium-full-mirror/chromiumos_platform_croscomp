@@ -7904,22 +7904,6 @@ weston_compositor_init_input(struct weston_compositor *compositor)
 	return compositor->backend->init_input(compositor);
 }
 
-/** weston_compositor_load_xwayland
- * \ingroup compositor
- */
-WL_EXPORT int
-weston_compositor_load_xwayland(struct weston_compositor *compositor)
-{
-	int (*module_init)(struct weston_compositor *ec);
-
-	module_init = weston_load_module("xwayland.so", "weston_module_init");
-	if (!module_init)
-		return -1;
-	if (module_init(compositor) < 0)
-		return -1;
-	return 0;
-}
-
 /** Resolve an internal compositor error by disconnecting the client.
  *
  * This function is used in cases when the wl_buffer turns out

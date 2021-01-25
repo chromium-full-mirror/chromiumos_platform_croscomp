@@ -2640,8 +2640,6 @@ weston_desktop_create(struct weston_compositor *compositor, void *user_data)
 		return NULL;
 	}
 
-	weston_desktop_xwayland_init(desktop);
-
 	exo_extensions_init(desktop, display);
 
 	return desktop;
@@ -4333,35 +4331,6 @@ wake_handler(struct wl_listener *listener, void *data)
 }
 
 static void
-transform_handler(struct wl_listener *listener, void *data)
-{
-	struct weston_surface *surface = data;
-	struct shell_surface *shsurf = get_shell_surface(surface);
-	const struct weston_xwayland_surface_api *api;
-	int x, y;
-
-	if (!shsurf)
-		return;
-
-	api = shsurf->shell->xwayland_surface_api;
-	if (!api) {
-		api = weston_xwayland_surface_get_api(shsurf->shell->compositor);
-		shsurf->shell->xwayland_surface_api = api;
-	}
-
-	if (!api || !api->is_xwayland_surface(surface))
-		return;
-
-	if (!weston_view_is_mapped(shsurf->view))
-		return;
-
-	x = shsurf->view->geometry.x;
-	y = shsurf->view->geometry.y;
-
-	api->send_position(surface, x, y);
-}
-
-static void
 center_on_output(struct weston_view *view, struct weston_output *output)
 {
 	int32_t surf_x, surf_y, width, height;
@@ -5106,7 +5075,6 @@ shell_destroy(struct wl_listener *listener, void *data)
 	wl_list_remove(&shell->destroy_listener.link);
 	wl_list_remove(&shell->idle_listener.link);
 	wl_list_remove(&shell->wake_listener.link);
-	wl_list_remove(&shell->transform_listener.link);
 
 	text_backend_destroy(shell->text_backend);
 	input_panel_destroy(shell);
@@ -5263,8 +5231,6 @@ wet_shell_init(struct weston_compositor *ec,
 	wl_signal_add(&ec->idle_signal, &shell->idle_listener);
 	shell->wake_listener.notify = wake_handler;
 	wl_signal_add(&ec->wake_signal, &shell->wake_listener);
-	shell->transform_listener.notify = transform_handler;
-	wl_signal_add(&ec->transform_signal, &shell->transform_listener);
 
 	weston_layer_init(&shell->fullscreen_layer, ec);
 	weston_layer_init(&shell->panel_layer, ec);

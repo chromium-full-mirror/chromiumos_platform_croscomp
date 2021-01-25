@@ -8,7 +8,6 @@ if get_option('shell-desktop')
 		'client.c',
 		'seat.c',
 		'surface.c',
-		'xwayland.c',
 		'wl-shell.c',
 		'xdg-shell.c',
 		'xdg-shell-v6.c',
