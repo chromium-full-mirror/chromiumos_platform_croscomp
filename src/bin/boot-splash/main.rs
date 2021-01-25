@@ -6,8 +6,8 @@ use std::{cmp::min, io::Write, os::unix::io::AsRawFd};
 
 use wayland_client::{
     event_enum,
-    protocol::{wl_compositor, wl_keyboard, wl_pointer, wl_seat, wl_shell, wl_shm},
-    Display, Filter, GlobalManager,
+    protocol::{wl_compositor, wl_keyboard, wl_pointer, wl_shell, wl_shm},
+    Display, GlobalManager,
 };
 
 // declare an event enum containing the events we want to receive in the iterator
@@ -99,66 +99,6 @@ fn main() {
     shell_surface.set_toplevel();
     surface.attach(Some(&buffer), 0, 0);
     surface.commit();
-
-    // initialize a seat to retrieve pointer & keyboard events
-    //
-    // example of using a common filter to handle both pointer & keyboard events
-    let common_filter = Filter::new(move |event, _, _| match event {
-        Events::Pointer { event, .. } => match event {
-            wl_pointer::Event::Enter { surface_x, surface_y, .. } => {
-                println!("Pointer entered at ({}, {}).", surface_x, surface_y);
-            }
-            wl_pointer::Event::Leave { .. } => {
-                println!("Pointer left.");
-            }
-            wl_pointer::Event::Motion { surface_x, surface_y, .. } => {
-                println!("Pointer moved to ({}, {}).", surface_x, surface_y);
-            }
-            wl_pointer::Event::Button { button, state, .. } => {
-                println!("Button {} was {:?}.", button, state);
-            }
-            _ => {}
-        },
-        Events::Keyboard { event, .. } => match event {
-            wl_keyboard::Event::Enter { .. } => {
-                println!("Gained keyboard focus.");
-            }
-            wl_keyboard::Event::Leave { .. } => {
-                println!("Lost keyboard focus.");
-            }
-            wl_keyboard::Event::Key { key, state, .. } => {
-                println!("Key with id {} was {:?}.", key, state);
-            }
-            _ => (),
-        },
-    });
-    // to be handled properly this should be more dynamic, as more
-    // than one seat can exist (and they can be created and destroyed
-    // dynamically), however most "traditional" setups have a single
-    // seat, so we'll keep it simple here
-    let mut pointer_created = false;
-    let mut keyboard_created = false;
-    globals.instantiate_exact::<wl_seat::WlSeat>(1).unwrap().quick_assign(move |seat, event, _| {
-        // The capabilities of a seat are known at runtime and we retrieve
-        // them via an events. 3 capabilities exists: pointer, keyboard, and touch
-        // we are only interested in pointer & keyboard here
-        use wayland_client::protocol::wl_seat::{Capability, Event as SeatEvent};
-
-        if let SeatEvent::Capabilities { capabilities } = event {
-            if !pointer_created && capabilities.contains(Capability::Pointer) {
-                // create the pointer only once
-                pointer_created = true;
-                seat.get_pointer().assign(common_filter.clone());
-            }
-            if !keyboard_created && capabilities.contains(Capability::Keyboard) {
-                // create the keyboard only once
-                keyboard_created = true;
-                seat.get_keyboard().assign(common_filter.clone());
-            }
-        }
-    });
-
-    event_queue.sync_roundtrip(&mut (), |_, _, _| { /* we ignore unfiltered messages */ }).unwrap();
 
     loop {
         event_queue.dispatch(&mut (), |_, _, _| { /* we ignore unfiltered messages */ }).unwrap();
