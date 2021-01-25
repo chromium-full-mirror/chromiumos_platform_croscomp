@@ -1940,89 +1940,6 @@ gl_renderer_attach_shm(struct weston_surface *es, struct weston_buffer *buffer,
 }
 
 static void
-gl_renderer_attach_egl(struct weston_surface *es, struct weston_buffer *buffer,
-		       uint32_t format)
-{
-	struct weston_compositor *ec = es->compositor;
-	struct gl_renderer *gr = get_renderer(ec);
-	struct gl_surface_state *gs = get_surface_state(es);
-	EGLint attribs[3];
-	int i, num_planes;
-
-	buffer->legacy_buffer = (struct wl_buffer *)buffer->resource;
-	gr->query_buffer(gr->egl_display, buffer->legacy_buffer,
-			 EGL_WIDTH, &buffer->width);
-	gr->query_buffer(gr->egl_display, buffer->legacy_buffer,
-			 EGL_HEIGHT, &buffer->height);
-	gr->query_buffer(gr->egl_display, buffer->legacy_buffer,
-			 EGL_WAYLAND_Y_INVERTED_WL, &buffer->y_inverted);
-
-	for (i = 0; i < gs->num_images; i++) {
-		egl_image_unref(gs->images[i]);
-		gs->images[i] = NULL;
-	}
-	gs->num_images = 0;
-	gs->target = GL_TEXTURE_2D;
-	es->is_opaque = false;
-	switch (format) {
-	case EGL_TEXTURE_RGB:
-		es->is_opaque = true;
-		/* fallthrough */
-	case EGL_TEXTURE_RGBA:
-	default:
-		num_planes = 1;
-		gs->shader = &gr->texture_shader_rgba;
-		break;
-	case EGL_TEXTURE_EXTERNAL_WL:
-		num_planes = 1;
-		gs->target = GL_TEXTURE_EXTERNAL_OES;
-		gs->shader = &gr->texture_shader_egl_external;
-		break;
-	case EGL_TEXTURE_Y_UV_WL:
-		num_planes = 2;
-		gs->shader = &gr->texture_shader_y_uv;
-		es->is_opaque = true;
-		break;
-	case EGL_TEXTURE_Y_U_V_WL:
-		num_planes = 3;
-		gs->shader = &gr->texture_shader_y_u_v;
-		es->is_opaque = true;
-		break;
-	case EGL_TEXTURE_Y_XUXV_WL:
-		num_planes = 2;
-		gs->shader = &gr->texture_shader_y_xuxv;
-		es->is_opaque = true;
-		break;
-	}
-
-	ensure_textures(gs, num_planes);
-	for (i = 0; i < num_planes; i++) {
-		attribs[0] = EGL_WAYLAND_PLANE_WL;
-		attribs[1] = i;
-		attribs[2] = EGL_NONE;
-		gs->images[i] = egl_image_create(gr,
-						 EGL_WAYLAND_BUFFER_WL,
-						 buffer->legacy_buffer,
-						 attribs);
-		if (!gs->images[i]) {
-			weston_log("failed to create img for plane %d\n", i);
-			continue;
-		}
-		gs->num_images++;
-
-		glActiveTexture(GL_TEXTURE0 + i);
-		glBindTexture(gs->target, gs->textures[i]);
-		gr->image_target_texture_2d(gs->target,
-					    gs->images[i]->image);
-	}
-
-	gs->pitch = buffer->width;
-	gs->height = buffer->height;
-	gs->buffer_type = BUFFER_TYPE_EGL;
-	gs->y_inverted = buffer->y_inverted;
-}
-
-static void
 gl_renderer_destroy_dmabuf(struct linux_dmabuf_buffer *dmabuf)
 {
 	struct dmabuf_image *image = linux_dmabuf_buffer_get_user_data(dmabuf);
@@ -2740,18 +2657,10 @@ gl_renderer_attach(struct weston_surface *es, struct weston_buffer *buffer)
 
 	if (shm_buffer)
 		gl_renderer_attach_shm(es, buffer, shm_buffer);
-	else if (gr->has_bind_display &&
-		 gr->query_buffer(gr->egl_display, (void *)buffer->resource,
-				  EGL_TEXTURE_FORMAT, &format))
-		gl_renderer_attach_egl(es, buffer, format);
 	else if ((dmabuf = linux_dmabuf_buffer_get(buffer->resource)))
 		gl_renderer_attach_dmabuf(es, buffer, dmabuf);
 	else {
 		weston_log("unhandled buffer type!\n");
-		if (gr->has_bind_display) {
-		  weston_log("eglQueryWaylandBufferWL failed\n");
-		  gl_renderer_print_egl_error_state();
-		}
 		weston_buffer_reference(&gs->buffer_ref, NULL);
 		weston_buffer_release_reference(&gs->buffer_release_ref, NULL);
 		gs->buffer_type = BUFFER_TYPE_NULL;
@@ -3515,9 +3424,6 @@ gl_renderer_destroy(struct weston_compositor *ec)
 
 	wl_signal_emit(&gr->destroy_signal, gr);
 
-	if (gr->has_bind_display)
-		gr->unbind_display(gr->egl_display, ec->wl_display);
-
 	/* Work around crash in egl_dri2.c's dri2_make_current() - when does this apply? */
 	eglMakeCurrent(gr->egl_display,
 		       EGL_NO_SURFACE, EGL_NO_SURFACE,
@@ -3925,9 +3831,6 @@ gl_renderer_setup(struct weston_compositor *ec)
 		ec->read_format == PIXMAN_a8r8g8b8 ? "BGRA" : "RGBA");
 	weston_log_continue(STAMP_SPACE "wl_shm sub-image to texture: %s\n",
 			    gr->has_unpack_subimage ? "yes" : "no");
-	weston_log_continue(STAMP_SPACE "EGL Wayland extension: %s\n",
-			    gr->has_bind_display ? "yes" : "no");
-
 
 	return 0;
 }

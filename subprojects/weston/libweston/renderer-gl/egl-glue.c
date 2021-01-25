@@ -586,18 +586,11 @@ gl_renderer_setup_egl_extensions(struct weston_compositor *ec)
 	};
 	struct gl_renderer *gr = get_renderer(ec);
 	const char *extensions;
-	EGLBoolean ret;
 	unsigned i;
 
 	gr->create_image = (void *) eglGetProcAddress("eglCreateImageKHR");
 	gr->destroy_image = (void *) eglGetProcAddress("eglDestroyImageKHR");
 
-	gr->bind_display =
-		(void *) eglGetProcAddress("eglBindWaylandDisplayWL");
-	gr->unbind_display =
-		(void *) eglGetProcAddress("eglUnbindWaylandDisplayWL");
-	gr->query_buffer =
-		(void *) eglGetProcAddress("eglQueryWaylandBufferWL");
 	gr->set_damage_region =
 		(void *) eglGetProcAddress("eglSetDamageRegionKHR");
 
@@ -610,17 +603,6 @@ gl_renderer_setup_egl_extensions(struct weston_compositor *ec)
 
 	if (weston_check_egl_extension(extensions, "EGL_IMG_context_priority"))
 		gr->has_context_priority = true;
-
-	if (weston_check_egl_extension(extensions, "EGL_WL_bind_wayland_display"))
-		gr->has_bind_display = true;
-	if (gr->has_bind_display) {
-		assert(gr->bind_display);
-		assert(gr->unbind_display);
-		assert(gr->query_buffer);
-		ret = gr->bind_display(gr->egl_display, ec->wl_display);
-		if (!ret)
-			gr->has_bind_display = false;
-	}
 
 	if (weston_check_egl_extension(extensions, "EGL_EXT_buffer_age"))
 		gr->has_egl_buffer_age = true;

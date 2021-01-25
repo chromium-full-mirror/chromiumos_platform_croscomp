@@ -70,11 +70,6 @@ struct gl_renderer {
 
 	bool has_unpack_subimage;
 
-	PFNEGLBINDWAYLANDDISPLAYWL bind_display;
-	PFNEGLUNBINDWAYLANDDISPLAYWL unbind_display;
-	PFNEGLQUERYWAYLANDBUFFERWL query_buffer;
-	bool has_bind_display;
-
 	bool has_context_priority;
 
 	bool has_egl_image_external;
