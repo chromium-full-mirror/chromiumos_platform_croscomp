@@ -7,6 +7,7 @@ build = "build.rs"
 
 [dependencies]
 wayland-scanner = { path = "third_party/wayland-scanner" }
+wayland-commons = { path = "third_party/wayland-commons" }
 wayland-client = { path = "third_party/wayland-client" }
 drm = { path = "third_party/drm" }
 once_cell = { path = "third_party/once_cell" }

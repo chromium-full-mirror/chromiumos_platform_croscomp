@@ -1,21 +1,52 @@
-// Allow single character names so clippy doesn't lint on x, y, r, g, b, which
-// are reasonable variable names in this domain.
-#![allow(clippy::many_single_char_names)]
-
-use std::{cmp::min, io::Write, os::unix::io::AsRawFd};
-
 use wayland_client::{
-    event_enum,
-    protocol::{wl_compositor, wl_keyboard, wl_pointer, wl_shell, wl_shm},
+    protocol::{wl_compositor, wl_shell},
     Display, GlobalManager,
 };
 
-// declare an event enum containing the events we want to receive in the iterator
-event_enum!(
-    Events |
-    Pointer => wl_pointer::WlPointer,
-    Keyboard => wl_keyboard::WlKeyboard
-);
+pub mod protocol {
+    #![allow(dead_code, non_camel_case_types, unused_unsafe, unused_variables)]
+    #![allow(non_upper_case_globals, non_snake_case, unused_imports)]
+    #![allow(missing_docs, clippy::all)]
+
+    pub(crate) use wayland_client::{AnonymousObject, Attached, Main, Proxy, ProxyMap};
+    pub(crate) use wayland_commons::map::{Object, ObjectMetadata};
+    pub(crate) use wayland_commons::smallvec;
+    pub(crate) use wayland_commons::wire::{Argument, ArgumentType, Message, MessageDesc};
+    pub(crate) use wayland_commons::{Interface, MessageGroup};
+
+    pub(crate) use wayland_client::protocol::wl_buffer;
+
+    include!(concat!(env!("OUT_DIR"), "/linux_dmabuf_unstable_v1_api.rs"));
+}
+
+pub struct Card {
+    file: std::fs::File
+}
+
+impl std::os::unix::io::AsRawFd for Card {
+    fn as_raw_fd(&self) -> std::os::unix::io::RawFd {
+        self.file.as_raw_fd()
+    }
+}
+
+use drm::control::Device as ControlDevice;
+use drm::buffer::Buffer;
+
+impl drm::Device for Card {}
+impl ControlDevice for Card {}
+
+impl Card {
+    pub fn open(path: &str) -> Self {
+        let mut options = std::fs::OpenOptions::new();
+        options.read(true);
+        options.write(true);
+        Card { file: options.open(path).unwrap() }
+    }
+
+    pub fn open_global() -> Self {
+        Self::open("/dev/dri/card0")
+    }
+}
 
 fn main() {
     let display = Display::connect_to_env().unwrap();
@@ -26,56 +57,49 @@ fn main() {
 
     let globals = GlobalManager::new(&attached_display);
 
-    // Make a synchronized roundtrip to the wayland server.
-    //
-    // When this returns it must be true that the server has already
-    // sent us all available globals.
     event_queue.sync_roundtrip(&mut (), |_, _, _| unreachable!()).unwrap();
+
+    let dmabuf = globals.instantiate_exact::<protocol::zwp_linux_dmabuf_v1::ZwpLinuxDmabufV1>(3).
+	unwrap();
+    let fmt = drm::buffer::format::PixelFormat::ABGR8888;
 
     /*
      * Create a buffer with window contents
      */
+    let card = Card::open_global();
+    let width = 800;
+    let height = 600;
 
-    // buffer (and window) width and height
-    let buf_x: u32 = 320;
-    let buf_y: u32 = 240;
+    let mut db = card.create_dumb_buffer((width, height), fmt)
+	    .expect("Could not create dumb buffer");
 
-    // create a tempfile to write the contents of the window on
-    let mut tmp = tempfile::tempfile().expect("Unable to create a tempfile.");
-    // write the contents to it, lets put a nice color gradient
-    for i in 0..(buf_x * buf_y) {
-        let x = i % buf_x;
-        let y = i / buf_x;
-        let a = 0xFF;
-        let r = min(((buf_x - x) * 0xFF) / buf_x, ((buf_y - y) * 0xFF) / buf_y);
-        let g = min((x * 0xFF) / buf_x, ((buf_y - y) * 0xFF) / buf_y);
-        let b = min(((buf_x - x) * 0xFF) / buf_x, (y * 0xFF) / buf_y);
-        tmp.write_all(&((a << 24) + (r << 16) + (g << 8) + b).to_ne_bytes()).unwrap();
+    {
+	let mut map = card.map_dumb_buffer(&mut db).expect("Could not map dumbbuffer");
+
+	let bg_color : [u8;4] = [128, 0, 0, 255];
+	for dst in map.as_mut().chunks_exact_mut(4) {
+	    dst.copy_from_slice(&bg_color)
+	}
     }
-    let _ = tmp.flush();
+
+    const DRM_CLOEXEC: u32 = 0o2000000;
+    const DRM_RDWR: u32 = 0o2;
+
+    let fd = card.buffer_to_prime_fd(db.handle(), DRM_CLOEXEC | DRM_RDWR).
+	expect("Buffer to prime fd failed");
 
     /*
      * Init wayland objects
      */
 
+    let params = dmabuf.create_params();
+    params.add(fd, 0, 0, db.pitch(), 0, 0);
+    let buffer = params.create_immed(width as i32, height as i32, fmt.as_raw(), 0);
+    params.destroy();
+
     // The compositor allows us to creates surfaces
     let compositor = globals.instantiate_exact::<wl_compositor::WlCompositor>(1).unwrap();
     let surface = compositor.create_surface();
-
-    // The SHM allows us to share memory with the server, and create buffers
-    // on this shared memory to paint our surfaces
-    let shm = globals.instantiate_exact::<wl_shm::WlShm>(1).unwrap();
-    let pool = shm.create_pool(
-        tmp.as_raw_fd(),            // RawFd to the tempfile serving as shared memory
-        (buf_x * buf_y * 4) as i32, // size in bytes of the shared memory (4 bytes per pixel)
-    );
-    let buffer = pool.create_buffer(
-        0,                        // Start of the buffer in the pool
-        buf_x as i32,             // width of the buffer in pixels
-        buf_y as i32,             // height of the buffer in pixels
-        (buf_x * 4) as i32,       // number of bytes between the beginning of two consecutive lines
-        wl_shm::Format::Argb8888, // chosen encoding for the data
-    );
 
     // The shell allows us to define our surface as a "toplevel", meaning the
     // server will treat it as a window
