@@ -22,6 +22,9 @@ foreach a : global_args_maybe
 endforeach
 add_global_arguments(global_args, language: 'c')
 
+install_data(
+	'croscomp.conf',
+	install_dir : join_paths(get_option('sysconfdir'), 'init'))
 
 proj_weston = subproject('weston', default_options: [
 	'backend-default=drm',
