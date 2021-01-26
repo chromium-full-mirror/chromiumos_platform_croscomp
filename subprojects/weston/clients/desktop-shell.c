@@ -1468,7 +1468,7 @@ parse_panel_position(struct desktop *desktop, struct weston_config_section *s)
 {
 	char *position;
 
-	desktop->want_panel = 1;
+	desktop->want_panel = 0;
 
 	weston_config_section_get_string(s, "panel-position", &position, "top");
 	if (strcmp(position, "top") == 0) {
