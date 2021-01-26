@@ -1,3 +1,5 @@
+use std::fs::File;
+
 use wayland_client::{
     protocol::{wl_compositor, wl_shell},
     Display, GlobalManager,
@@ -48,7 +50,39 @@ impl Card {
     }
 }
 
+struct Frame {
+    data: Vec<u8>,
+    width: u32,
+    height: u32
+}
+
+fn load_pngs() -> Vec<Frame> {
+    (1..14).map(|i| {
+	let path = format!("/usr/share/chromeos-assets/images_200_percent/boot_splash_frame{:02}.png", i);
+	let decoder = png::Decoder::new(File::open(path).unwrap());
+
+	let (info, mut reader) = decoder.read_info().unwrap();
+
+	// Allocate the output buffer.
+	let mut buf = vec![0; info.buffer_size()];
+	// Read the next frame. An APNG might contain multiple frames.
+	reader.next_frame(&mut buf).unwrap();
+
+	if info.color_type != png::ColorType::Rgb {
+	    panic!("unhandled color type");
+	}
+
+	Frame {
+	    data: buf,
+	    width: info.width,
+	    height: info.height
+	}
+    }).collect()
+}
+
 fn main() {
+    let frames = load_pngs();
+
     let display = Display::connect_to_env().unwrap();
 
     let mut event_queue = display.create_event_queue();
