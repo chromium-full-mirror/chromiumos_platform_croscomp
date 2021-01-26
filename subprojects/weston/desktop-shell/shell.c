@@ -2640,8 +2640,6 @@ weston_desktop_create(struct weston_compositor *compositor, void *user_data)
 		return NULL;
 	}
 
-	exo_extensions_init(desktop, display);
-
 	return desktop;
 }
 
@@ -4139,6 +4137,8 @@ shell_fade_done_for_output(struct weston_view_animation *animation, void *data)
 	if (!shell->initialized_inputs) {
 		weston_compositor_init_input(shell->compositor);
 		shell->initialized_inputs = true;
+
+		exo_extensions_init(shell->desktop, shell->compositor->wl_display);
 	}
 }
 
