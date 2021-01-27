@@ -79,7 +79,7 @@ struct window {
 	struct display *display;
 	int width, height;
 	struct wl_surface *surface;
-	struct buffer buffers[2];
+	struct buffer buffers[3];
 	struct buffer *prev_buffer;
 	struct wl_callback *callback;
 	bool wait_for_configure;
@@ -183,6 +183,12 @@ create_window(struct display *display, struct wl_output *output, int width, int 
 	window->height = height;
 	window->surface = wl_compositor_create_surface(display->compositor);
 
+	struct wl_region *region =
+		wl_compositor_create_region(display->compositor);
+	wl_region_add(region, 0, 0, width, height);
+	wl_surface_set_opaque_region(window->surface, region);
+	wl_region_destroy(region);
+
 	croscomp_splash_set(display->splash, output, window->surface);
 	redraw(window, NULL, 0);
 
@@ -210,15 +216,17 @@ static struct buffer *
 window_next_buffer(struct window *window)
 {
 	struct buffer *buffer;
-	int ret = 0;
+	int ret = 0, i;
 
-	if (!window->buffers[0].busy)
-		buffer = &window->buffers[0];
-	else if (!window->buffers[1].busy)
-		buffer = &window->buffers[1];
-	else
+	for (i = 0; i < ARRAY_LENGTH(window->buffers); i++) {
+		if (!window->buffers[i].busy)
+			break;
+	}
+
+	if (i == ARRAY_LENGTH(window->buffers))
 		return NULL;
 
+	buffer = &window->buffers[i];
 	if (!buffer->buffer) {
 		ret = create_dma_buf(window->display, buffer,
 				     window->width, window->height,
