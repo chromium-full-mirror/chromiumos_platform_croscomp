@@ -33,8 +33,13 @@
 #include <assert.h>
 #include <unistd.h>
 #include <sys/mman.h>
+#include <sys/ioctl.h>
 #include <signal.h>
 #include <errno.h>
+#include <linux/dma-buf.h>
+#include <linux/udmabuf.h>
+#include <drm/drm_fourcc.h>
+#include <fcntl.h>
 
 #include <wayland-client.h>
 #include "shared/os-compatibility.h"
@@ -43,14 +48,17 @@
 #include <libweston/zalloc.h>
 
 #include "croscomp-client-protocol.h"
+#include "linux-dmabuf-unstable-v1-client-protocol.h"
 
 struct display {
 	struct wl_display *display;
 	struct wl_registry *registry;
 	struct wl_compositor *compositor;
-	struct wl_shm *shm;
+	struct zwp_linux_dmabuf_v1 *linux_dmabuf;
 	struct croscomp_splash *splash;
 	bool has_xrgb;
+
+	int udmabuf_fd;
 
 	pixman_image_t *frames[32];
 	uint32_t frame_count;
@@ -62,7 +70,8 @@ struct display {
 
 struct buffer {
 	struct wl_buffer *buffer;
-	void *shm_data;
+	uint32_t stride;
+	void *data;
 	int busy;
 };
 
@@ -92,20 +101,46 @@ static const struct wl_buffer_listener buffer_listener = {
 };
 
 static int
-create_shm_buffer(struct display *display, struct buffer *buffer,
-		  int width, int height, uint32_t format)
+create_dma_buf(struct display *display, struct buffer *buffer,
+	       int width, int height, uint32_t format)
 {
-	struct wl_shm_pool *pool;
-	int fd, size, stride;
+	int fd, ret, size, stride;
 	void *data;
 
-	stride = width * 4;
+	/* We align the stride to 256, in best effort to allocate a
+	 * linear layout dma-buf that can be scanned out.
+	 */
+	stride = (width * 4 + 255) & ~255;
 	size = stride * height;
 
-	fd = os_create_anonymous_file(size);
+	fd = memfd_create("weston-shared", MFD_CLOEXEC | MFD_ALLOW_SEALING);
 	if (fd < 0) {
-		fprintf(stderr, "creating a buffer file for %d B failed: %s\n",
-			size, strerror(errno));
+		fprintf(stderr, "memfd_create failed: %s\n", strerror(errno));
+		return -1;
+	}
+
+	/* We can add this seal before calling posix_fallocate(), as
+	 * the file is currently zero-sized anyway.
+	 *
+	 * There is also no need to check for the return value, we
+	 * couldn't do anything with it anyway.
+	 */
+	fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK);
+	ret = ftruncate(fd, size);
+	if (fd < 0) {
+		fprintf(stderr, "ftruncate failed: %s\n", strerror(errno));
+		return -1;
+	}
+
+	struct udmabuf_create create;
+	create.memfd = fd;
+	create.flags = UDMABUF_FLAGS_CLOEXEC;
+	create.offset = 0;
+	create.size = size;
+
+	int dmabuf_fd = ioctl(display->udmabuf_fd, UDMABUF_CREATE, &create);
+	if (dmabuf_fd < 0) {
+		fprintf(stderr, "error creating udmabuf: %s", strerror(errno));
 		return -1;
 	}
 
@@ -116,15 +151,19 @@ create_shm_buffer(struct display *display, struct buffer *buffer,
 		return -1;
 	}
 
-	pool = wl_shm_create_pool(display->shm, fd, size);
-	buffer->buffer = wl_shm_pool_create_buffer(pool, 0,
-						   width, height,
-						   stride, format);
+	struct zwp_linux_buffer_params_v1 *params =
+		zwp_linux_dmabuf_v1_create_params(display->linux_dmabuf);
+
+	zwp_linux_buffer_params_v1_add(params, dmabuf_fd, 0, 0, stride, 0, 0);
+
+	buffer->buffer = zwp_linux_buffer_params_v1_create_immed(params, width, height, format, 0);
+	buffer->stride = stride;
 	wl_buffer_add_listener(buffer->buffer, &buffer_listener, buffer);
-	wl_shm_pool_destroy(pool);
 	close(fd);
 
-	buffer->shm_data = data;
+	zwp_linux_buffer_params_v1_destroy(params);
+
+	buffer->data = data;
 
 	return 0;
 }
@@ -180,20 +219,18 @@ window_next_buffer(struct window *window)
 	else
 		return NULL;
 
-	/* xxx this can't be scanned out, create a dma-buf with minigbm or dumb ioctls */
-
 	if (!buffer->buffer) {
-		ret = create_shm_buffer(window->display, buffer,
-					window->width, window->height,
-					WL_SHM_FORMAT_XRGB8888);
+		ret = create_dma_buf(window->display, buffer,
+				     window->width, window->height,
+				     DRM_FORMAT_ARGB8888);
 
 		if (ret < 0)
 			return NULL;
 
 		pixman_image_t *dst = pixman_image_create_bits(PIXMAN_a8r8g8b8,
 							       window->width, window->height,
-							       buffer->shm_data,
-							       window->width * 4);
+							       buffer->data,
+							       buffer->stride);
 		pixman_rectangle16_t rects = { 0, 0, window->width, window->height };
 		pixman_color_t color = { 0xfefe, 0xfefe, 0xfefe, 0xffff };
 
@@ -227,8 +264,8 @@ redraw(void *data, struct wl_callback *callback, uint32_t time)
 	pixman_image_t *src = display->frames[frame];
 	pixman_image_t *dst = pixman_image_create_bits(PIXMAN_a8r8g8b8,
 						       window->width, window->height,
-						       buffer->shm_data,
-						       window->width * 4);
+						       buffer->data,
+						       buffer->stride);
 
 	uint32_t width = pixman_image_get_width(src);
 	uint32_t height = pixman_image_get_height(src);
@@ -265,19 +302,6 @@ redraw(void *data, struct wl_callback *callback, uint32_t time)
 
 static const struct wl_callback_listener frame_listener = {
 	redraw
-};
-
-static void
-shm_format(void *data, struct wl_shm *wl_shm, uint32_t format)
-{
-	struct display *d = data;
-
-	if (format == WL_SHM_FORMAT_XRGB8888)
-		d->has_xrgb = true;
-}
-
-struct wl_shm_listener shm_listener = {
-	shm_format
 };
 
 static void
@@ -340,10 +364,9 @@ registry_handle_global(void *data, struct wl_registry *registry,
 	} else if (strcmp(interface, "croscomp_splash") == 0) {
 		d->splash = wl_registry_bind(registry,
 					      id, &croscomp_splash_interface, 1);
-	} else if (strcmp(interface, "wl_shm") == 0) {
-		d->shm = wl_registry_bind(registry,
-					  id, &wl_shm_interface, 1);
-		wl_shm_add_listener(d->shm, &shm_listener, d);
+	} else if (strcmp(interface, "zwp_linux_dmabuf_v1") == 0) {
+		d->linux_dmabuf = wl_registry_bind(registry,
+						   id, &zwp_linux_dmabuf_v1_interface, 3);
 	} else if (strcmp(interface, "wl_output") == 0) {
 		struct wl_output *output=
 			wl_registry_bind(registry,
@@ -376,6 +399,12 @@ create_display(void)
 	display->display = wl_display_connect(NULL);
 	assert(display->display);
 
+	display->udmabuf_fd = open("/dev/udmabuf", O_RDWR);
+	if (display->udmabuf_fd == -1) {
+		fprintf(stderr, "could not open /dev/udmabuf: %s\n", strerror(errno));
+		exit(1);
+	}
+
 	for (uint32_t i = 0; i < ARRAY_LENGTH(display->frames); i++) {
 		char path[256];
 
@@ -395,17 +424,22 @@ create_display(void)
 				 &registry_listener, display);
 	wl_display_roundtrip(display->display);
 
-	if (display->shm == NULL) {
-		fprintf(stderr, "No wl_shm global\n");
+	if (display->linux_dmabuf == NULL) {
+		fprintf(stderr, "No zwp_linux_dmabuf_v1 global\n");
+		exit(1);
+	}
+
+	if (display->splash == NULL) {
+		fprintf(stderr, "No croscomp_splash global\n");
+		exit(1);
+	}
+
+	if (display->compositor == NULL) {
+		fprintf(stderr, "No compositor global\n");
 		exit(1);
 	}
 
 	wl_display_roundtrip(display->display);
-
-	if (!display->has_xrgb) {
-		fprintf(stderr, "WL_SHM_FORMAT_XRGB32 not available\n");
-		exit(1);
-	}
 
 	return display;
 }
@@ -413,12 +447,8 @@ create_display(void)
 static void
 destroy_display(struct display *display)
 {
-	if (display->shm)
-		wl_shm_destroy(display->shm);
-
-	if (display->compositor)
-		wl_compositor_destroy(display->compositor);
-
+	zwp_linux_dmabuf_v1_destroy(display->linux_dmabuf);
+	wl_compositor_destroy(display->compositor);
 	wl_registry_destroy(display->registry);
 	wl_display_flush(display->display);
 	wl_display_disconnect(display->display);

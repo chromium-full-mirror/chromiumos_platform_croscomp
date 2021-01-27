@@ -128,6 +128,8 @@ simple_clients = [
 			'splash.c',
 			croscomp_client_protocol_h,
 			croscomp_protocol_c,
+			linux_dmabuf_unstable_v1_client_protocol_h,
+			linux_dmabuf_unstable_v1_protocol_c,
 		],
 		'dep_objs': [ dep_wayland_client, dep_libshared, dep_lib_cairo_shared ]
 	},
