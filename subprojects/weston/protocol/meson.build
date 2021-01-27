@@ -15,6 +15,9 @@ install_data(
 )
 
 generated_protocols = [
+	# croscomp extensinos
+	[ 'croscomp', 'internal' ],
+
 	# exo extensions
 	[ 'alpha-compositing-unstable-v1', 'internal' ],
 	[ 'aura-shell', 'internal' ],

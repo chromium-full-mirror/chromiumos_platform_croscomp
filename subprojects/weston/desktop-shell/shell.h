@@ -119,6 +119,9 @@ struct shell_output {
 	struct weston_surface *background_surface;
 	struct wl_listener background_surface_listener;
 
+	struct weston_surface *splash_surface;
+	struct wl_listener splash_surface_listener;
+
 	struct {
 		struct weston_view *view;
 		struct weston_view_animation *animation;
@@ -259,3 +262,20 @@ void
 shell_for_each_layer(struct desktop_shell *shell,
 		     shell_for_each_layer_func_t func,
 		     void *data);
+
+int init_splash(struct desktop_shell *shell);
+
+
+static inline struct shell_output *
+find_shell_output_from_weston_output(struct desktop_shell *shell,
+				     struct weston_output *output)
+{
+	struct shell_output *shell_output;
+
+	wl_list_for_each(shell_output, &shell->output_list, link) {
+		if (shell_output->output == output)
+			return shell_output;
+	}
+
+	return NULL;
+}

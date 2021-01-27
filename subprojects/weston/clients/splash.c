@@ -41,14 +41,15 @@
 #include "shared/helpers.h"
 #include "shared/image-loader.h"
 #include <libweston/zalloc.h>
-#include "xdg-shell-client-protocol.h"
+
+#include "croscomp-client-protocol.h"
 
 struct display {
 	struct wl_display *display;
 	struct wl_registry *registry;
 	struct wl_compositor *compositor;
-	struct xdg_wm_base *wm_base;
 	struct wl_shm *shm;
+	struct croscomp_splash *splash;
 	bool has_xrgb;
 
 	pixman_image_t *frames[32];
@@ -67,8 +68,6 @@ struct window {
 	struct display *display;
 	int width, height;
 	struct wl_surface *surface;
-	struct xdg_surface *xdg_surface;
-	struct xdg_toplevel *xdg_toplevel;
 	struct buffer buffers[2];
 	struct buffer *prev_buffer;
 	struct wl_callback *callback;
@@ -130,42 +129,6 @@ create_shm_buffer(struct display *display, struct buffer *buffer,
 	return 0;
 }
 
-static void
-handle_xdg_surface_configure(void *data, struct xdg_surface *surface,
-			     uint32_t serial)
-{
-	struct window *window = data;
-
-	xdg_surface_ack_configure(surface, serial);
-
-	if (window->wait_for_configure) {
-		redraw(window, NULL, 0);
-		window->wait_for_configure = false;
-	}
-}
-
-static const struct xdg_surface_listener xdg_surface_listener = {
-	handle_xdg_surface_configure,
-};
-
-static void
-handle_xdg_toplevel_configure(void *data, struct xdg_toplevel *xdg_toplevel,
-			      int32_t width, int32_t height,
-			      struct wl_array *state)
-{
-}
-
-static void
-handle_xdg_toplevel_close(void *data, struct xdg_toplevel *xdg_toplevel)
-{
-	running = 0;
-}
-
-static const struct xdg_toplevel_listener xdg_toplevel_listener = {
-	handle_xdg_toplevel_configure,
-	handle_xdg_toplevel_close,
-};
-
 static struct window *
 create_window(struct display *display, struct wl_output *output, int width, int height)
 {
@@ -181,26 +144,8 @@ create_window(struct display *display, struct wl_output *output, int width, int 
 	window->height = height;
 	window->surface = wl_compositor_create_surface(display->compositor);
 
-	if (display->wm_base) {
-		window->xdg_surface =
-			xdg_wm_base_get_xdg_surface(display->wm_base,
-						    window->surface);
-		assert(window->xdg_surface);
-		xdg_surface_add_listener(window->xdg_surface,
-					 &xdg_surface_listener, window);
-
-		window->xdg_toplevel =
-			xdg_surface_get_toplevel(window->xdg_surface);
-		assert(window->xdg_toplevel);
-		xdg_toplevel_add_listener(window->xdg_toplevel,
-					  &xdg_toplevel_listener, window);
-
-		xdg_toplevel_set_title(window->xdg_toplevel, "simple-shm");
-		wl_surface_commit(window->surface);
-		window->wait_for_configure = true;
-	} else {
-		assert(0);
-	}
+	croscomp_splash_set(display->splash, output, window->surface);
+	redraw(window, NULL, 0);
 
 	return window;
 }
@@ -217,10 +162,6 @@ destroy_window(struct window *window)
 	if (window->buffers[1].buffer)
 		wl_buffer_destroy(window->buffers[1].buffer);
 
-	if (window->xdg_toplevel)
-		xdg_toplevel_destroy(window->xdg_toplevel);
-	if (window->xdg_surface)
-		xdg_surface_destroy(window->xdg_surface);
 	wl_surface_destroy(window->surface);
 	free(window);
 }
@@ -338,17 +279,6 @@ struct wl_shm_listener shm_listener = {
 };
 
 static void
-xdg_wm_base_ping(void *data, struct xdg_wm_base *shell, uint32_t serial)
-{
-	xdg_wm_base_pong(shell, serial);
-}
-
-static const struct xdg_wm_base_listener xdg_wm_base_listener = {
-	xdg_wm_base_ping,
-};
-
-
-static void
 output_handle_geometry(void *data,
                        struct wl_output *wl_output,
                        int x, int y,
@@ -405,10 +335,9 @@ registry_handle_global(void *data, struct wl_registry *registry,
 		d->compositor =
 			wl_registry_bind(registry,
 					 id, &wl_compositor_interface, 1);
-	} else if (strcmp(interface, "xdg_wm_base") == 0) {
-		d->wm_base = wl_registry_bind(registry,
-					      id, &xdg_wm_base_interface, 1);
-		xdg_wm_base_add_listener(d->wm_base, &xdg_wm_base_listener, d);
+	} else if (strcmp(interface, "croscomp_splash") == 0) {
+		d->splash = wl_registry_bind(registry,
+					      id, &croscomp_splash_interface, 1);
 	} else if (strcmp(interface, "wl_shm") == 0) {
 		d->shm = wl_registry_bind(registry,
 					  id, &wl_shm_interface, 1);
@@ -445,11 +374,25 @@ create_display(void)
 	display->display = wl_display_connect(NULL);
 	assert(display->display);
 
+	for (uint32_t i = 0; i < ARRAY_LENGTH(display->frames); i++) {
+		char path[256];
+
+		snprintf(path, sizeof(path),
+			 "/usr/share/chromeos-assets/images_200_percent"
+			 "/boot_splash_frame%02d.png", i + 1);
+
+		display->frames[i] = load_image(path);
+		if (display->frames[i] == NULL)
+			break;
+		display->frame_count = i + 1;
+	}
+
 	display->has_xrgb = false;
 	display->registry = wl_display_get_registry(display->display);
 	wl_registry_add_listener(display->registry,
 				 &registry_listener, display);
 	wl_display_roundtrip(display->display);
+
 	if (display->shm == NULL) {
 		fprintf(stderr, "No wl_shm global\n");
 		exit(1);
@@ -462,19 +405,6 @@ create_display(void)
 		exit(1);
 	}
 
-	for (uint32_t i = 0; i < 16; i++) {
-		char path[256];
-
-		snprintf(path, sizeof(path),
-			 "/usr/share/chromeos-assets/images_200_percent"
-			 "/boot_splash_frame%02d.png", i + 1);
-		
-		display->frames[i] = load_image(path);
-		if (display->frames[i] == NULL)
-			break;
-		display->frame_count = i + 1;
-	}
-
 	return display;
 }
 
@@ -483,9 +413,6 @@ destroy_display(struct display *display)
 {
 	if (display->shm)
 		wl_shm_destroy(display->shm);
-
-	if (display->wm_base)
-		xdg_wm_base_destroy(display->wm_base);
 
 	if (display->compositor)
 		wl_compositor_destroy(display->compositor);

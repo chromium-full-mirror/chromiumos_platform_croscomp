@@ -3,6 +3,7 @@ if get_option('shell-desktop')
 
 	srcs_shell_desktop = [
 		'shell.c',
+		'splash.c',
 		'exposay.c',
 		'input-panel.c',
 		'client.c',
@@ -14,6 +15,8 @@ if get_option('shell-desktop')
 		'exo-extensions.c',
 		weston_desktop_shell_server_protocol_h,
 		weston_desktop_shell_protocol_c,
+		croscomp_server_protocol_h,
+		croscomp_protocol_c,
 		input_method_unstable_v1_server_protocol_h,
 		input_method_unstable_v1_protocol_c,
 		alpha_compositing_unstable_v1_server_protocol_h,

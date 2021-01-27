@@ -3095,21 +3095,6 @@ configure_static_view(struct weston_view *ev, struct weston_layer *layer, int x,
 	}
 }
 
-
-static struct shell_output *
-find_shell_output_from_weston_output(struct desktop_shell *shell,
-				     struct weston_output *output)
-{
-	struct shell_output *shell_output;
-
-	wl_list_for_each(shell_output, &shell->output_list, link) {
-		if (shell_output->output == output)
-			return shell_output;
-	}
-
-	return NULL;
-}
-
 static int
 background_get_label(struct weston_surface *surface, char *buf, size_t len)
 {
@@ -4489,8 +4474,6 @@ launch_desktop_shell_process(void *data)
 {
 	struct desktop_shell *shell = data;
 
-	weston_client_start(shell->compositor, "/usr/bin/weston-simple-splash");
-
 	shell->child.client = weston_client_start(shell->compositor,
 						  shell->client);
 
@@ -5308,6 +5291,8 @@ wet_shell_init(struct weston_compositor *ec,
 	shell_add_bindings(ec, shell);
 
 	shell_fade_init(shell);
+
+	init_splash(shell);
 
 	clock_gettime(CLOCK_MONOTONIC, &shell->startup_time);
 

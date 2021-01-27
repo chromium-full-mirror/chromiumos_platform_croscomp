@@ -126,8 +126,8 @@ simple_clients = [
 		'name': 'splash',
 		'sources': [
 			'splash.c',
-			xdg_shell_client_protocol_h,
-			xdg_shell_protocol_c,
+			croscomp_client_protocol_h,
+			croscomp_protocol_c,
 		],
 		'dep_objs': [ dep_wayland_client, dep_libshared, dep_lib_cairo_shared ]
 	},

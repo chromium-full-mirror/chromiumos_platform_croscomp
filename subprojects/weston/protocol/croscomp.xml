@@ -1,0 +1,10 @@
+<protocol name="croscomp">
+
+  <interface name="croscomp_splash" version="1">
+    <request name="set">
+      <arg name="output" type="object" interface="wl_output"/>
+      <arg name="surface" type="object" interface="wl_surface"/>
+    </request>
+  </interface>
+
+</protocol>
