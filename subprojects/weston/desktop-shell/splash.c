@@ -56,11 +56,10 @@ splash_get_label(struct weston_surface *surface, char *buf, size_t len)
 static void
 splash_committed(struct weston_surface *es, int32_t sx, int32_t sy)
 {
-	struct desktop_shell *shell = es->committed_private;
-	struct weston_view *ev;
-	struct weston_layer *layer = &shell->fullscreen_layer;
-
-	ev = container_of(es->views.next, struct weston_view, surface_link);
+	struct weston_view *ev =
+		container_of(es->views.next, struct weston_view, surface_link);
+	struct weston_compositor *ec = ev->surface->compositor;
+	struct weston_layer *layer = &ec->fade_layer;
 
 	weston_view_set_position(ev, ev->output->x, ev->output->y);
 	ev->surface->is_mapped = true;
