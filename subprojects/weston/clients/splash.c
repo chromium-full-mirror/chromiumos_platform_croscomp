@@ -56,6 +56,8 @@ struct display {
 	uint32_t frame_count;
 	uint32_t current_frame;
 	uint32_t width, height;
+
+	bool terminate;
 };
 
 struct buffer {
@@ -73,8 +75,6 @@ struct window {
 	struct wl_callback *callback;
 	bool wait_for_configure;
 };
-
-static int running = 1;
 
 static void
 redraw(void *data, struct wl_callback *callback, uint32_t time);
@@ -255,6 +255,8 @@ redraw(void *data, struct wl_callback *callback, uint32_t time)
 	if (frame < display->frame_count - 1) {
 		window->callback = wl_surface_frame(window->surface);
 		wl_callback_add_listener(window->callback, &frame_listener, window);
+	} else {
+		display->terminate = true;
 	}
 
 	wl_surface_commit(window->surface);
@@ -431,7 +433,7 @@ main(int argc, char **argv)
 
 	display = create_display();
 
-	while (running && ret != -1)
+	while (!display->terminate && ret != -1)
 		ret = wl_display_dispatch(display->display);
 
 	destroy_display(display);
