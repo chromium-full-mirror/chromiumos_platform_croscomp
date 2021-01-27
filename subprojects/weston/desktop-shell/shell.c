@@ -205,9 +205,6 @@ static void
 surface_rotate(struct shell_surface *surface, struct weston_pointer *pointer);
 
 static void
-shell_fade_startup(struct desktop_shell *shell);
-
-static void
 shell_fade(struct desktop_shell *shell, enum fade_type type);
 
 static struct shell_seat *
@@ -3385,9 +3382,6 @@ static void
 desktop_shell_desktop_ready(struct wl_client *client,
 			    struct wl_resource *resource)
 {
-	struct desktop_shell *shell = wl_resource_get_user_data(resource);
-
-	shell_fade_startup(shell);
 }
 
 static void
@@ -4118,13 +4112,6 @@ shell_fade_done_for_output(struct weston_view_animation *animation, void *data)
 	default:
 		break;
 	}
-
-	if (!shell->initialized_inputs) {
-		weston_compositor_init_input(shell->compositor);
-		shell->initialized_inputs = true;
-
-		exo_extensions_init(shell->desktop, shell->compositor->wl_display);
-	}
 }
 
 static struct weston_view *
@@ -4146,7 +4133,7 @@ shell_fade_create_surface_for_output(struct desktop_shell *shell, struct shell_o
 
 	weston_surface_set_size(surface, shell_output->output->width, shell_output->output->height);
 	weston_view_set_position(view, shell_output->output->x, shell_output->output->y);
-	weston_surface_set_color(surface, 1.0, 1.0, 1.0, 1.0);
+	weston_surface_set_color(surface, 0.0, 0.0, 0.0, 1.0);
 	weston_layer_entry_insert(&compositor->fade_layer.view_list,
 				  &view->layer_link);
 	pixman_region32_init(&surface->input);
@@ -4203,91 +4190,6 @@ shell_fade(struct desktop_shell *shell, enum fade_type type)
 						1.0 - tint, tint, 300.0,
 						shell_fade_done_for_output, shell_output);
 		}
-	}
-}
-
-static void
-do_shell_fade_startup(void *data)
-{
-	struct desktop_shell *shell = data;
-	struct shell_output *shell_output;
-
-	if (shell->startup_animation_type == ANIMATION_FADE) {
-		shell_fade(shell, FADE_IN);
-	} else {
-		weston_log("desktop shell: "
-			   "unexpected fade-in animation type %d\n",
-			   shell->startup_animation_type);
-		wl_list_for_each(shell_output, &shell->output_list, link) {
-			weston_surface_destroy(shell_output->fade.view->surface);
-			shell_output->fade.view = NULL;
-		}
-	}
-}
-
-static void
-shell_fade_startup(struct desktop_shell *shell)
-{
-	struct wl_event_loop *loop;
-	struct shell_output *shell_output;
-	bool has_fade = false;
-
-	wl_list_for_each(shell_output, &shell->output_list, link) {
-		if (!shell_output->fade.startup_timer)
-			continue;
-
-		wl_event_source_remove(shell_output->fade.startup_timer);
-		shell_output->fade.startup_timer = NULL;
-		has_fade = true;
-	}
-
-	if (has_fade) {
-		loop = wl_display_get_event_loop(shell->compositor->wl_display);
-		wl_event_loop_add_idle(loop, do_shell_fade_startup, shell);
-	}
-}
-
-static int
-fade_startup_timeout(void *data)
-{
-	struct desktop_shell *shell = data;
-
-	shell_fade_startup(shell);
-	return 0;
-}
-
-static void
-shell_fade_init(struct desktop_shell *shell)
-{
-	/* Make compositor output all black, and wait for the desktop-shell
-	 * client to signal it is ready, then fade in. The timer triggers a
-	 * fade-in, in case the desktop-shell client takes too long.
-	 */
-
-	struct wl_event_loop *loop;
-	struct shell_output *shell_output;
-
-	if (shell->startup_animation_type == ANIMATION_NONE)
-		return;
-
-	wl_list_for_each(shell_output, &shell->output_list, link) {
-		if (shell_output->fade.view != NULL) {
-			weston_log("%s: warning: fade surface already exists\n",
-				   __func__);
-			continue;
-		}
-
-		shell_output->fade.view = shell_fade_create_surface_for_output(shell, shell_output);
-		if (!shell_output->fade.view)
-			continue;
-
-		weston_view_update_transform(shell_output->fade.view);
-		weston_surface_damage(shell_output->fade.view->surface);
-
-		loop = wl_display_get_event_loop(shell->compositor->wl_display);
-		shell_output->fade.startup_timer =
-			wl_event_loop_add_timer(loop, fade_startup_timeout, shell);
-		wl_event_source_timer_update(shell_output->fade.startup_timer, 15000);
 	}
 }
 
@@ -4465,8 +4367,6 @@ desktop_shell_client_destroy(struct wl_listener *listener, void *data)
 
 	if (!check_desktop_shell_crash_too_early(shell))
 		respawn_desktop_shell_process(shell);
-
-	shell_fade_startup(shell);
 }
 
 static void
@@ -5187,6 +5087,17 @@ handle_seat_created(struct wl_listener *listener, void *data)
 	create_shell_seat(seat);
 }
 
+void
+shell_finish_init(struct desktop_shell *shell)
+{
+	assert(!shell->initialized_inputs);
+
+	weston_compositor_init_input(shell->compositor);
+	shell->initialized_inputs = true;
+
+	exo_extensions_init(shell->desktop, shell->compositor->wl_display);
+}
+
 WL_EXPORT int
 wet_shell_init(struct weston_compositor *ec,
 	       int *argc, char *argv[])
@@ -5289,8 +5200,6 @@ wet_shell_init(struct weston_compositor *ec,
 	screenshooter_create(ec);
 
 	shell_add_bindings(ec, shell);
-
-	shell_fade_init(shell);
 
 	init_splash(shell);
 

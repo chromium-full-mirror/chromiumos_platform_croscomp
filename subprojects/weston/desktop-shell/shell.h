@@ -266,6 +266,9 @@ shell_for_each_layer(struct desktop_shell *shell,
 int init_splash(struct desktop_shell *shell);
 
 
+void
+shell_finish_init(struct desktop_shell *shell);
+
 static inline struct shell_output *
 find_shell_output_from_weston_output(struct desktop_shell *shell,
 				     struct weston_output *output)

@@ -72,17 +72,6 @@ splash_committed(struct weston_surface *es, int32_t sx, int32_t sy)
 }
 
 static void
-handle_splash_surface_destroy(struct wl_listener *listener, void *data)
-{
-	struct shell_output *output =
-	    container_of(listener, struct shell_output, splash_surface_listener);
-
-	weston_log("splash surface gone\n");
-	wl_list_remove(&output->splash_surface_listener.link);
-	output->splash_surface = NULL;
-}
-
-static void
 splash_set(struct wl_client *client,
 	   struct wl_resource *resource,
 	   struct wl_resource *output_resource,
@@ -114,10 +103,8 @@ splash_set(struct wl_client *client,
 	sh_output = find_shell_output_from_weston_output(shell, surface->output);
 	sh_output->splash_surface = surface;
 
-	sh_output->splash_surface_listener.notify =
-		handle_splash_surface_destroy;
-	wl_signal_add(&surface->destroy_signal,
-		      &sh_output->splash_surface_listener);
+	/* Hold on to last frame after client exits. */
+	surface->ref_count++;
 }
 
 static const struct croscomp_splash_interface croscomp_splash_implementation = {
@@ -127,6 +114,18 @@ static const struct croscomp_splash_interface croscomp_splash_implementation = {
 static void
 unbind_splash(struct wl_resource *resource)
 {
+	struct desktop_shell *shell = wl_resource_get_user_data(resource);
+	struct weston_compositor *ec = shell->compositor;
+	struct weston_layer *layer = &ec->fade_layer;
+	struct weston_view *view, *next;
+
+	weston_log("splash client exit, finishing initialization\n");
+
+	shell_finish_init(shell);
+
+	wl_list_for_each_safe(view, next, &layer->view_list.link, layer_link.link)
+		weston_surface_destroy(view->surface);
+
 }
 
 static void
