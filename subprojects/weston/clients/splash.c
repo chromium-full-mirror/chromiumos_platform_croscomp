@@ -73,6 +73,9 @@ struct buffer {
 	uint32_t stride;
 	void *data;
 	int busy;
+	int dmabuf_fd;
+	bool cleared;
+	int size;
 };
 
 struct window {
@@ -104,14 +107,13 @@ static int
 create_dma_buf(struct display *display, struct buffer *buffer,
 	       int width, int height, uint32_t format)
 {
-	int fd, ret, size, stride;
-	void *data;
+	int fd, ret;
 
 	/* We align the stride to 256, in best effort to allocate a
 	 * linear layout dma-buf that can be scanned out.
 	 */
-	stride = (width * 4 + 255) & ~255;
-	size = stride * height;
+	buffer->stride = (width * 4 + 255) & ~255;
+	buffer->size = buffer->stride * height;
 
 	fd = memfd_create("weston-shared", MFD_CLOEXEC | MFD_ALLOW_SEALING);
 	if (fd < 0) {
@@ -126,7 +128,7 @@ create_dma_buf(struct display *display, struct buffer *buffer,
 	 * couldn't do anything with it anyway.
 	 */
 	fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK);
-	ret = ftruncate(fd, size);
+	ret = ftruncate(fd, buffer->size);
 	if (fd < 0) {
 		fprintf(stderr, "ftruncate failed: %s\n", strerror(errno));
 		return -1;
@@ -136,16 +138,19 @@ create_dma_buf(struct display *display, struct buffer *buffer,
 	create.memfd = fd;
 	create.flags = UDMABUF_FLAGS_CLOEXEC;
 	create.offset = 0;
-	create.size = size;
+	create.size = buffer->size;
 
-	int dmabuf_fd = ioctl(display->udmabuf_fd, UDMABUF_CREATE, &create);
-	if (dmabuf_fd < 0) {
+	buffer->dmabuf_fd = ioctl(display->udmabuf_fd, UDMABUF_CREATE, &create);
+	if (buffer->dmabuf_fd < 0) {
 		fprintf(stderr, "error creating udmabuf: %s", strerror(errno));
 		return -1;
 	}
 
-	data = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-	if (data == MAP_FAILED) {
+	/* We need to map the dma-buf fd, not the memfd for the
+	 * dma-buf sync ioctl to work properly.
+	 */
+	buffer->data = mmap(NULL, buffer->size, PROT_READ | PROT_WRITE, MAP_SHARED, buffer->dmabuf_fd, 0);
+	if (buffer->data == MAP_FAILED) {
 		fprintf(stderr, "mmap failed: %s\n", strerror(errno));
 		close(fd);
 		return -1;
@@ -154,16 +159,13 @@ create_dma_buf(struct display *display, struct buffer *buffer,
 	struct zwp_linux_buffer_params_v1 *params =
 		zwp_linux_dmabuf_v1_create_params(display->linux_dmabuf);
 
-	zwp_linux_buffer_params_v1_add(params, dmabuf_fd, 0, 0, stride, 0, 0);
+	zwp_linux_buffer_params_v1_add(params, buffer->dmabuf_fd, 0, 0, buffer->stride, 0, 0);
 
 	buffer->buffer = zwp_linux_buffer_params_v1_create_immed(params, width, height, format, 0);
-	buffer->stride = stride;
 	wl_buffer_add_listener(buffer->buffer, &buffer_listener, buffer);
 	close(fd);
 
 	zwp_linux_buffer_params_v1_destroy(params);
-
-	buffer->data = data;
 
 	return 0;
 }
@@ -216,7 +218,8 @@ static struct buffer *
 window_next_buffer(struct window *window)
 {
 	struct buffer *buffer;
-	int ret = 0, i;
+	int ret = 0;
+	uint32_t i;
 
 	for (i = 0; i < ARRAY_LENGTH(window->buffers); i++) {
 		if (!window->buffers[i].busy)
@@ -234,16 +237,6 @@ window_next_buffer(struct window *window)
 
 		if (ret < 0)
 			return NULL;
-
-		pixman_image_t *dst = pixman_image_create_bits(PIXMAN_a8r8g8b8,
-							       window->width, window->height,
-							       buffer->data,
-							       buffer->stride);
-		pixman_rectangle16_t rects = { 0, 0, window->width, window->height };
-		pixman_color_t color = { 0xfefe, 0xfefe, 0xfefe, 0xffff };
-
-		pixman_image_fill_rectangles(PIXMAN_OP_SRC, dst, &color, 1, &rects);
-		pixman_image_unref(dst);
 	}
 
 	return buffer;
@@ -251,12 +244,30 @@ window_next_buffer(struct window *window)
 
 static const struct wl_callback_listener frame_listener;
 
+#define CACHELINE_SIZE 64
+#define CACHELINE_MASK 63
+
+static inline void
+clflush_range(void *start, size_t size)
+{
+   void *p = (void *) (((uintptr_t) start) & ~CACHELINE_MASK);
+   void *end = start + size;
+
+   __builtin_ia32_mfence();
+
+   while (p < end) {
+      __builtin_ia32_clflush(p);
+      p += CACHELINE_SIZE;
+   }
+}
+
 static void
 redraw(void *data, struct wl_callback *callback, uint32_t time)
 {
 	struct window *window = data;
 	struct display *display = window->display;
 	struct buffer *buffer;
+	struct dma_buf_sync sync;
 
 	buffer = window_next_buffer(window);
 	if (!buffer) {
@@ -269,6 +280,10 @@ redraw(void *data, struct wl_callback *callback, uint32_t time)
 	uint32_t frame = display->current_frame / 1;
 	display->current_frame++;
 
+	sync.flags = DMA_BUF_SYNC_WRITE | DMA_BUF_SYNC_START;
+	if (ioctl(buffer->dmabuf_fd, DMA_BUF_IOCTL_SYNC, &sync) != 0)
+		fprintf(stderr, "dmabuf write sync start failed\n");
+
 	pixman_image_t *src = display->frames[frame];
 	pixman_image_t *dst = pixman_image_create_bits(PIXMAN_a8r8g8b8,
 						       window->width, window->height,
@@ -280,6 +295,14 @@ redraw(void *data, struct wl_callback *callback, uint32_t time)
 	uint32_t x = (window->width - width) / 2;
 	uint32_t y = (window->height - height) / 2;
 
+
+	if (!buffer->cleared) {
+		pixman_rectangle16_t rects = { 0, 0, window->width, window->height };
+		pixman_color_t color = { 0xfefe, 0xfefe, 0xfefe, 0xffff };
+
+		pixman_image_fill_rectangles(PIXMAN_OP_SRC, dst, &color, 1, &rects);
+	}
+
 	pixman_image_composite(PIXMAN_OP_SRC,
 			       src,
 			       NULL,
@@ -290,6 +313,18 @@ redraw(void *data, struct wl_callback *callback, uint32_t time)
 			       width, height);
 
 	pixman_image_unref(dst);
+
+	/* xxx udmabuf doesn't implement the sync ioctl so these are
+	 * nops. On Intel and other architectures, the display
+	 * controller isn't cache-coherent with the CPU and missing
+	 * the clflush will trigger unflushed cache lines.  Use
+	 * clflush directly for now.
+	 */
+	sync.flags = DMA_BUF_SYNC_WRITE | DMA_BUF_SYNC_END;
+	if (ioctl(buffer->dmabuf_fd, DMA_BUF_IOCTL_SYNC, &sync) != 0)
+		fprintf(stderr, "dmabuf write sync end failed\n");
+
+	clflush_range(buffer->data, buffer->size);
 
 	wl_surface_attach(window->surface, buffer->buffer, 0, 0);
 	wl_surface_damage(window->surface, x, y, width, height);
