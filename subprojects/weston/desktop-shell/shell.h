@@ -265,6 +265,7 @@ shell_for_each_layer(struct desktop_shell *shell,
 
 int init_splash(struct desktop_shell *shell);
 
+int init_croscomp_display(struct desktop_shell *shell);
 
 void
 shell_finish_init(struct desktop_shell *shell);

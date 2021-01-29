@@ -7,4 +7,76 @@
     </request>
   </interface>
 
+  <interface name="croscomp_display" version="1">
+    <request name="destroy" type="destructor"/>
+
+    <event name="output">
+      <arg name="id" type="new_id" interface="croscomp_output"/>
+    </event>
+  </interface>
+
+  <interface name="croscomp_output" version="1">
+    <event name="geometry">
+      <arg name="physical_width" type="int"
+	   summary="width in millimeters of the output"/>
+      <arg name="physical_height" type="int"
+	   summary="height in millimeters of the output"/>
+      <arg name="subpixel" type="int" enum="subpixel"
+	   summary="subpixel orientation of the output"/>
+      <arg name="make" type="string"
+	   summary="textual description of the manufacturer"/>
+      <arg name="model" type="string"
+	   summary="textual description of the model"/>
+      <arg name="transform" type="int" enum="transform"
+	   summary="transform that maps framebuffer to output"/>
+
+      <!-- 
+  DisplaySnapshot(int64_t display_id,
+                  const gfx::Point& origin,
+                  const gfx::Size& physical_size,
+                  DisplayConnectionType type,
+                  uint64_t base_connector_id,
+                  const std::vector<uint64_t>& path_topology,
+                  bool is_aspect_preserving_scaling,
+                  bool has_overscan,
+                  PrivacyScreenState privacy_screen_state,
+                  bool has_color_correction_matrix,
+                  bool color_correction_in_linear_space,
+                  const gfx::ColorSpace& color_space,
+                  uint32_t bits_per_channel,
+                  std::string display_name,
+                  const base::FilePath& sys_path,
+                  DisplayModeList modes,
+                  PanelOrientation panel_orientation,
+                  const std::vector<uint8_t>& edid,
+                  const DisplayMode* current_mode,
+                  const DisplayMode* native_mode,
+                  int64_t product_code,
+                  int32_t year_of_manufacture,
+                  const gfx::Size& maximum_cursor_size);
+      -->
+    </event>
+
+    <enum name="mode" bitfield="true">
+      <description summary="mode information">
+	These flags describe properties of an output mode.
+	They are used in the flags bitfield of the mode event.
+      </description>
+      <entry name="current" value="0x1"
+	     summary="indicates this is the current mode"/>
+      <entry name="preferred" value="0x2"
+	     summary="indicates this is the preferred mode"/>
+    </enum>
+
+    <event name="mode">
+      <arg name="flags" type="uint" enum="mode" summary="bitfield of mode flags"/>
+      <arg name="width" type="int" summary="width of the mode in hardware units"/>
+      <arg name="height" type="int" summary="height of the mode in hardware units"/>
+      <arg name="refresh" type="int" summary="vertical refresh rate in mHz"/>
+    </event>
+
+    <event name="done"/>
+
+  </interface>
+
 </protocol>

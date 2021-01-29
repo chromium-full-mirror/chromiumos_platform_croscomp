@@ -15,7 +15,7 @@ install_data(
 )
 
 generated_protocols = [
-	# croscomp extensinos
+	# croscomp extensions
 	[ 'croscomp', 'internal' ],
 
 	# exo extensions
