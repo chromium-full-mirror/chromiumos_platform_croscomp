@@ -46,6 +46,11 @@
 
 #include "croscomp-server-protocol.h"
 
+struct splash {
+	struct desktop_shell *shell;
+	struct wl_listener surface_create_listener;
+};
+
 static int
 splash_get_label(struct weston_surface *surface, char *buf, size_t len)
 {
@@ -80,7 +85,6 @@ splash_set(struct wl_client *client,
 	struct desktop_shell *shell = wl_resource_get_user_data(resource);
 	struct weston_surface *surface =
 		wl_resource_get_user_data(surface_resource);
-	struct shell_output *sh_output;
 	struct weston_view *view, *next;
 
 	if (surface->committed) {
@@ -100,9 +104,6 @@ splash_set(struct wl_client *client,
 	surface->output = weston_head_from_resource(output_resource)->output;
 	weston_view_set_output(view, surface->output);
 
-	sh_output = find_shell_output_from_weston_output(shell, surface->output);
-	sh_output->splash_surface = surface;
-
 	/* Hold on to last frame after client exits. */
 	surface->ref_count++;
 }
@@ -112,27 +113,54 @@ static const struct croscomp_splash_interface croscomp_splash_implementation = {
 };
 
 static void
+fade_out_boot_splash_done(struct weston_view_animation *animation, void *data)
+{
+	struct weston_view *view = data;
+
+	weston_surface_destroy(view->surface);
+}
+
+static void
+surface_create_notify(struct wl_listener *listener, void *data)
+{
+	struct splash *s =
+		container_of(listener, struct splash,
+			     surface_create_listener);
+	struct weston_compositor *ec = s->shell->compositor;
+	struct weston_layer *layer = &ec->fade_layer;
+	struct weston_view *view;
+
+	wl_list_for_each(view, &layer->view_list.link, layer_link.link)
+		weston_fade_run(view, view->alpha, 0.0, 100,
+				fade_out_boot_splash_done, view);
+
+	wl_list_remove(&listener->link);
+	free(s);
+}
+
+static void
 unbind_splash(struct wl_resource *resource)
 {
-	struct desktop_shell *shell = wl_resource_get_user_data(resource);
-	struct weston_compositor *ec = shell->compositor;
-	struct weston_layer *layer = &ec->fade_layer;
-	struct weston_view *view, *next;
+	struct splash *s = wl_resource_get_user_data(resource);
+	struct weston_compositor *ec = s->shell->compositor;
 
-	weston_log("splash client exit, finishing initialization\n");
+	shell_finish_init(s->shell);
 
-	shell_finish_init(shell);
-
-	wl_list_for_each_safe(view, next, &layer->view_list.link, layer_link.link)
-		weston_surface_destroy(view->surface);
-
+	/* Once the splash screen exits, the animation is
+	 * complete. Now set up a surface create listener to fade out
+	 * the splash screen surfaces once the first client creates a
+	 * surface.
+	 */
+	s->surface_create_listener.notify = surface_create_notify;
+	wl_signal_add(&ec->create_surface_signal,
+		      &s->surface_create_listener);
 }
 
 static void
 bind_splash(struct wl_client *client,
 		   void *data, uint32_t version, uint32_t id)
 {
-	struct desktop_shell *shell = data;
+	struct splash *s = data;
 	struct wl_resource *resource;
 
 	resource = wl_resource_create(client, &croscomp_splash_interface,
@@ -140,30 +168,42 @@ bind_splash(struct wl_client *client,
 
 	wl_resource_set_implementation(resource,
 				       &croscomp_splash_implementation,
-				       shell, unbind_splash);
+				       s, unbind_splash);
 }
 
 static void
 launch_splash_process(void *data)
 {
-	struct desktop_shell *shell = data;
+	struct splash *s = data;
 
-	weston_client_start(shell->compositor, "/usr/bin/weston-simple-splash");
+	weston_client_start(s->shell->compositor,
+			    "/usr/bin/weston-simple-splash");
 }
 
 int
 init_splash(struct desktop_shell *shell)
 {
+	struct splash *s;
 	struct weston_compositor *ec = shell->compositor;
 	struct wl_event_loop *loop;
 
+	s = zalloc(sizeof(*s));
+	if (s == NULL) {
+		weston_log("allocation failed for splash\n");
+		return -1;
+	}
+
+	s->shell = shell;
 	if (wl_global_create(ec->wl_display,
 			     &croscomp_splash_interface, 1,
-			     shell, bind_splash) == NULL)
+			     s, bind_splash) == NULL)
 		return -1;
 
+	/* xxx We probably want a signal for this for when the display
+	 * is up and done with initial modeset.
+	 */
 	loop = wl_display_get_event_loop(ec->wl_display);
-	wl_event_loop_add_idle(loop, launch_splash_process, shell);
+	wl_event_loop_add_idle(loop, launch_splash_process, s);
 
 	return 0;
 }

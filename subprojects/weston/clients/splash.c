@@ -280,6 +280,11 @@ redraw(void *data, struct wl_callback *callback, uint32_t time)
 	uint32_t frame = display->current_frame / 1;
 	display->current_frame++;
 
+	if (frame == display->frame_count) {
+		display->terminate = true;
+		return;
+	}
+
 	sync.flags = DMA_BUF_SYNC_WRITE | DMA_BUF_SYNC_START;
 	if (ioctl(buffer->dmabuf_fd, DMA_BUF_IOCTL_SYNC, &sync) != 0)
 		fprintf(stderr, "dmabuf write sync start failed\n");
@@ -332,11 +337,9 @@ redraw(void *data, struct wl_callback *callback, uint32_t time)
 	if (callback)
 		wl_callback_destroy(callback);
 
-	if (frame < display->frame_count - 1) {
+	if (frame < display->frame_count) {
 		window->callback = wl_surface_frame(window->surface);
 		wl_callback_add_listener(window->callback, &frame_listener, window);
-	} else {
-		display->terminate = true;
 	}
 
 	wl_surface_commit(window->surface);
