@@ -5205,6 +5205,8 @@ wet_shell_init(struct weston_compositor *ec,
 
 	init_croscomp_display(shell);
 
+	init_terminal(shell);
+
 	clock_gettime(CLOCK_MONOTONIC, &shell->startup_time);
 
 	return 0;

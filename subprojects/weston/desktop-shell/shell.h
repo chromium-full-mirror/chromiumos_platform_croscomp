@@ -279,3 +279,5 @@ find_shell_output_from_weston_output(struct desktop_shell *shell,
 
 	return NULL;
 }
+
+int init_terminal(struct desktop_shell *shell);

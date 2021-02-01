@@ -4,6 +4,7 @@ if get_option('shell-desktop')
 	srcs_shell_desktop = [
 		'shell.c',
 		'splash.c',
+		'terminal.c',
 		'exposay.c',
 		'input-panel.c',
 		'client.c',
