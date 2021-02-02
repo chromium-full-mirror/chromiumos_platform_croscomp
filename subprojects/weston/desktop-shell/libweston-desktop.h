@@ -44,17 +44,12 @@ enum weston_desktop_surface_edge {
 	WESTON_DESKTOP_SURFACE_EDGE_BOTTOM_RIGHT = 10,
 };
 
-struct weston_desktop;
+struct desktop_shell;
 struct weston_desktop_client;
 struct weston_desktop_surface;
 
 void
 weston_seat_break_desktop_grabs(struct weston_seat *seat);
-
-struct weston_desktop *
-weston_desktop_create(struct weston_compositor *compositor, void *user_data);
-void
-weston_desktop_destroy(struct weston_desktop *desktop);
 
 struct wl_client *
 weston_desktop_client_get_client(struct weston_desktop_client *client);

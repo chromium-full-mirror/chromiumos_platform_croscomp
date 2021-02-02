@@ -39,7 +39,6 @@
 
 #include "shell.h"
 #include "compositor/weston.h"
-#include "weston-desktop-shell-server-protocol.h"
 #include <libweston/config-parser.h>
 #include <libweston/libweston.h>
 #include <libweston/zalloc.h>
@@ -2591,14 +2590,6 @@ desktop_surface_set_unresponsive(struct weston_desktop_surface *desktop_surface,
 	shsurf->unresponsive = *unresponsive;
 }
 
-struct weston_desktop {
-	struct weston_compositor *compositor;
-	void *user_data;
-	struct wl_global *xdg_wm_base;	 /* Stable protocol xdg_shell replaces xdg_shell_unstable_v6 */
-	struct wl_global *xdg_shell_v6;  /* Unstable xdg_shell_unstable_v6 protocol. */
-	struct wl_global *wl_shell;
-};
-
 void
 weston_desktop_destroy_request(struct wl_client *client,
 			       struct wl_resource *resource)
@@ -2606,74 +2597,45 @@ weston_desktop_destroy_request(struct wl_client *client,
 	wl_resource_destroy(resource);
 }
 
-WL_EXPORT struct weston_desktop *
-weston_desktop_create(struct weston_compositor *compositor, void *user_data)
+static int
+weston_desktop_create(struct weston_compositor *compositor, struct desktop_shell *shell)
 {
-	struct weston_desktop *desktop;
 	struct wl_display *display = compositor->wl_display;
 
-	desktop = zalloc(sizeof(struct weston_desktop));
-	desktop->compositor = compositor;
-	desktop->user_data = user_data;
+	shell->xdg_wm_base =
+		weston_desktop_xdg_wm_base_create(shell, display);
+	if (shell->xdg_wm_base == NULL)
+		return -1;
 
-	desktop->xdg_wm_base =
-		weston_desktop_xdg_wm_base_create(desktop, display);
-	if (desktop->xdg_wm_base == NULL) {
-		weston_desktop_destroy(desktop);
-		return NULL;
-	}
+	shell->xdg_shell_v6 =
+		weston_desktop_xdg_shell_v6_create(shell, display);
+	if (shell->xdg_shell_v6 == NULL)
+		return -1;
 
-	desktop->xdg_shell_v6 =
-		weston_desktop_xdg_shell_v6_create(desktop, display);
-	if (desktop->xdg_shell_v6 == NULL) {
-		weston_desktop_destroy(desktop);
-		return NULL;
-	}
+	shell->wl_shell =
+		weston_desktop_wl_shell_create(shell, display);
+	if (shell->wl_shell == NULL)
+		return -1;
 
-	desktop->wl_shell =
-		weston_desktop_wl_shell_create(desktop, display);
-	if (desktop->wl_shell == NULL) {
-		weston_desktop_destroy(desktop);
-		return NULL;
-	}
-
-	return desktop;
+	return 0;
 }
-
-WL_EXPORT void
-weston_desktop_destroy(struct weston_desktop *desktop)
-{
-	if (desktop == NULL)
-		return;
-
-	if (desktop->wl_shell != NULL)
-		wl_global_destroy(desktop->wl_shell);
-	if (desktop->xdg_shell_v6 != NULL)
-		wl_global_destroy(desktop->xdg_shell_v6);
-	if (desktop->xdg_wm_base != NULL)
-		wl_global_destroy(desktop->xdg_wm_base);
-
-	free(desktop);
-}
-
 
 struct weston_compositor *
-weston_desktop_get_compositor(struct weston_desktop *desktop)
+desktop_shell_get_compositor(struct desktop_shell *shell)
 {
-	return desktop->compositor;
+	return shell->compositor;
 }
 
 struct wl_display *
-weston_desktop_get_display(struct weston_desktop *desktop)
+desktop_shell_get_display(struct desktop_shell *shell)
 {
-	return desktop->compositor->wl_display;
+	return shell->compositor->wl_display;
 }
 
 void
-weston_desktop_api_ping_timeout(struct weston_desktop *desktop,
+weston_desktop_api_ping_timeout(struct desktop_shell *shell,
 				struct weston_desktop_client *client)
 {
-	struct desktop_shell *shell = desktop->user_data;
 	struct shell_surface *shsurf;
 	struct weston_seat *seat;
 	bool unresponsive = true;
@@ -2701,10 +2663,9 @@ weston_desktop_api_ping_timeout(struct weston_desktop *desktop,
 }
 
 void
-weston_desktop_api_pong(struct weston_desktop *desktop,
+weston_desktop_api_pong(struct desktop_shell *shell,
 			struct weston_desktop_client *client)
 {
-	struct desktop_shell *shell = desktop->user_data;
 	bool unresponsive = false;
 
 	weston_desktop_client_for_each_surface(client,
@@ -2714,7 +2675,7 @@ weston_desktop_api_pong(struct weston_desktop *desktop,
 }
 
 void
-weston_desktop_api_surface_added(struct weston_desktop *desktop,
+weston_desktop_api_surface_added(struct desktop_shell *shell,
 				 struct weston_desktop_surface *desktop_surface)
 {
 	struct weston_desktop_client *client =
@@ -2743,7 +2704,7 @@ weston_desktop_api_surface_added(struct weston_desktop *desktop,
 
 	weston_surface_set_label_func(surface, shell_surface_get_label);
 
-	shsurf->shell = (struct desktop_shell *) desktop->user_data;
+	shsurf->shell = shell;
 	shsurf->unresponsive = 0;
 	shsurf->saved_position_valid = false;
 	shsurf->saved_rotation_valid = false;
@@ -2778,7 +2739,7 @@ weston_desktop_api_surface_added(struct weston_desktop *desktop,
 }
 
 void
-weston_desktop_api_surface_removed(struct weston_desktop *desktop,
+weston_desktop_api_surface_removed(struct desktop_shell *shell,
 				   struct weston_desktop_surface *desktop_surface)
 {
 	struct wl_list *link = weston_desktop_surface_get_client_link(desktop_surface);
@@ -2832,7 +2793,7 @@ weston_desktop_api_surface_removed(struct weston_desktop *desktop,
 }
 
 void
-weston_desktop_api_committed(struct weston_desktop *desktop,
+weston_desktop_api_committed(struct desktop_shell *shell,
 			     struct weston_desktop_surface *desktop_surface,
 			     int32_t sx, int32_t sy)
 {
@@ -2841,7 +2802,6 @@ weston_desktop_api_committed(struct weston_desktop *desktop,
 	struct weston_surface *surface =
 		weston_desktop_surface_get_surface(desktop_surface);
 	struct weston_view *view = shsurf->view;
-	struct desktop_shell *shell = desktop->user_data;
 	bool was_fullscreen;
 	bool was_maximized;
 
@@ -2929,7 +2889,7 @@ weston_desktop_api_committed(struct weston_desktop *desktop,
 }
 
 void
-weston_desktop_api_show_window_menu(struct weston_desktop *desktop,
+weston_desktop_api_show_window_menu(struct desktop_shell *shell,
 				    struct weston_desktop_surface *surface,
 				    struct weston_seat *seat,
 				    int32_t x, int32_t y)
@@ -2937,7 +2897,7 @@ weston_desktop_api_show_window_menu(struct weston_desktop *desktop,
 }
 
 void
-weston_desktop_api_set_parent(struct weston_desktop *desktop,
+weston_desktop_api_set_parent(struct desktop_shell *shell,
 			      struct weston_desktop_surface *desktop_surface,
 			      struct weston_desktop_surface *parent)
 {
@@ -2958,7 +2918,7 @@ weston_desktop_api_set_parent(struct weston_desktop *desktop,
 }
 
 void
-weston_desktop_api_move(struct weston_desktop *desktop,
+weston_desktop_api_move(struct desktop_shell *shell,
 			struct weston_desktop_surface *desktop_surface,
 			struct weston_seat *seat, uint32_t serial)
 {
@@ -2990,7 +2950,7 @@ weston_desktop_api_move(struct weston_desktop *desktop,
 }
 
 void
-weston_desktop_api_resize(struct weston_desktop *desktop,
+weston_desktop_api_resize(struct desktop_shell *shell,
 			  struct weston_desktop_surface *desktop_surface,
 			  struct weston_seat *seat, uint32_t serial,
 			  enum weston_desktop_surface_edge edges)
@@ -3019,7 +2979,7 @@ weston_desktop_api_resize(struct weston_desktop *desktop,
 }
 
 void
-weston_desktop_api_fullscreen_requested(struct weston_desktop *desktop,
+weston_desktop_api_fullscreen_requested(struct desktop_shell *shell,
 					struct weston_desktop_surface *desktop_surface,
 					bool fullscreen,
 					struct weston_output *output)
@@ -3031,7 +2991,7 @@ weston_desktop_api_fullscreen_requested(struct weston_desktop *desktop,
 }
 
 void
-weston_desktop_api_maximized_requested(struct weston_desktop *desktop,
+weston_desktop_api_maximized_requested(struct desktop_shell *shell,
 				       struct weston_desktop_surface *desktop_surface,
 				       bool maximized)
 {
@@ -3043,7 +3003,7 @@ weston_desktop_api_maximized_requested(struct weston_desktop *desktop,
 }
 
 void
-weston_desktop_api_minimized_requested(struct weston_desktop *desktop,
+weston_desktop_api_minimized_requested(struct desktop_shell *shell,
 				       struct weston_desktop_surface *desktop_surface)
 {
 	struct weston_surface *surface =
@@ -3054,7 +3014,7 @@ weston_desktop_api_minimized_requested(struct weston_desktop *desktop,
 }
 
 void
-weston_desktop_api_set_xwayland_position(struct weston_desktop *desktop,
+weston_desktop_api_set_xwayland_position(struct desktop_shell *shell,
 					 struct weston_desktop_surface *surface,
 					 int32_t x, int32_t y)
 {
@@ -4976,6 +4936,13 @@ shell_destroy(struct wl_listener *listener, void *data)
 		workspace_destroy(*ws);
 	wl_array_release(&shell->workspaces.array);
 
+	if (shell->wl_shell != NULL)
+		wl_global_destroy(shell->wl_shell);
+	if (shell->xdg_shell_v6 != NULL)
+		wl_global_destroy(shell->xdg_shell_v6);
+	if (shell->xdg_wm_base != NULL)
+		wl_global_destroy(shell->xdg_wm_base);
+
 	free(shell->client);
 	free(shell);
 }
@@ -5095,7 +5062,7 @@ shell_finish_init(struct desktop_shell *shell)
 	weston_compositor_init_input(shell->compositor);
 	shell->initialized_inputs = true;
 
-	exo_extensions_init(shell->desktop, shell->compositor->wl_display);
+	exo_extensions_init(shell);
 }
 
 WL_EXPORT int
@@ -5171,8 +5138,7 @@ wet_shell_init(struct weston_compositor *ec,
 	wl_list_init(&shell->workspaces.animation.link);
 	shell->workspaces.animation.frame = animate_workspace_change_frame;
 
-	shell->desktop = weston_desktop_create(ec, shell);
-	if (!shell->desktop)
+	if (weston_desktop_create(ec, shell) == -1)
 		return -1;
 
 	if (wl_global_create(ec->wl_display,

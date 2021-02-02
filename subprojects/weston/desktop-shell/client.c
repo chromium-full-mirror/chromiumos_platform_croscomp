@@ -30,9 +30,10 @@
 
 #include "libweston-desktop.h"
 #include "internal.h"
+#include "shell.h"
 
 struct weston_desktop_client {
-	struct weston_desktop *desktop;
+	struct desktop_shell *shell;
 	struct wl_client *client;
 	struct wl_resource *resource;
 	struct wl_list surface_list;
@@ -76,12 +77,12 @@ weston_desktop_client_ping_timeout(void *user_data)
 {
 	struct weston_desktop_client *client = user_data;
 
-	weston_desktop_api_ping_timeout(client->desktop, client);
+	weston_desktop_api_ping_timeout(client->shell, client);
 	return 1;
 }
 
 struct weston_desktop_client *
-weston_desktop_client_create(struct weston_desktop *desktop,
+weston_desktop_client_create(struct desktop_shell *shell,
 			     struct wl_client *wl_client,
 			     wl_dispatcher_func_t dispatcher,
 			     const struct wl_interface *interface,
@@ -99,7 +100,7 @@ weston_desktop_client_create(struct weston_desktop *desktop,
 		return NULL;
 	}
 
-	client->desktop = desktop;
+	client->shell = shell;
 	client->client = wl_client;
 
 	wl_list_init(&client->surface_list);
@@ -137,10 +138,10 @@ weston_desktop_client_create(struct weston_desktop *desktop,
 	return client;
 }
 
-struct weston_desktop *
-weston_desktop_client_get_desktop(struct weston_desktop_client *client)
+struct desktop_shell *
+weston_desktop_client_get_shell(struct weston_desktop_client *client)
 {
-	return client->desktop;
+	return client->shell;
 }
 
 struct wl_resource *
@@ -205,7 +206,7 @@ weston_desktop_client_pong(struct weston_desktop_client *client, uint32_t serial
 	if (client->ping_serial != serial)
 		return;
 
-	weston_desktop_api_pong(client->desktop, client);
+	weston_desktop_api_pong(client->shell, client);
 
 	wl_event_source_timer_update(client->ping_timer, 0);
 	client->ping_serial = 0;

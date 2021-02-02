@@ -59,9 +59,9 @@ terminal_binding(struct weston_keyboard *keyboard,
 			struct weston_desktop_surface *ds =
 				weston_surface_get_desktop_surface(t->client_surface);
 
-			weston_desktop_api_fullscreen_requested(t->shell->desktop,
+			weston_desktop_api_fullscreen_requested(t->shell,
 								ds, false, NULL);
-			weston_desktop_api_minimized_requested(t->shell->desktop, ds);
+			weston_desktop_api_minimized_requested(t->shell, ds);
 		}
 		return;
 	}
@@ -73,7 +73,7 @@ terminal_binding(struct weston_keyboard *keyboard,
 		wl_list_for_each(view, &t->client_surface->views, surface_link)
 			activate(t->shell, view, keyboard->seat,
 				 WESTON_ACTIVATE_FLAG_CONFIGURE);
-		weston_desktop_api_fullscreen_requested(t->shell->desktop,
+		weston_desktop_api_fullscreen_requested(t->shell,
 							ds, true, t->client_surface->output);
 
 		return;

@@ -35,6 +35,7 @@
 
 #include "libweston-desktop.h"
 #include "internal.h"
+#include "shell.h"
 
 #define WD_WL_SHELL_PROTOCOL_VERSION 1
 
@@ -49,7 +50,7 @@ enum weston_desktop_wl_shell_surface_state {
 
 struct weston_desktop_wl_shell_surface {
 	struct wl_resource *resource;
-	struct weston_desktop *desktop;
+	struct desktop_shell *shell;
 	struct wl_display *display;
 	struct weston_desktop_surface *surface;
 	struct weston_desktop_surface *parent;
@@ -102,7 +103,7 @@ weston_desktop_wl_shell_surface_committed(struct weston_desktop_surface *dsurfac
 		weston_desktop_wl_shell_surface_maybe_ungrab(surface);
 
 	if (surface->added)
-		weston_desktop_api_committed(surface->desktop, surface->surface,
+		weston_desktop_api_committed(surface->shell, surface->surface,
 					     sx, sy);
 }
 
@@ -164,10 +165,10 @@ weston_desktop_wl_shell_change_state(struct weston_desktop_wl_shell_surface *sur
 
 		if (to_add) {
 			weston_desktop_surface_unset_relative_to(surface->surface);
-			weston_desktop_api_surface_added(surface->desktop,
+			weston_desktop_api_surface_added(surface->shell,
 							 surface->surface);
 		} else if (surface->added) {
-			weston_desktop_api_surface_removed(surface->desktop,
+			weston_desktop_api_surface_removed(surface->shell,
 							   surface->surface);
 		}
 
@@ -191,7 +192,7 @@ weston_desktop_wl_shell_surface_destroy(struct weston_desktop_surface *dsurface,
 	weston_desktop_wl_shell_surface_maybe_ungrab(surface);
 	weston_desktop_surface_unset_relative_to(surface->surface);
 	if (surface->added)
-		weston_desktop_api_surface_removed(surface->desktop,
+		weston_desktop_api_surface_removed(surface->shell,
 						   surface->surface);
 
 	free(surface);
@@ -223,7 +224,7 @@ weston_desktop_wl_shell_surface_protocol_move(struct wl_client *wl_client,
 	if (seat == NULL)
 		return;
 
-	weston_desktop_api_move(surface->desktop, dsurface, seat, serial);
+	weston_desktop_api_move(surface->shell, dsurface, seat, serial);
 }
 
 static void
@@ -244,7 +245,8 @@ weston_desktop_wl_shell_surface_protocol_resize(struct wl_client *wl_client,
 	if (seat == NULL)
 		return;
 
-	weston_desktop_api_resize(surface->desktop, dsurface, seat, serial, surf_edges);
+	weston_desktop_api_resize(surface->shell,
+				  dsurface, seat, serial, surf_edges);
 }
 
 static void
@@ -260,7 +262,7 @@ weston_desktop_wl_shell_surface_protocol_set_toplevel(struct wl_client *wl_clien
 	if (surface->parent == NULL)
 		return;
 	surface->parent = NULL;
-	weston_desktop_api_set_parent(surface->desktop, surface->surface, NULL);
+	weston_desktop_api_set_parent(surface->shell, surface->surface, NULL);
 }
 
 static void
@@ -289,7 +291,7 @@ weston_desktop_wl_shell_surface_protocol_set_transient(struct wl_client *wl_clie
 		weston_desktop_wl_shell_change_state(surface, TOPLEVEL, NULL,
 						     0, 0);
 		surface->parent = parent;
-		weston_desktop_api_set_parent(surface->desktop,
+		weston_desktop_api_set_parent(surface->shell,
 					      surface->surface, parent);
 	}
 }
@@ -311,7 +313,7 @@ weston_desktop_wl_shell_surface_protocol_set_fullscreen(struct wl_client *wl_cli
 		output = weston_head_from_resource(output_resource)->output;
 
 	weston_desktop_wl_shell_change_state(surface, FULLSCREEN, NULL, 0, 0);
-	weston_desktop_api_fullscreen_requested(surface->desktop, dsurface,
+	weston_desktop_api_fullscreen_requested(surface->shell, dsurface,
 						true, output);
 }
 
@@ -362,7 +364,7 @@ weston_desktop_wl_shell_surface_protocol_set_maximized(struct wl_client *wl_clie
 		weston_desktop_surface_get_implementation_data(dsurface);
 
 	weston_desktop_wl_shell_change_state(surface, MAXIMIZED, NULL, 0, 0);
-	weston_desktop_api_maximized_requested(surface->desktop, dsurface, true);
+	weston_desktop_api_maximized_requested(surface->shell, dsurface, true);
 }
 
 static void
@@ -446,11 +448,11 @@ weston_desktop_wl_shell_protocol_get_shell_surface(struct wl_client *wl_client,
 		return;
 	}
 
-	surface->desktop = weston_desktop_client_get_desktop(client);
-	surface->display = weston_desktop_get_display(surface->desktop);
+	surface->shell = weston_desktop_client_get_shell(client);
+	surface->display = desktop_shell_get_display(surface->shell);
 
 	surface->surface =
-		weston_desktop_surface_create(surface->desktop, client, wsurface,
+		weston_desktop_surface_create(surface->shell, client, wsurface,
 					      &weston_desktop_wl_shell_surface_internal_implementation,
 					      surface);
 	if (surface->surface == NULL) {
@@ -479,19 +481,19 @@ static void
 weston_desktop_wl_shell_bind(struct wl_client *client, void *data,
 			     uint32_t version, uint32_t id)
 {
-	struct weston_desktop *desktop = data;
+	struct desktop_shell *shell = data;
 
-	weston_desktop_client_create(desktop, client, NULL, &wl_shell_interface,
+	weston_desktop_client_create(shell, client, NULL, &wl_shell_interface,
 				     &weston_desktop_wl_shell_implementation,
 				     version, id);
 }
 
 struct wl_global *
-weston_desktop_wl_shell_create(struct weston_desktop *desktop,
+weston_desktop_wl_shell_create(struct desktop_shell *shell,
 			       struct wl_display *display)
 {
 	return wl_global_create(display,
 				&wl_shell_interface,
-				WD_WL_SHELL_PROTOCOL_VERSION, desktop,
+				WD_WL_SHELL_PROTOCOL_VERSION, shell,
 				weston_desktop_wl_shell_bind);
 }

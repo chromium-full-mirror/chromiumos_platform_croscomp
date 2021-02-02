@@ -39,11 +39,12 @@
 #include <libweston/libweston.h>
 #include "libweston-desktop.h"
 #include "internal.h"
+#include "shell.h"
 
 
 struct exo_surface {
 	struct wl_resource *resource;
-	struct weston_desktop *desktop;
+	struct desktop_shell *shell;
 	struct wl_display *display;
 	struct weston_desktop_surface *surface;
 	struct wl_listener destroy_listener;
@@ -64,7 +65,7 @@ exo_surface_committed(struct weston_desktop_surface *dsurface,
 {
 	struct exo_surface *surface = user_data;
 
-	weston_desktop_api_committed(surface->desktop, surface->surface, sx, sy);
+	weston_desktop_api_committed(surface->shell, surface->surface, sx, sy);
 }
 
 static void
@@ -76,7 +77,7 @@ exo_surface_destroy(struct weston_desktop_surface *dsurface,
 	wl_list_remove(&surface->destroy_listener.link);
 
 	if (surface->added)
-		weston_desktop_api_surface_removed(surface->desktop,
+		weston_desktop_api_surface_removed(surface->shell,
 						   surface->surface);
 
 	free(surface);
@@ -125,7 +126,7 @@ static const struct zcr_alpha_compositing_v1_interface zcr_alpha_compositing_v1_
 };
 
 static struct wl_resource *
-do_bind(struct wl_client *client, struct weston_desktop *desktop,
+do_bind(struct wl_client *client, struct desktop_shell *shell,
 	uint32_t version, uint32_t id,
 	const struct wl_interface *interface,
 	const void *implementation)
@@ -136,7 +137,7 @@ do_bind(struct wl_client *client, struct weston_desktop *desktop,
 
 	resource = wl_resource_create(client, interface, version, id);
 
-	wl_resource_set_implementation(resource, implementation, desktop, NULL);
+	wl_resource_set_implementation(resource, implementation, shell, NULL);
 
 	return resource;
 }
@@ -567,9 +568,9 @@ remote_surface_maximize(struct wl_client *client,
 	weston_log("exo: remote_surface_maximize\n");
 
 	surface->added = true;
-	weston_desktop_api_surface_added(surface->desktop,
+	weston_desktop_api_surface_added(surface->shell,
 					 surface->surface);
-	weston_desktop_api_maximized_requested(surface->desktop, dsurface, true);
+	weston_desktop_api_maximized_requested(surface->shell, dsurface, true);
 }
 
 static void
@@ -966,12 +967,12 @@ remote_shell_get_remote_surface(struct wl_client *wl_client,
 		return;
 	}
 
-	surface->desktop = weston_desktop_client_get_desktop(client);
-	surface->display = weston_desktop_get_display(surface->desktop);
+	surface->shell = weston_desktop_client_get_shell(client);
+	surface->display = desktop_shell_get_display(surface->shell);
 	surface->added = false;
 
 	surface->surface =
-		weston_desktop_surface_create(surface->desktop, client, wsurface,
+		weston_desktop_surface_create(surface->shell, client, wsurface,
 					      &exo_surface_internal_implementation,
 					      surface);
 	if (surface->surface == NULL) {
@@ -1052,11 +1053,11 @@ static void
 bind_remote_shell(struct wl_client *wl_client,
 		  void *data, uint32_t version, uint32_t id)
 {
-	struct weston_desktop *desktop = data;
-	struct weston_compositor *compositor = weston_desktop_get_compositor(desktop);
+	struct desktop_shell *dshell = data;
+	struct weston_compositor *compositor = desktop_shell_get_compositor(dshell);
 	struct weston_desktop_client *client;
 
-	client = weston_desktop_client_create(desktop, wl_client, NULL,
+	client = weston_desktop_client_create(dshell, wl_client, NULL,
 					      &zcr_remote_shell_v1_interface,
 					      &zcr_remote_shell_v1_implementation,
 					      version, id);
@@ -1164,67 +1165,68 @@ bind_vsync_feedback(struct wl_client *client,
 }
 
 int
-exo_extensions_init(struct weston_desktop *desktop,
-		    struct wl_display *display)
+exo_extensions_init(struct desktop_shell *shell)
 {
+	struct wl_display *display = desktop_shell_get_display(shell);
+
 	if (wl_global_create(display,
 			     &zcr_alpha_compositing_v1_interface, 1,
-			     desktop, bind_alpha_compositing) == NULL)
+			     shell, bind_alpha_compositing) == NULL)
 		return -1;
 	
 	if (wl_global_create(display,
 			     &zaura_shell_interface, 12,
-			     desktop, bind_aura_shell) == NULL)
+			     shell, bind_aura_shell) == NULL)
 		return -1;
 
 	if (wl_global_create(display,
 			     &zwp_pointer_gestures_v1_interface, 2,
-			     desktop, bind_pointer_gestures) == NULL)
+			     shell, bind_pointer_gestures) == NULL)
 		return -1;
 
 	if (wl_global_create(display,
 			     &zcr_gaming_input_v2_interface, 2,
-			     desktop, bind_gaming_input) == NULL)
+			     shell, bind_gaming_input) == NULL)
 		return -1;
 
 	if (wl_global_create(display,
 			     &zcr_keyboard_configuration_v1_interface, 2,
-			     desktop, bind_keyboard_configuration) == NULL)
+			     shell, bind_keyboard_configuration) == NULL)
 		return -1;
 
 	if (wl_global_create(display,
 			     &zcr_keyboard_extension_v1_interface, 1,
-			     desktop, bind_keyboard_extension) == NULL)
+			     shell, bind_keyboard_extension) == NULL)
 		return -1;
 
 	if (wl_global_create(display,
 			     &zcr_cursor_shapes_v1_interface, 1,
-			     desktop, bind_cursor_shapes) == NULL)
+			     shell, bind_cursor_shapes) == NULL)
 		return -1;
 
 	if (wl_global_create(display,
 			     &zcr_remote_shell_v1_interface, 30,
-			     desktop, bind_remote_shell) == NULL)
+			     shell, bind_remote_shell) == NULL)
 		return -1;
 
 	if (wl_global_create(display,
 			     &zcr_secure_output_v1_interface, 1,
-			     desktop, bind_secure_output) == NULL)
+			     shell, bind_secure_output) == NULL)
 		return -1;
 
 	if (wl_global_create(display,
 			     &zcr_stylus_v2_interface, 2,
-			     desktop, bind_stylus) == NULL)
+			     shell, bind_stylus) == NULL)
 		return -1;
 
 	if (wl_global_create(display,
 			     &zcr_stylus_tools_v1_interface, 1,
-			     desktop, bind_stylus_tools) == NULL)
+			     shell, bind_stylus_tools) == NULL)
 		return -1;
 
 	if (wl_global_create(display,
 			     &zcr_vsync_feedback_v1_interface, 1,
-			     desktop, bind_vsync_feedback) == NULL)
+			     shell, bind_vsync_feedback) == NULL)
 		return -1;
 
 	weston_log("exo: init done\n");

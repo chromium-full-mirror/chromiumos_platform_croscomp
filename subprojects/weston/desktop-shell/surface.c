@@ -33,6 +33,7 @@
 
 #include "libweston-desktop.h"
 #include "internal.h"
+#include "shell.h"
 
 struct weston_desktop_view {
 	struct wl_list link;
@@ -43,7 +44,7 @@ struct weston_desktop_view {
 };
 
 struct weston_desktop_surface {
-	struct weston_desktop *desktop;
+	struct desktop_shell *shell;
 	struct weston_desktop_client *client;
 	struct wl_list client_link;
 	const struct weston_desktop_surface_implementation *implementation;
@@ -239,7 +240,7 @@ weston_desktop_surface_client_destroyed(struct wl_listener *listener,
 }
 
 struct weston_desktop_surface *
-weston_desktop_surface_create(struct weston_desktop *desktop,
+weston_desktop_surface_create(struct desktop_shell *shell,
 			      struct weston_desktop_client *client,
 			      struct weston_surface *wsurface,
 			      const struct weston_desktop_surface_implementation *implementation,
@@ -256,7 +257,7 @@ weston_desktop_surface_create(struct weston_desktop *desktop,
 		return NULL;
 	}
 
-	surface->desktop = desktop;
+	surface->shell = shell;
 	surface->implementation = implementation;
 	surface->implementation_data = implementation_data;
 	surface->surface = wsurface;

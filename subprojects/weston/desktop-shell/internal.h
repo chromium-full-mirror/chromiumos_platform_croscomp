@@ -28,61 +28,62 @@
 
 struct weston_desktop_seat;
 struct weston_desktop_client;
+struct desktop_shell;
 
 struct weston_compositor *
-weston_desktop_get_compositor(struct weston_desktop *desktop);
+desktop_shell_get_compositor(struct desktop_shell *shell);
 struct wl_display *
-weston_desktop_get_display(struct weston_desktop *desktop);
+desktop_shell_get_display(struct desktop_shell *shell);
 
 void
-weston_desktop_api_ping_timeout(struct weston_desktop *desktop,
+weston_desktop_api_ping_timeout(struct desktop_shell *shell,
 				struct weston_desktop_client *client);
 void
-weston_desktop_api_pong(struct weston_desktop *desktop,
+weston_desktop_api_pong(struct desktop_shell *shell,
 			struct weston_desktop_client *client);
 void
-weston_desktop_api_surface_added(struct weston_desktop *desktop,
+weston_desktop_api_surface_added(struct desktop_shell *shell,
 				 struct weston_desktop_surface *surface);
 void
-weston_desktop_api_surface_removed(struct weston_desktop *desktop,
+weston_desktop_api_surface_removed(struct desktop_shell *shell,
 				   struct weston_desktop_surface *surface);
 void
-weston_desktop_api_committed(struct weston_desktop *desktop,
+weston_desktop_api_committed(struct desktop_shell *shell,
 			     struct weston_desktop_surface *surface,
 			     int32_t sx, int32_t sy);
 void
-weston_desktop_api_show_window_menu(struct weston_desktop *desktop,
+weston_desktop_api_show_window_menu(struct desktop_shell *shell,
 				    struct weston_desktop_surface *surface,
 				    struct weston_seat *seat,
 				    int32_t x, int32_t y);
 void
-weston_desktop_api_set_parent(struct weston_desktop *desktop,
+weston_desktop_api_set_parent(struct desktop_shell *shell,
 			      struct weston_desktop_surface *surface,
 			      struct weston_desktop_surface *parent);
 void
-weston_desktop_api_move(struct weston_desktop *desktop,
+weston_desktop_api_move(struct desktop_shell *shell,
 			struct weston_desktop_surface *surface,
 			struct weston_seat *seat, uint32_t serial);
 void
-weston_desktop_api_resize(struct weston_desktop *desktop,
+weston_desktop_api_resize(struct desktop_shell *shell,
 			  struct weston_desktop_surface *surface,
 			  struct weston_seat *seat, uint32_t serial,
 			  enum weston_desktop_surface_edge edges);
 void
-weston_desktop_api_fullscreen_requested(struct weston_desktop *desktop,
+weston_desktop_api_fullscreen_requested(struct desktop_shell *shell,
 					struct weston_desktop_surface *surface,
 					bool fullscreen,
 					struct weston_output *output);
 void
-weston_desktop_api_maximized_requested(struct weston_desktop *desktop,
+weston_desktop_api_maximized_requested(struct desktop_shell *shell,
 				       struct weston_desktop_surface *surface,
 				       bool maximized);
 void
-weston_desktop_api_minimized_requested(struct weston_desktop *desktop,
+weston_desktop_api_minimized_requested(struct desktop_shell *shell,
 				       struct weston_desktop_surface *surface);
 
 void
-weston_desktop_api_set_xwayland_position(struct weston_desktop *desktop,
+weston_desktop_api_set_xwayland_position(struct desktop_shell *shell,
 					 struct weston_desktop_surface *surface,
 					 int32_t x, int32_t y);
 
@@ -128,7 +129,7 @@ struct weston_desktop_surface_implementation {
 };
 
 struct weston_desktop_client *
-weston_desktop_client_create(struct weston_desktop *desktop,
+weston_desktop_client_create(struct desktop_shell *shell,
 			     struct wl_client *client,
 			     wl_dispatcher_func_t dispatcher,
 			     const struct wl_interface *interface,
@@ -138,8 +139,8 @@ weston_desktop_client_create(struct weston_desktop *desktop,
 void
 weston_desktop_client_add_destroy_listener(struct weston_desktop_client *client,
 					   struct wl_listener *listener);
-struct weston_desktop *
-weston_desktop_client_get_desktop(struct weston_desktop_client *client);
+struct desktop_shell *
+weston_desktop_client_get_shell(struct weston_desktop_client *client);
 struct wl_resource *
 weston_desktop_client_get_resource(struct weston_desktop_client *client);
 struct wl_list *
@@ -150,7 +151,7 @@ weston_desktop_client_pong(struct weston_desktop_client *client,
 			   uint32_t serial);
 
 struct weston_desktop_surface *
-weston_desktop_surface_create(struct weston_desktop *desktop,
+weston_desktop_surface_create(struct desktop_shell *shell,
 			      struct weston_desktop_client *client,
 			      struct weston_surface *surface,
 			      const struct weston_desktop_surface_implementation *implementation,
@@ -227,18 +228,16 @@ void
 weston_desktop_destroy_request(struct wl_client *client,
 			       struct wl_resource *resource);
 struct wl_global *
-weston_desktop_xdg_wm_base_create(struct weston_desktop *desktop,
+weston_desktop_xdg_wm_base_create(struct desktop_shell *shell,
 				  struct wl_display *display);
 struct wl_global *
-weston_desktop_xdg_shell_v6_create(struct weston_desktop *desktop,
+weston_desktop_xdg_shell_v6_create(struct desktop_shell *shell,
 				   struct wl_display *display);
 struct wl_global *
-weston_desktop_wl_shell_create(struct weston_desktop *desktop,
+weston_desktop_wl_shell_create(struct desktop_shell *shell,
 			       struct wl_display *display);
 
 int
-exo_extensions_init(struct weston_desktop *desktop,
-		    struct wl_display *display);
-
+exo_extensions_init(struct desktop_shell *shell);
 
 #endif /* WESTON_DESKTOP_INTERNAL_H */
