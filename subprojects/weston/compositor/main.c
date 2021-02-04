@@ -46,6 +46,7 @@
 #include <sys/time.h>
 #include <linux/limits.h>
 #include <grp.h>
+#include <time.h>
 
 #include "weston.h"
 #include <libweston/libweston.h>
