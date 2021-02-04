@@ -36,6 +36,7 @@
 #include "weston-test-fixture-compositor.h"
 #include "weston.h"
 #include "test-config.h"
+#include "shared/zalloc.h"
 
 struct prog_args {
 	int argc;

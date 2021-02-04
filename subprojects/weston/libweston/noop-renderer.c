@@ -29,6 +29,7 @@
 #include <stdlib.h>
 
 #include <libweston/libweston.h>
+#include "shared/zalloc.h"
 #include "libweston-internal.h"
 
 static int

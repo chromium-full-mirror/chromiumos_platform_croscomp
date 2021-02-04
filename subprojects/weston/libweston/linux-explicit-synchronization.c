@@ -33,6 +33,7 @@
 #include "linux-explicit-synchronization-unstable-v1-server-protocol.h"
 #include "linux-sync-file.h"
 #include "shared/fd-util.h"
+#include "shared/zalloc.h"
 #include "libweston-internal.h"
 
 static void

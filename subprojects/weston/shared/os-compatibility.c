@@ -33,9 +33,9 @@
 #include <sys/epoll.h>
 #include <string.h>
 #include <stdlib.h>
-#include <libweston/zalloc.h>
 #include <sys/mman.h>
 
+#include "zalloc.h"
 #include "os-compatibility.h"
 
 #define READONLY_SEALS (F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_WRITE)

@@ -32,6 +32,7 @@
 #include "weston.h"
 #include "weston-screenshooter-server-protocol.h"
 #include "shared/helpers.h"
+#include "shared/zalloc.h"
 #include <libweston/weston-log.h>
 
 struct screenshooter {

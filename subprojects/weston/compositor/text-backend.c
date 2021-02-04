@@ -38,6 +38,7 @@
 #include "text-input-unstable-v1-server-protocol.h"
 #include "input-method-unstable-v1-server-protocol.h"
 #include "shared/helpers.h"
+#include "shared/zalloc.h"
 #include "shared/timespec-util.h"
 
 struct text_input_manager;

@@ -40,6 +40,7 @@
 #include <libweston/pixel-formats.h>
 #include <libweston/linux-dmabuf.h>
 #include "shared/helpers.h"
+#include "shared/zalloc.h"
 #include "drm-internal.h"
 #include "linux-dmabuf.h"
 

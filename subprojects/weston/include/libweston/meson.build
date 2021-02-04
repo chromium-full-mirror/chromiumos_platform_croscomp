@@ -5,7 +5,6 @@ install_headers(
 	'plugin-registry.h',
 	'windowed-output-api.h',
 	'weston-log.h',
-	'zalloc.h',
 	subdir: dir_include_libweston_install
 )
 

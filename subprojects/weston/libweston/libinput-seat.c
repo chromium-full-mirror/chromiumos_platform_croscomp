@@ -35,6 +35,7 @@
 #include <libudev.h>
 
 #include <libweston/libweston.h>
+#include "shared/zalloc.h"
 #include "backend.h"
 #include "libweston-internal.h"
 #include "weston-log-internal.h"

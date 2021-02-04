@@ -48,7 +48,7 @@
 
 #include <libweston/config-parser.h>
 #include "shared/helpers.h"
-#include <libweston/zalloc.h>
+#include "shared/zalloc.h"
 
 /*
  * If CLOCK_MONOTONIC is present on the system it will give us reliable

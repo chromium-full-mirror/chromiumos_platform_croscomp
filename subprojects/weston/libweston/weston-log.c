@@ -28,6 +28,7 @@
 
 #include <libweston/weston-log.h>
 #include "shared/helpers.h"
+#include "shared/zalloc.h"
 #include <libweston/libweston.h>
 
 #include "weston-log-internal.h"
@@ -39,6 +40,7 @@
 #include <string.h>
 #include <errno.h>
 #include <sys/time.h>
+#include <time.h>
 
 /**
  * @defgroup log Public Logging/Debugging API

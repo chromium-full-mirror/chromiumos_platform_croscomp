@@ -27,6 +27,7 @@
 
 #include <libweston/weston-log.h>
 #include "shared/helpers.h"
+#include "shared/zalloc.h"
 #include <libweston/libweston.h>
 
 #include "weston-log-internal.h"

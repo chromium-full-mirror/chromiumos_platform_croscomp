@@ -4,6 +4,7 @@ srcs_libshared = [
 	'file-util.c',
 	'os-compatibility.c',
 	'xalloc.c',
+	'zalloc.h',
 ]
 deps_libshared = dep_wayland_client
 

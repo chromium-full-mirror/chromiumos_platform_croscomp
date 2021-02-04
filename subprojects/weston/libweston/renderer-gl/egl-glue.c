@@ -28,6 +28,7 @@
 #include "config.h"
 
 #include <assert.h>
+#include <stdlib.h>
 
 #include "shared/helpers.h"
 #include "shared/platform.h"

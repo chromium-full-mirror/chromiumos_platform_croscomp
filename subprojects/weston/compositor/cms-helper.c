@@ -35,6 +35,7 @@
 #endif
 
 #include <libweston/libweston.h>
+#include "shared/zalloc.h"
 #include "cms-helper.h"
 
 #ifdef HAVE_LCMS

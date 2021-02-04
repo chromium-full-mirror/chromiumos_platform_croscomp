@@ -34,6 +34,7 @@
 
 #include "pixman-renderer.h"
 #include "shared/helpers.h"
+#include "shared/zalloc.h"
 
 #include <linux/input.h>
 

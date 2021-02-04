@@ -51,6 +51,7 @@
 #include <libweston/libweston.h>
 #include "shared/os-compatibility.h"
 #include "shared/helpers.h"
+#include "shared/zalloc.h"
 #include "shared/string-helpers.h"
 #include "git-version.h"
 #include <libweston/version.h>

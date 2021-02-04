@@ -45,6 +45,7 @@
 #include "libweston-internal.h"
 #include "weston.h"
 #include "shared/helpers.h"
+#include "shared/zalloc.h"
 #include "shared/os-compatibility.h"
 #include "shared/timespec-util.h"
 #include "fullscreen-shell-unstable-v1-client-protocol.h"

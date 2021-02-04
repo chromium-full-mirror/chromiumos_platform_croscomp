@@ -52,6 +52,7 @@
 #include "shared/weston-egl-ext.h"
 #include "pixman-renderer.h"
 #include "shared/helpers.h"
+#include "shared/zalloc.h"
 #include "shared/image-loader.h"
 #include "shared/os-compatibility.h"
 #include "shared/cairo-util.h"

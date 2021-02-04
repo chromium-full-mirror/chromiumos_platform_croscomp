@@ -30,6 +30,7 @@
 
 #include "shell.h"
 #include "shared/helpers.h"
+#include "shared/zalloc.h"
 
 struct exposay_surface {
 	struct desktop_shell *shell;

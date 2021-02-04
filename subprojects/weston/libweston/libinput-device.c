@@ -43,6 +43,7 @@
 #include "libweston-internal.h"
 #include "libinput-device.h"
 #include "shared/helpers.h"
+#include "shared/zalloc.h"
 #include "shared/timespec-util.h"
 
 void

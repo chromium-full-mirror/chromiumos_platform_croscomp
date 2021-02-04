@@ -47,7 +47,7 @@
 #include <linux/input.h>
 
 #include <wayland-client.h>
-#include <libweston/zalloc.h>
+#include "shared/zalloc.h"
 #include "xdg-shell-client-protocol.h"
 #include "fullscreen-shell-unstable-v1-client-protocol.h"
 #include "linux-dmabuf-unstable-v1-client-protocol.h"

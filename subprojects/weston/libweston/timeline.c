@@ -34,6 +34,7 @@
 
 #include <libweston/libweston.h>
 #include <libweston/weston-log.h>
+#include "shared/zalloc.h"
 #include "timeline.h"
 #include "weston-log-internal.h"
 

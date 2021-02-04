@@ -42,7 +42,6 @@ extern "C" {
 #include <wayland-server.h>
 
 #include <libweston/matrix.h>
-#include <libweston/zalloc.h>
 
 struct weston_geometry {
 	int32_t x, y;

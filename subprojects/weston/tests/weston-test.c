@@ -45,6 +45,7 @@
 #include "weston-testsuite-data.h"
 
 #include "shared/helpers.h"
+#include "shared/zalloc.h"
 #include "shared/timespec-util.h"
 
 #define MAX_TOUCH_DEVICES 32

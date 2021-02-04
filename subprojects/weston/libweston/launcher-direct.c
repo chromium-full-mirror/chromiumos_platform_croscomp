@@ -40,6 +40,8 @@
 #include <linux/major.h>
 
 #include "launcher-impl.h"
+#include "shared/helpers.h"
+#include "shared/zalloc.h"
 
 #define DRM_MAJOR 226
 

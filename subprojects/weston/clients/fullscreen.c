@@ -37,7 +37,7 @@
 #include <wayland-client.h>
 #include "window.h"
 #include "fullscreen-shell-unstable-v1-client-protocol.h"
-#include <libweston/zalloc.h>
+#include "shared/zalloc.h"
 
 struct fs_output {
 	struct wl_list link;

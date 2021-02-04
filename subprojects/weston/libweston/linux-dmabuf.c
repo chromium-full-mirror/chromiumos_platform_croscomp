@@ -31,6 +31,7 @@
 #include <sys/types.h>
 
 #include <libweston/libweston.h>
+#include "shared/zalloc.h"
 #include "linux-dmabuf.h"
 #include "linux-dmabuf-unstable-v1-server-protocol.h"
 #include "libweston-internal.h"

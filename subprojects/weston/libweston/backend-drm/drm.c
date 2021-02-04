@@ -53,6 +53,7 @@
 #include <libweston/weston-log.h>
 #include "drm-internal.h"
 #include "shared/helpers.h"
+#include "shared/zalloc.h"
 #include "shared/timespec-util.h"
 #include "shared/string-helpers.h"
 #include "pixman-renderer.h"

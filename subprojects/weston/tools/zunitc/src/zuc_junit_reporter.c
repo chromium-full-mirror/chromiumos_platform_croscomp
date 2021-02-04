@@ -42,7 +42,7 @@
 #include "zuc_event_listener.h"
 #include "zuc_types.h"
 
-#include <libweston/zalloc.h>
+#include "shared/zalloc.h"
 
 /**
  * Hardcoded output name.

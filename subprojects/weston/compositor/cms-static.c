@@ -31,6 +31,7 @@
 #include <libweston/libweston.h>
 #include "cms-helper.h"
 #include "shared/helpers.h"
+#include "shared/zalloc.h"
 #include "weston.h"
 
 struct cms_static {

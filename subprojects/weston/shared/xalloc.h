@@ -34,7 +34,7 @@ extern "C" {
 #include <stdlib.h>
 #include <string.h>
 
-#include <libweston/zalloc.h>
+#include "zalloc.h"
 
 void *
 fail_on_null(void *p, size_t size, char *file, int32_t line);

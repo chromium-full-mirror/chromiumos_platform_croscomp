@@ -38,6 +38,7 @@
 #include "weston-test-runner.h"
 #include "weston-testsuite-data.h"
 #include "shared/string-helpers.h"
+#include "shared/zalloc.h"
 
 /**
  * \defgroup testharness Test harness

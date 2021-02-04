@@ -56,6 +56,7 @@
 #include <libweston/backend-drm.h>
 #include <libweston/weston-log.h>
 #include "shared/helpers.h"
+#include "shared/zalloc.h"
 #include "libinput-seat.h"
 #include "backend.h"
 #include "libweston-internal.h"

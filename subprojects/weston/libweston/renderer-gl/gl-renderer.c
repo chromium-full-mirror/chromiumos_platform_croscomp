@@ -54,6 +54,7 @@
 
 #include "shared/fd-util.h"
 #include "shared/helpers.h"
+#include "shared/zalloc.h"
 #include "shared/platform.h"
 #include "shared/timespec-util.h"
 #include "shared/weston-egl-ext.h"

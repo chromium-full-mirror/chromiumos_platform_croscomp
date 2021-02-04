@@ -42,7 +42,7 @@
 #include <wayland-client.h>
 
 #include "shared/helpers.h"
-#include <libweston/zalloc.h>
+#include "shared/zalloc.h"
 #include "weston-debug-client-protocol.h"
 
 struct debug_app {

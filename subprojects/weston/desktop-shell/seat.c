@@ -31,7 +31,7 @@
 #include <wayland-server.h>
 
 #include <libweston/libweston.h>
-#include <libweston/zalloc.h>
+#include "shared/zalloc.h"
 
 #include "libweston-desktop.h"
 #include "internal.h"

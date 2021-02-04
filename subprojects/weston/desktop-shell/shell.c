@@ -41,7 +41,7 @@
 #include "compositor/weston.h"
 #include <libweston/config-parser.h>
 #include <libweston/libweston.h>
-#include <libweston/zalloc.h>
+#include "shared/zalloc.h"
 #include "shared/helpers.h"
 #include "shared/timespec-util.h"
 #include "libweston-desktop.h"

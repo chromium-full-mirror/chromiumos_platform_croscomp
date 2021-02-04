@@ -39,7 +39,7 @@
 
 #include <wayland-client.h>
 #include "shared/os-compatibility.h"
-#include <libweston/zalloc.h>
+#include "shared/zalloc.h"
 #include "xdg-shell-client-protocol.h"
 #include "fullscreen-shell-unstable-v1-client-protocol.h"
 #include "viewporter-client-protocol.h"

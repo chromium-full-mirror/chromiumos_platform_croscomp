@@ -45,7 +45,7 @@
 #include "shared/os-compatibility.h"
 #include "shared/helpers.h"
 #include "shared/image-loader.h"
-#include <libweston/zalloc.h>
+#include "shared/zalloc.h"
 
 #include "croscomp-client-protocol.h"
 #include "linux-dmabuf-unstable-v1-client-protocol.h"
