@@ -50,6 +50,7 @@ struct pad_mode_led {
 	int mode_idx;
 };
 
+#if 0
 static inline struct pad_mode_toggle_button *
 pad_mode_toggle_button_new(struct pad_dispatch *pad,
 			   struct libinput_tablet_pad_mode_group *group,
@@ -62,6 +63,7 @@ pad_mode_toggle_button_new(struct pad_dispatch *pad,
 
 	return button;
 }
+#endif
 
 static inline void
 pad_mode_toggle_button_destroy(struct pad_mode_toggle_button* button)
@@ -109,6 +111,7 @@ pad_led_destroy(struct libinput *libinput,
 	free(led);
 }
 
+#if 0
 static inline struct pad_mode_led *
 pad_led_new(struct libinput *libinput, const char *prefix, int group, int mode)
 {
@@ -146,6 +149,7 @@ error:
 	pad_led_destroy(libinput, led);
 	return NULL;
 }
+#endif
 
 static void
 pad_led_group_destroy(struct libinput_tablet_pad_mode_group *g)
@@ -183,13 +187,16 @@ pad_group_new_basic(struct pad_dispatch *pad,
 	return group;
 }
 
+#if 0
 static inline bool
 is_litest_device(struct evdev_device *device)
 {
 	return !!udev_device_get_property_value(device->udev_device,
 						"LIBINPUT_TEST_DEVICE");
 }
+#endif
 
+#if 0
 static inline struct pad_led_group *
 pad_group_new(struct pad_dispatch *pad,
 	      unsigned int group_index,
@@ -268,6 +275,7 @@ pad_led_get_sysfs_base_path(struct evdev_device *device,
 
 	return rc != -1;
 }
+#endif
 
 #if HAVE_LIBWACOM
 static int

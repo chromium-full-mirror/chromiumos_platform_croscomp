@@ -64,6 +64,7 @@ out:
 }
 #endif
 
+#if 0
 static int
 find_tree_distance(struct udev_device *a, struct udev_device *b)
 {
@@ -90,7 +91,9 @@ find_tree_distance(struct udev_device *a, struct udev_device *b)
 	}
 	return -1;
 }
+#endif
 
+#if 0
 static void
 wacom_handle_ekr(struct udev_device *device,
 		 int *vendor_id,
@@ -148,6 +151,7 @@ wacom_handle_ekr(struct udev_device *device,
 
 	udev_enumerate_unref(e);
 }
+#endif
 
 int main(int argc, char **argv)
 {

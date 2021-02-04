@@ -1906,6 +1906,7 @@ tp_handle_state(struct tp_dispatch *tp,
 	tp_apply_rotation(tp->device);
 }
 
+#if 0
 static inline void
 tp_debug_touch_state(struct tp_dispatch *tp,
 		     struct evdev_device *device)
@@ -1928,6 +1929,7 @@ tp_debug_touch_state(struct tp_dispatch *tp,
 	if (buf[0] != '\0')
 		evdev_log_debug(device, "touch state: %s\n", buf);
 }
+#endif
 
 static void
 tp_interface_process(struct evdev_dispatch *dispatch,

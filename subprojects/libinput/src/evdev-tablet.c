@@ -924,6 +924,7 @@ copy_button_cap(const struct tablet_dispatch *tablet,
 		set_bit(tool->buttons, button);
 }
 
+#if 0
 static inline int
 tool_set_bits_from_libwacom(const struct tablet_dispatch *tablet,
 			    struct libinput_tablet_tool *tool)
@@ -990,6 +991,7 @@ tool_set_bits_from_libwacom(const struct tablet_dispatch *tablet,
 #endif
 	return rc;
 }
+#endif
 
 static void
 tool_set_bits(const struct tablet_dispatch *tablet,

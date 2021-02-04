@@ -934,6 +934,7 @@ evdev_read_switch_reliability_prop(struct evdev_device *device)
 	return r;
 }
 
+#if 0
 static inline void
 evdev_print_event(struct evdev_device *device,
 		  const struct input_event *e)
@@ -967,6 +968,7 @@ evdev_print_event(struct evdev_device *device,
 			  e->value);
 	}
 }
+#endif
 
 static inline void
 evdev_process_event(struct evdev_device *device, struct input_event *e)

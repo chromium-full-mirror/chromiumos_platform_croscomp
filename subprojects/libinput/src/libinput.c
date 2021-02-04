@@ -107,6 +107,7 @@ check_event_type(struct libinput *libinput,
 	return rc;
 }
 
+#if 0
 static inline const char *
 event_type_to_str(enum libinput_event_type type)
 {
@@ -144,6 +145,7 @@ event_type_to_str(enum libinput_event_type type)
 
 	return NULL;
 }
+#endif
 
 struct libinput_source {
 	libinput_source_dispatch_t dispatch;
