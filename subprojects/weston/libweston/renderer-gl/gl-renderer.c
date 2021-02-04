@@ -2627,12 +2627,9 @@ gl_renderer_attach_dmabuf(struct weston_surface *surface,
 static void
 gl_renderer_attach(struct weston_surface *es, struct weston_buffer *buffer)
 {
-	struct weston_compositor *ec = es->compositor;
-	struct gl_renderer *gr = get_renderer(ec);
 	struct gl_surface_state *gs = get_surface_state(es);
 	struct wl_shm_buffer *shm_buffer;
 	struct linux_dmabuf_buffer *dmabuf;
-	EGLint format;
 	int i;
 
 	weston_buffer_reference(&gs->buffer_ref, buffer);
