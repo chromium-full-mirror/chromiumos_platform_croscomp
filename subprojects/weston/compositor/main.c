@@ -466,6 +466,9 @@ weston_client_launch(struct weston_compositor *compositor,
 WL_EXPORT void
 weston_watch_process(struct weston_process *process)
 {
+	if (child_process_list.next == NULL)
+		wl_list_init(&child_process_list);
+
 	wl_list_insert(&child_process_list, &process->link);
 }
 
@@ -572,9 +575,12 @@ wet_init_parsed_options(struct weston_compositor *ec)
 WL_EXPORT struct weston_config *
 wet_get_config(struct weston_compositor *ec)
 {
+	return NULL;
+#if 0
 	struct wet_compositor *compositor = to_wet_compositor(ec);
 
 	return compositor->config;
+#endif
 }
 
 static const char xdg_error_message[] =

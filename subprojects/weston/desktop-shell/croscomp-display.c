@@ -105,8 +105,10 @@ bind_display(struct wl_client *client,
 				       &croscomp_display_implementation,
 				       shell, unbind_display);
 
-	wl_list_for_each(head, &compositor->head_list, compositor_link)
-		send_output(resource, head);
+	wl_list_for_each(head, &compositor->head_list, compositor_link) {
+		if (head->output && head->output->enabled)
+			send_output(resource, head);
+	}
 }
 
 int

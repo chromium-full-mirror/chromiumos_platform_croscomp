@@ -20,7 +20,7 @@ deps_weston = [
 	dep_threads,
 ]
 
-libexec_weston = shared_library(
+libexec_weston = static_library(
 	'exec_weston',
 	sources: srcs_weston,
 	include_directories: common_inc,

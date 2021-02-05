@@ -41,11 +41,15 @@
 #include "compositor/weston.h"
 #include <libweston/config-parser.h>
 #include <libweston/libweston.h>
+#include <libweston/libweston.h>
+#include <libweston/weston-log.h>
 #include "shared/zalloc.h"
 #include "shared/helpers.h"
 #include "shared/timespec-util.h"
 #include "libweston-desktop.h"
 #include "internal.h"
+
+#include "exports.h"
 
 #define DEFAULT_NUM_WORKSPACES 1
 #define DEFAULT_WORKSPACE_CHANGE_ANIMATION_LENGTH 200
@@ -5065,10 +5069,9 @@ shell_finish_init(struct desktop_shell *shell)
 	exo_extensions_init(shell);
 }
 
-WL_EXPORT int
-wet_shell_init(struct weston_compositor *ec,
-	       int *argc, char *argv[])
-{
+int
+desktop_shell_init(struct weston_compositor *ec)
+	{
 	struct weston_seat *seat;
 	struct desktop_shell *shell;
 	struct workspace **pws;
@@ -5176,4 +5179,25 @@ wet_shell_init(struct weston_compositor *ec,
 	clock_gettime(CLOCK_MONOTONIC, &shell->startup_time);
 
 	return 0;
+}
+
+WL_EXPORT int
+wet_shell_init(struct weston_compositor *ec,
+	       int *argc, char *argv[])
+{
+	return desktop_shell_init(ec);
+}
+
+/* croscomp rs glue code */
+
+int
+vlog(const char *fmt, va_list ap)
+{
+	return vprintf(fmt, ap);
+}
+
+int
+vlog_continue(const char *fmt, va_list argp)
+{
+	return vlog(fmt, argp);
 }

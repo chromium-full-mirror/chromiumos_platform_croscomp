@@ -56,12 +56,11 @@ if get_option('shell-desktop')
 		dep_libshared,
 		dep_libweston_public,
 	]
-	plugin_shell_desktop = shared_library(
+	plugin_shell_desktop = static_library(
 		'desktop-shell',
 		srcs_shell_desktop,
 		include_directories: common_inc,
 		dependencies: deps_shell_desktop,
-		name_prefix: '',
 		install: true,
 		install_dir: dir_module_weston,
 		install_rpath: '$ORIGIN'
