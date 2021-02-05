@@ -5069,9 +5069,9 @@ shell_finish_init(struct desktop_shell *shell)
 	exo_extensions_init(shell);
 }
 
-int
+struct desktop_shell *
 desktop_shell_init(struct weston_compositor *ec)
-	{
+{
 	struct weston_seat *seat;
 	struct desktop_shell *shell;
 	struct workspace **pws;
@@ -5080,7 +5080,7 @@ desktop_shell_init(struct weston_compositor *ec)
 
 	shell = zalloc(sizeof *shell);
 	if (shell == NULL)
-		return -1;
+		return NULL;
 
 	shell->compositor = ec;
 
@@ -5088,7 +5088,7 @@ desktop_shell_init(struct weston_compositor *ec)
 							 &shell->destroy_listener,
 							 shell_destroy)) {
 		free(shell);
-		return 0;
+		return NULL;
 	}
 
 	shell->idle_listener.notify = idle_handler;
@@ -5113,11 +5113,11 @@ desktop_shell_init(struct weston_compositor *ec)
 	wl_list_init(&shell->workspaces.client_list);
 
 	if (input_panel_setup(shell) < 0)
-		return -1;
+		return NULL;
 
 	shell->text_backend = text_backend_init(ec);
 	if (!shell->text_backend)
-		return -1;
+		return NULL;
 
 	shell_configuration(shell);
 
@@ -5127,11 +5127,11 @@ desktop_shell_init(struct weston_compositor *ec)
 	for (i = 0; i < shell->workspaces.num; i++) {
 		pws = wl_array_add(&shell->workspaces.array, sizeof *pws);
 		if (pws == NULL)
-			return -1;
+			return NULL;
 
 		*pws = workspace_create(shell);
 		if (*pws == NULL)
-			return -1;
+			return NULL;
 	}
 	activate_workspace(shell, 0);
 
@@ -5142,12 +5142,12 @@ desktop_shell_init(struct weston_compositor *ec)
 	shell->workspaces.animation.frame = animate_workspace_change_frame;
 
 	if (weston_desktop_create(ec, shell) == -1)
-		return -1;
+		return NULL;
 
 	if (wl_global_create(ec->wl_display,
 			     &weston_desktop_shell_interface, 1,
 			     shell, bind_desktop_shell) == NULL)
-		return -1;
+		return NULL;
 
 	weston_compositor_get_time(&shell->child.deathstamp);
 
@@ -5174,18 +5174,19 @@ desktop_shell_init(struct weston_compositor *ec)
 
 	init_croscomp_display(shell);
 
-	init_terminal(shell);
-
 	clock_gettime(CLOCK_MONOTONIC, &shell->startup_time);
 
-	return 0;
+	return shell;
 }
 
 WL_EXPORT int
 wet_shell_init(struct weston_compositor *ec,
 	       int *argc, char *argv[])
 {
-	return desktop_shell_init(ec);
+	struct desktop_shell *shell =
+		desktop_shell_init(ec);
+
+	return shell ? 0 : -1;
 }
 
 /* croscomp rs glue code */

@@ -73,6 +73,92 @@ fn head_notify(_listener: *mut ffi::wl_listener, data: *mut ::std::os::raw::c_vo
     }
 }
 
+#[derive(Debug)]
+struct Display {
+    native: *mut ffi::wl_display
+}
+
+impl Display {
+    fn new() -> Self {
+	Display { native: unsafe { ffi::wl_display_create() } }
+    }
+
+    fn run(&self) {
+	unsafe { ffi::wl_display_run(self.native) }
+    }
+
+    fn add_socket_auto(&self) -> *const ::std::os::raw::c_char {
+	unsafe { ffi::wl_display_add_socket_auto(self.native) }
+    }
+}
+
+impl Drop for Display {
+    fn drop(&mut self) {
+	println!("drop display");
+	unsafe { ffi::wl_display_destroy(self.native) }
+    }
+}
+
+#[derive(Debug)]
+struct Compositor {
+    native: *mut ffi::weston_compositor
+}
+
+impl Compositor {
+    fn new(display: &Display, ctx: *mut ffi::weston_log_context) -> Self {
+	Compositor { native: unsafe {
+	    ffi::weston_compositor_create(display.native,
+					  ctx, 0 as *mut ::std::os::raw::c_void)
+	} }
+    }
+
+    fn add_heads_changed_listener(&mut self, listener: &mut ffi::wl_listener) {
+	unsafe {
+	    ffi::weston_compositor_add_heads_changed_listener(self.native,
+							      listener)
+	}
+    }
+
+    fn wake(&mut self) {
+	unsafe { ffi::weston_compositor_wake(self.native) }
+    }
+
+    fn flush_heads_changed(&self) {
+	unsafe {
+	    ffi::weston_compositor_flush_heads_changed(self.native)
+	}
+    }
+
+    fn set_xkb_rule_names(&self, names: &mut ffi::xkb_rule_names) {
+	unsafe {
+	    ffi::weston_compositor_set_xkb_rule_names(self.native, names);
+	}
+    }
+}
+
+impl Drop for Compositor {
+    fn drop(&mut self) {
+	println!("drop compositor");
+	unsafe { ffi::weston_compositor_destroy(self.native) }
+    }
+}
+
+
+#[derive(Debug)]
+struct Shell {
+    native: *mut ffi::desktop_shell
+}
+
+impl Shell {
+    fn new(compositor: *mut ffi::weston_compositor) -> Self {
+	Shell { native: unsafe { ffi::desktop_shell_init(compositor) } }
+    }
+
+    fn init_terminal(&self) {
+	unsafe { ffi::init_terminal(self.native) };
+    }
+}
+
 fn main() {
     verify_xdg_runtime_dir();
 
@@ -82,14 +168,9 @@ fn main() {
 	ffi::weston_log_ctx_create()
     };
 
-    let display = unsafe {
-	ffi::wl_display_create()
-    };
+    let display = Display::new();
 
-    let compositor = unsafe {
-	ffi::weston_compositor_create(display,
-				      ctx, 0 as *mut ::std::os::raw::c_void)
-    };
+    let mut compositor = Compositor::new(&display, ctx);
 
     println!("set log handler");
     unsafe {
@@ -109,10 +190,7 @@ fn main() {
 	notify: Some(head_notify)
     };
 
-    unsafe {
-	ffi::weston_compositor_add_heads_changed_listener(compositor,
-							  &mut listener)
-    }
+    compositor.add_heads_changed_listener(&mut listener);
 
     let null_str = 0 as *mut ::std::os::raw::c_char;
 
@@ -124,9 +202,7 @@ fn main() {
 	options: null_str
     };
 
-    unsafe {
-	ffi::weston_compositor_set_xkb_rule_names(compositor, &mut rules);
-    }
+    compositor.set_xkb_rule_names(&mut rules);
 
     let mut config = ffi::weston_drm_backend_config {
 	base: ffi::weston_backend_config {
@@ -145,36 +221,29 @@ fn main() {
     };
 
     let _ret = unsafe { ffi::weston_compositor_load_backend(
-	compositor,
+	compositor.native,
 	ffi::weston_compositor_backend::WESTON_BACKEND_DRM,
 	&mut config.base)
     };
 
-    unsafe {
-	ffi::weston_compositor_flush_heads_changed(compositor)
-    };
+    compositor.flush_heads_changed();
 
-    let socket_name = unsafe {
-	ffi::wl_display_add_socket_auto(display)
-    };
+    let socket_name = display.add_socket_auto();
+
     if socket_name == null_str {
 	panic!("failed to create listening socket")
     }
 
-    unsafe {
-	ffi::desktop_shell_init(compositor)
-    };
+    let shell = Shell::new(compositor.native);
+
+    shell.init_terminal();
 
     println!("{:?}", display);
     println!("{:?}", args);
     println!("{:?}", compositor);
+    println!("{:?}", shell);
 
-    unsafe {
-	ffi::weston_compositor_wake(compositor)
-    };
+    compositor.wake();
 
-    unsafe {
-	ffi::wl_display_run(display)
-    };
-
+    display.run();
 }

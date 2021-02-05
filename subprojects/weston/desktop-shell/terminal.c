@@ -25,6 +25,8 @@
 #include "libweston-desktop.h"
 #include "internal.h"
 
+#include "exports.h"
+
 struct terminal {
 	struct desktop_shell *shell;
 	struct wl_listener surface_create_listener;
