@@ -1,3 +1,10 @@
+// Copyright 2021 The Chromium OS Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+#[macro_use]
+extern crate bitflags;
+
 use std::env;
 use std::fs::metadata;
 use std::cell::RefCell;
@@ -6,6 +13,7 @@ use std::rc::Rc;
 #[macro_use]
 mod ffi;
 mod terminal;
+mod splash;
 
 fn verify_xdg_runtime_dir() {
     let path = env::var_os("XDG_RUNTIME_DIR")
@@ -268,6 +276,8 @@ fn main() {
 	Shell::new(&compositor)));
 
     terminal::init(&shell);
+
+    splash::init(&shell);
 
     compositor.borrow_mut().wake();
 

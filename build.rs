@@ -14,7 +14,7 @@ fn generate_protocol(f: &str, out: &str) {
     generate_code_with_destructor_events(
         f,
         out_dir.join(out),
-        Side::Client,
+        Side::Server,
         &[("wl_callback", "done")],
     );
 }
@@ -23,6 +23,8 @@ fn main() {
     generate_protocol("./wayland.xml", "wayland_api.rs");
     generate_protocol("./linux-dmabuf-unstable-v1.xml",
 		      "linux_dmabuf_unstable_v1_api.rs");
+    generate_protocol("./subprojects/weston/protocol/croscomp.xml",
+		      "croscomp_api.rs");
 
     let bindings = bindgen::Builder::default()
 	.clang_arg("-I/usr/include/pixman-1")

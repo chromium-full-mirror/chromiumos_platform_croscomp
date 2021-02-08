@@ -5047,8 +5047,6 @@ desktop_shell_init(struct weston_compositor *ec)
 
 	shell_add_bindings(ec, shell);
 
-	init_splash(shell);
-
 	init_croscomp_display(shell);
 
 	clock_gettime(CLOCK_MONOTONIC, &shell->startup_time);
