@@ -1,6 +1,10 @@
 use std::env;
 use std::fs::metadata;
 
+#[macro_use]
+mod ffi;
+mod terminal;
+
 fn verify_xdg_runtime_dir() {
     let path = env::var_os("XDG_RUNTIME_DIR")
 	.expect("environment variable XDG_RUNTIME_DIR is not set.")
@@ -16,7 +20,6 @@ fn verify_xdg_runtime_dir() {
     // Verify permissions 0700 and owned by user?
 }
 
-mod ffi;
 
 extern "C"
 fn head_notify(_listener: *mut ffi::wl_listener, data: *mut ::std::os::raw::c_void) {
@@ -100,7 +103,7 @@ impl Drop for Display {
 }
 
 #[derive(Debug)]
-struct Compositor {
+pub struct Compositor {
     native: *mut ffi::weston_compositor
 }
 
@@ -116,6 +119,16 @@ impl Compositor {
 	unsafe {
 	    ffi::weston_compositor_add_heads_changed_listener(self.native,
 							      listener)
+	}
+    }
+
+    fn add_key_binding(&mut self, key: u32,
+		       modifier: ffi::weston_keyboard_modifier,
+		       binding: ffi::weston_key_binding_handler_t,
+		       data: *mut ::std::os::raw::c_void) -> *mut ffi::weston_binding{
+	unsafe {
+	    ffi::weston_compositor_add_key_binding(
+		self.native, key, modifier, binding, data)
 	}
     }
 
@@ -145,24 +158,37 @@ impl Drop for Compositor {
 
 
 #[derive(Debug)]
-struct Shell {
-    native: *mut ffi::desktop_shell
+pub struct Shell {
+    native: *mut ffi::desktop_shell,
 }
 
 impl Shell {
-    fn new(compositor: *mut ffi::weston_compositor) -> Self {
-	Shell { native: unsafe { ffi::desktop_shell_init(compositor) } }
+    fn new(compositor: &mut Compositor) -> Self {
+	Shell {
+	    native: unsafe { ffi::desktop_shell_init(compositor.native) },
+	}
     }
+}
 
-    fn init_terminal(&self) {
-	unsafe { ffi::init_terminal(self.native) };
+const NULL_LIST: ffi::wl_list = ffi::wl_list {
+	prev: 0 as *mut ffi::wl_list,
+	next: 0 as *mut ffi::wl_list
+};
+
+type NotifyFunc =
+    unsafe extern "C" fn(listener: *mut ffi::wl_listener, data: *mut ::std::os::raw::c_void);
+
+impl ffi::wl_listener {
+    fn new(notify: NotifyFunc) -> Self {
+	ffi::wl_listener {
+	    link: NULL_LIST,
+	    notify: Some(notify)
+	}
     }
 }
 
 fn main() {
     verify_xdg_runtime_dir();
-
-    let args: Vec<String> = env::args().collect();
 
     let ctx = unsafe {
 	ffi::weston_log_ctx_create()
@@ -180,15 +206,7 @@ fn main() {
 
     println!("done set log handler");
 
-    let null_list = ffi::wl_list {
-	prev: 0 as *mut ffi::wl_list,
-	next: 0 as *mut ffi::wl_list
-    };
-
-    let mut listener = ffi::wl_listener {
-	link: null_list,
-	notify: Some(head_notify)
-    };
+    let mut listener = ffi::wl_listener::new(head_notify);
 
     compositor.add_heads_changed_listener(&mut listener);
 
@@ -234,14 +252,11 @@ fn main() {
 	panic!("failed to create listening socket")
     }
 
-    let shell = Shell::new(compositor.native);
+    let mut shell = {
+	Shell::new(&mut compositor)
+    };
 
-    shell.init_terminal();
-
-    println!("{:?}", display);
-    println!("{:?}", args);
-    println!("{:?}", compositor);
-    println!("{:?}", shell);
+    terminal::init(&mut shell, &mut compositor);
 
     compositor.wake();
 

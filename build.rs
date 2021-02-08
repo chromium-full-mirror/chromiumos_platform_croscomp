@@ -33,6 +33,7 @@ fn main() {
         .header("./subprojects/weston/compositor/weston.h")
 	.generate_comments(false)
 	.default_enum_style(bindgen::EnumVariation::Rust{non_exhaustive: true})
+	.bitfield_enum("weston_keyboard_modifier")
 	.layout_tests(false)
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))
         .generate()
