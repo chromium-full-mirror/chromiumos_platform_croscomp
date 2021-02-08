@@ -46,12 +46,8 @@
 #include "shared/zalloc.h"
 #include "shared/helpers.h"
 #include "shared/timespec-util.h"
-#include "libweston-desktop.h"
-#include "internal.h"
 
 #include "weston-desktop-shell-server-protocol.h"
-
-#include "exports.h"
 
 #define DEFAULT_NUM_WORKSPACES 1
 #define DEFAULT_WORKSPACE_CHANGE_ANIMATION_LENGTH 200

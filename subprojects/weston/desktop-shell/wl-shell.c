@@ -33,8 +33,6 @@
 #include <libweston/libweston.h>
 #include "shared/zalloc.h"
 
-#include "libweston-desktop.h"
-#include "internal.h"
 #include "shell.h"
 
 #define WD_WL_SHELL_PROTOCOL_VERSION 1

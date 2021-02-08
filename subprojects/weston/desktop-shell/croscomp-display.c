@@ -17,13 +17,11 @@
 #include <sys/types.h>
 #include <wayland-server.h>
 
-#include "shell.h"
 #include "compositor/weston.h"
 #include <libweston/libweston.h>
 #include "shared/zalloc.h"
 #include "shared/helpers.h"
-#include "libweston-desktop.h"
-#include "internal.h"
+#include "shell.h"
 
 #include "croscomp-server-protocol.h"
 

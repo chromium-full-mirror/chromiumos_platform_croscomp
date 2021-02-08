@@ -32,10 +32,8 @@
 
 #include <libweston/libweston.h>
 #include "shared/zalloc.h"
-
-#include "libweston-desktop.h"
-#include "internal.h"
 #include "shared/timespec-util.h"
+#include "shell.h"
 
 struct weston_desktop_seat {
 	struct wl_listener seat_destroy_listener;

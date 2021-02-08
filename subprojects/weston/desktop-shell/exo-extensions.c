@@ -38,8 +38,6 @@
 
 #include <libweston/libweston.h>
 #include "shared/zalloc.h"
-#include "libweston-desktop.h"
-#include "internal.h"
 #include "shell.h"
 
 

@@ -35,8 +35,6 @@
 #include "shared/zalloc.h"
 #include "xdg-shell-server-protocol.h"
 
-#include "libweston-desktop.h"
-#include "internal.h"
 #include "shell.h"
 
 /************************************************************************************
