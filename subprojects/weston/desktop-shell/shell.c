@@ -49,6 +49,8 @@
 #include "libweston-desktop.h"
 #include "internal.h"
 
+#include "weston-desktop-shell-server-protocol.h"
+
 #include "exports.h"
 
 #define DEFAULT_NUM_WORKSPACES 1
@@ -214,11 +216,6 @@ static struct shell_seat *
 get_shell_seat(struct weston_seat *seat);
 
 static void
-get_output_panel_size(struct desktop_shell *shell,
-		      struct weston_output *output,
-		      int *width, int *height);
-
-static void
 shell_surface_update_child_surface_layers(struct shell_surface *shsurf);
 
 static int
@@ -297,54 +294,11 @@ shell_grab_start(struct shell_grab *grab,
 	}
 }
 
-static void
-get_panel_size(struct desktop_shell *shell,
-	       struct weston_view *view,
-	       int *width,
-	       int *height)
-{
-	float x1, y1;
-	float x2, y2;
-	weston_view_to_global_float(view, 0, 0, &x1, &y1);
-	weston_view_to_global_float(view,
-				    view->surface->width,
-				    view->surface->height,
-				    &x2, &y2);
-	*width = (int)(x2 - x1);
-	*height = (int)(y2 - y1);
-}
-
-static void
-get_output_panel_size(struct desktop_shell *shell,
-		      struct weston_output *output,
-		      int *width,
-		      int *height)
-{
-	struct weston_view *view;
-
-	*width = 0;
-	*height = 0;
-
-	if (!output)
-		return;
-
-	wl_list_for_each(view, &shell->panel_layer.view_list.link, layer_link.link) {
-		if (view->surface->output == output) {
-			get_panel_size(shell, view, width, height);
-			return;
-		}
-	}
-
-	/* the correct view wasn't found */
-}
-
 void
 get_output_work_area(struct desktop_shell *shell,
 		     struct weston_output *output,
 		     pixman_rectangle32_t *area)
 {
-	int32_t panel_width = 0, panel_height = 0;
-
 	if (!output) {
 		area->x = 0;
 		area->y = 0;
@@ -356,25 +310,8 @@ get_output_work_area(struct desktop_shell *shell,
 
 	area->x = output->x;
 	area->y = output->y;
-
-	get_output_panel_size(shell, output, &panel_width, &panel_height);
-	switch (shell->panel_position) {
-	case WESTON_DESKTOP_SHELL_PANEL_POSITION_TOP:
-	default:
-		area->y += panel_height;
-		/* fallthrough */
-	case WESTON_DESKTOP_SHELL_PANEL_POSITION_BOTTOM:
-		area->width = output->width;
-		area->height = output->height - panel_height;
-		break;
-	case WESTON_DESKTOP_SHELL_PANEL_POSITION_LEFT:
-		area->x += panel_width;
-		/* fallthrough */
-	case WESTON_DESKTOP_SHELL_PANEL_POSITION_RIGHT:
-		area->width = output->width - panel_width;
-		area->height = output->height;
-		break;
-	}
+	area->width = output->width;
+	area->height = output->height;
 }
 
 static void
@@ -1474,36 +1411,10 @@ noop_grab_frame(struct weston_pointer_grab *grab)
 static void
 constrain_position(struct weston_move_grab *move, int *cx, int *cy)
 {
-	struct shell_surface *shsurf = move->base.shsurf;
-	struct weston_surface *surface =
-		weston_desktop_surface_get_surface(shsurf->desktop_surface);
 	struct weston_pointer *pointer = move->base.grab.pointer;
-	int x, y, bottom;
-	const int safety = 50;
-	pixman_rectangle32_t area;
-	struct weston_geometry geometry;
 
-	x = wl_fixed_to_int(pointer->x + move->dx);
-	y = wl_fixed_to_int(pointer->y + move->dy);
-
-	if (shsurf->shell->panel_position ==
-	    WESTON_DESKTOP_SHELL_PANEL_POSITION_TOP) {
-		get_output_work_area(shsurf->shell, surface->output, &area);
-		geometry =
-			weston_desktop_surface_get_geometry(shsurf->desktop_surface);
-
-		bottom = y + geometry.height + geometry.y;
-		if (bottom - safety < area.y)
-			y = area.y + safety - geometry.height
-			  - geometry.y;
-
-		if (move->client_initiated &&
-		    y + geometry.y < area.y)
-			y = area.y - geometry.y;
-	}
-
-	*cx = x;
-	*cy = y;
+	*cx = wl_fixed_to_int(pointer->x + move->dx);
+	*cy = wl_fixed_to_int(pointer->y + move->dy);
 }
 
 static void
@@ -3148,24 +3059,9 @@ panel_committed(struct weston_surface *es, int32_t sx, int32_t sy)
 {
 	struct desktop_shell *shell = es->committed_private;
 	struct weston_view *view;
-	int width, height;
 	int x = 0, y = 0;
 
 	view = container_of(es->views.next, struct weston_view, surface_link);
-
-	get_panel_size(shell, view, &width, &height);
-	switch (shell->panel_position) {
-	case WESTON_DESKTOP_SHELL_PANEL_POSITION_TOP:
-		break;
-	case WESTON_DESKTOP_SHELL_PANEL_POSITION_BOTTOM:
-		y = view->output->height - height;
-		break;
-	case WESTON_DESKTOP_SHELL_PANEL_POSITION_LEFT:
-		break;
-	case WESTON_DESKTOP_SHELL_PANEL_POSITION_RIGHT:
-		x = view->output->width - width;
-		break;
-	}
 
 	configure_static_view(view, &shell->panel_layer, x, y);
 }
@@ -3353,19 +3249,6 @@ desktop_shell_set_panel_position(struct wl_client *client,
 				 struct wl_resource *resource,
 				 uint32_t position)
 {
-	struct desktop_shell *shell = wl_resource_get_user_data(resource);
-
-	if (position != WESTON_DESKTOP_SHELL_PANEL_POSITION_TOP &&
-	    position != WESTON_DESKTOP_SHELL_PANEL_POSITION_BOTTOM &&
-	    position != WESTON_DESKTOP_SHELL_PANEL_POSITION_LEFT &&
-	    position != WESTON_DESKTOP_SHELL_PANEL_POSITION_RIGHT) {
-		wl_resource_post_error(resource,
-				       WESTON_DESKTOP_SHELL_ERROR_INVALID_ARGUMENT,
-				       "bad position argument");
-		return;
-	}
-
-	shell->panel_position = position;
 }
 
 static const struct weston_desktop_shell_interface desktop_shell_implementation = {
@@ -5150,8 +5033,6 @@ desktop_shell_init(struct weston_compositor *ec)
 		return NULL;
 
 	weston_compositor_get_time(&shell->child.deathstamp);
-
-	shell->panel_position = WESTON_DESKTOP_SHELL_PANEL_POSITION_TOP;
 
 	setup_output_destroy_handler(ec, shell);
 

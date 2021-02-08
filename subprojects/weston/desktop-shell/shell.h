@@ -29,8 +29,6 @@
 
 #include <libweston/libweston.h>
 
-#include "weston-desktop-shell-server-protocol.h"
-
 enum animation_type {
 	ANIMATION_NONE,
 
@@ -211,8 +209,6 @@ struct desktop_shell {
 	struct wl_listener output_create_listener;
 	struct wl_listener output_move_listener;
 	struct wl_list output_list;
-
-	enum weston_desktop_shell_panel_position panel_position;
 
 	char *client;
 
