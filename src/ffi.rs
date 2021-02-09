@@ -13,13 +13,13 @@ macro_rules! offset_of {
 }
 
 macro_rules! container_of {
-    ($ptr:ident, $container:ty, $field:ident) => ({
+    ($ptr:expr, $container:ty, $field:ident) => ({
         (($ptr as usize) - offset_of!($container, $field)) as *const $container
     })
 }
 
 macro_rules! container_of_mut {
-    ($ptr:ident, $container:ty, $field:ident) => ({
+    ($ptr:expr, $container:ty, $field:ident) => ({
         (($ptr as usize) - offset_of!($container, $field)) as *mut $container
     })
 }
