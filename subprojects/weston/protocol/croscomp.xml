@@ -16,6 +16,43 @@
   </interface>
 
   <interface name="croscomp_output" version="1">
+    <enum name="subpixel">
+      <description summary="subpixel geometry information">
+	This enumeration describes how the physical
+	pixels on an output are laid out.
+      </description>
+      <entry name="unknown" value="0" summary="unknown geometry"/>
+      <entry name="none" value="1" summary="no geometry"/>
+      <entry name="horizontal_rgb" value="2" summary="horizontal RGB"/>
+      <entry name="horizontal_bgr" value="3" summary="horizontal BGR"/>
+      <entry name="vertical_rgb" value="4" summary="vertical RGB"/>
+      <entry name="vertical_bgr" value="5" summary="vertical BGR"/>
+    </enum>
+
+    <enum name="transform">
+      <description summary="transform from framebuffer to output">
+	This describes the transform that a compositor will apply to a
+	surface to compensate for the rotation or mirroring of an
+	output device.
+
+	The flipped values correspond to an initial flip around a
+	vertical axis followed by rotation.
+
+	The purpose is mainly to allow clients to render accordingly and
+	tell the compositor, so that for fullscreen surfaces, the
+	compositor will still be able to scan out directly from client
+	surfaces.
+      </description>
+      <entry name="normal" value="0" summary="no transform"/>
+      <entry name="90" value="1" summary="90 degrees counter-clockwise"/>
+      <entry name="180" value="2" summary="180 degrees counter-clockwise"/>
+      <entry name="270" value="3" summary="270 degrees counter-clockwise"/>
+      <entry name="flipped" value="4" summary="180 degree flip around a vertical axis"/>
+      <entry name="flipped_90" value="5" summary="flip and rotate 90 degrees counter-clockwise"/>
+      <entry name="flipped_180" value="6" summary="flip and rotate 180 degrees counter-clockwise"/>
+      <entry name="flipped_270" value="7" summary="flip and rotate 270 degrees counter-clockwise"/>
+    </enum>
+
     <event name="geometry">
       <arg name="physical_width" type="int"
 	   summary="width in millimeters of the output"/>
