@@ -1,3 +1,9 @@
+// Copyright 2021 The Chromium OS Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+use std::cell::RefCell;
+use std::rc::Rc;
 use crate::Shell;
 
 use crate::ffi;
@@ -5,8 +11,7 @@ use crate::ffi;
 struct Terminal {
     client_surface: Option<*mut ffi::weston_surface>,
 
-    /* xxx Ugh, how is this going to work in proper rust? */
-    shell: *mut ffi::desktop_shell,
+    shell: Rc<RefCell<crate::Shell>>,
 
     client: Option<*const ffi::wl_client>,
 
@@ -37,14 +42,15 @@ fn binding(keyboard: *mut ffi::weston_keyboard,
            key: u32,
            data: *mut Void) {
     let mut t = unsafe { Box::from_raw(data as *mut Terminal) };
-    
+    let shell = t.shell.borrow().native;
+
     match (key, t.client_surface) {
 	(KEY_F1, Some(surface)) => {
 	    unsafe {
 		let ds = ffi::weston_surface_get_desktop_surface(surface);
-		ffi::weston_desktop_api_fullscreen_requested(t.shell, ds, false,
+		ffi::weston_desktop_api_fullscreen_requested(shell, ds, false,
 							     0 as *mut ffi::weston_output);
-		ffi::weston_desktop_api_minimized_requested(t.shell, ds);
+		ffi::weston_desktop_api_minimized_requested(shell, ds);
 	    }
 	},
 	(KEY_F2, Some(surface)) => {
@@ -52,10 +58,10 @@ fn binding(keyboard: *mut ffi::weston_keyboard,
 		let ds = ffi::weston_surface_get_desktop_surface(surface);
 		let view = ffi::get_default_view(surface);
 		ffi::activate(
-		    t.shell, view, (*keyboard).seat,
+		    shell, view, (*keyboard).seat,
 		    ffi::weston_activate_flag::WESTON_ACTIVATE_FLAG_CONFIGURE as u32);
 			 
-		ffi::weston_desktop_api_fullscreen_requested(t.shell, ds,
+		ffi::weston_desktop_api_fullscreen_requested(shell, ds,
 							     true, (*surface).output);
 	    }
 	},
@@ -64,7 +70,7 @@ fn binding(keyboard: *mut ffi::weston_keyboard,
 		let terminal_client_path = "/usr/bin/croscomp-terminal\0";
 
 		let client = unsafe {
-		    ffi::weston_client_start((*t.shell).compositor,
+		    ffi::weston_client_start((*shell).compositor,
 					     terminal_client_path.as_ptr() as *const i8)
 		    // add destroy listener
 		};
@@ -102,15 +108,18 @@ fn surface_create_notify(listener: *mut ffi::wl_listener,
     Box::into_raw(t);
 }
 
-pub fn init(shell: &mut Shell, compositor: &mut crate::Compositor) {
+pub fn init(shell: &Rc<RefCell<Shell>>) {
     let mut t = Box::new(Terminal {
 	client_surface: None,
-	shell: shell.native,
+	shell: Rc::clone(shell),
 	client: None,
 	surface_create_listener: ffi::wl_listener::new(surface_create_notify),
 	client_destroy_listener: ffi::wl_listener::new(client_destroy_notify),
     });
     
+    let s = shell.borrow();
+    let mut compositor = s.compositor.borrow_mut();
+
     // signal add
     unsafe {
 	ffi::wl_list_insert((*compositor.native).create_surface_signal.listener_list.prev,

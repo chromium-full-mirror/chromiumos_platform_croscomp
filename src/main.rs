@@ -1,5 +1,7 @@
 use std::env;
 use std::fs::metadata;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 #[macro_use]
 mod ffi;
@@ -161,12 +163,22 @@ impl Drop for Compositor {
 #[derive(Debug)]
 pub struct Shell {
     native: *mut ffi::desktop_shell,
+    compositor: Rc<RefCell<Compositor>>
 }
 
 impl Shell {
-    fn new(compositor: &mut Compositor) -> Self {
+    fn new(compositor: &Rc<RefCell<Compositor>>) -> Self {
+	let native = compositor.borrow().native;
 	Shell {
-	    native: unsafe { ffi::desktop_shell_init(compositor.native) },
+	    native: unsafe { ffi::desktop_shell_init(native) },
+	    compositor: Rc::clone(compositor)
+	}
+    }
+
+    fn finish_init(&self) {
+	unsafe {
+	    ffi::weston_compositor_init_input(self.compositor.borrow().native);
+	    ffi::exo_extensions_init(self.native);
 	}
     }
 }
@@ -197,7 +209,8 @@ fn main() {
 
     let display = Display::new();
 
-    let mut compositor = Compositor::new(&display, ctx);
+    let compositor =
+	Rc::new(RefCell::new(Compositor::new(&display, ctx)));
 
     println!("set log handler");
     unsafe {
@@ -209,8 +222,7 @@ fn main() {
 
     let mut listener = ffi::wl_listener::new(head_notify);
 
-    compositor.add_heads_changed_listener(&mut listener);
-
+    compositor.borrow_mut().add_heads_changed_listener(&mut listener);
 
     let mut rules = ffi::xkb_rule_names {
 	rules: NULL_STR,
@@ -220,7 +232,7 @@ fn main() {
 	options: NULL_STR
     };
 
-    compositor.set_xkb_rule_names(&mut rules);
+    compositor.borrow_mut().set_xkb_rule_names(&mut rules);
 
     let mut config = ffi::weston_drm_backend_config {
 	base: ffi::weston_backend_config {
@@ -239,12 +251,12 @@ fn main() {
     };
 
     let _ret = unsafe { ffi::weston_compositor_load_backend(
-	compositor.native,
+	compositor.borrow().native,
 	ffi::weston_compositor_backend::WESTON_BACKEND_DRM,
 	&mut config.base)
     };
 
-    compositor.flush_heads_changed();
+    compositor.borrow().flush_heads_changed();
 
     let socket_name = display.add_socket_auto();
 
@@ -252,13 +264,12 @@ fn main() {
 	panic!("failed to create listening socket")
     }
 
-    let mut shell = {
-	Shell::new(&mut compositor)
-    };
+    let shell = Rc::new(RefCell::new(
+	Shell::new(&compositor)));
 
-    terminal::init(&mut shell, &mut compositor);
+    terminal::init(&shell);
 
-    compositor.wake();
+    compositor.borrow_mut().wake();
 
     display.run();
 }
