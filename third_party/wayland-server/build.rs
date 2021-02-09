@@ -14,7 +14,7 @@ fn main() {
     generate_code_with_destructor_events(
         protocol_file,
         out_dir.join("wayland_api.rs"),
-        Side::Client,
+        Side::Server,
         &[("wl_callback", "done")],
     );
 }
