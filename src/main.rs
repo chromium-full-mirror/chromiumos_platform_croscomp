@@ -20,18 +20,19 @@ fn verify_xdg_runtime_dir() {
     // Verify permissions 0700 and owned by user?
 }
 
+const NULL_HEAD: *mut ffi::weston_head = 0 as *mut ffi::weston_head;
+const NULL_STR: *mut ::std::os::raw::c_char = 0 as *mut ::std::os::raw::c_char;
+const NULL_VOID: *mut ::std::os::raw::c_void = 0 as *mut ::std::os::raw::c_void;
+type Void = ::std::os::raw::c_void;
 
 extern "C"
 fn head_notify(_listener: *mut ffi::wl_listener, data: *mut ::std::os::raw::c_void) {
     let c = data as *mut ffi::weston_compositor;
     println!("listener");
 
-    let null_head = 0 as *mut ffi::weston_head;
-    let null_str = 0 as *mut ::std::os::raw::c_char;
-
     unsafe {
-	let mut head = ffi::weston_compositor_iterate_heads(c, null_head);
-	while head != null_head {
+	let mut head = ffi::weston_compositor_iterate_heads(c, NULL_HEAD);
+	while head != NULL_HEAD {
 	    let connected = ffi::weston_head_is_connected(head);
 	    let enabled = ffi::weston_head_is_enabled(head);
 	    let changed = ffi::weston_head_is_device_changed(head);
@@ -52,14 +53,14 @@ fn head_notify(_listener: *mut ffi::wl_listener, data: *mut ::std::os::raw::c_vo
 
 		let set_mode = (*api).set_mode.unwrap();
 
-		set_mode(output, ffi::weston_drm_backend_output_mode::WESTON_DRM_BACKEND_OUTPUT_PREFERRED, null_str);
+		set_mode(output, ffi::weston_drm_backend_output_mode::WESTON_DRM_BACKEND_OUTPUT_PREFERRED, NULL_STR);
 
 		ffi::weston_output_set_scale(output, 1);
 
 		ffi::weston_output_set_transform(output,
 						 ffi::wl_output_transform::WL_OUTPUT_TRANSFORM_NORMAL as u32);
 		let set_gbm_format = (*api).set_gbm_format.unwrap();
-		set_gbm_format(output, null_str);
+		set_gbm_format(output, NULL_STR);
 
 		let set_seat = (*api).set_seat.unwrap();
 		set_seat(output, "\0".as_ptr() as *const i8);
@@ -210,14 +211,13 @@ fn main() {
 
     compositor.add_heads_changed_listener(&mut listener);
 
-    let null_str = 0 as *mut ::std::os::raw::c_char;
 
     let mut rules = ffi::xkb_rule_names {
-	rules: null_str,
-	model: null_str,
-	layout: null_str,
-	variant: null_str,
-	options: null_str
+	rules: NULL_STR,
+	model: NULL_STR,
+	layout: NULL_STR,
+	variant: NULL_STR,
+	options: NULL_STR
     };
 
     compositor.set_xkb_rule_names(&mut rules);
@@ -229,11 +229,11 @@ fn main() {
 	},
 	tty: -1,
 	use_pixman: false,
-	seat_id: null_str,
-	gbm_format: null_str,
+	seat_id: NULL_STR,
+	gbm_format: NULL_STR,
 	configure_device: None,
 	pageflip_timeout: 0,
-	specific_device: null_str,
+	specific_device: NULL_STR,
 	use_pixman_shadow: false,
 	continue_without_input: true
     };
@@ -248,7 +248,7 @@ fn main() {
 
     let socket_name = display.add_socket_auto();
 
-    if socket_name == null_str {
+    if socket_name == NULL_STR {
 	panic!("failed to create listening socket")
     }
 
