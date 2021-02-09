@@ -13,7 +13,6 @@ readme = "README.md"
 
 [dependencies]
 wayland-sys = { version = "0.28.2", path = "../wayland-sys" }
-# nix = "0.18"
-nix = "0.14"
+nix = "*"
 once_cell = { path = "../once_cell" }
 smallvec = "*"
