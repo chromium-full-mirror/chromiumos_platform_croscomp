@@ -7,7 +7,6 @@ if get_option('shell-desktop')
 		'exposay.c',
 		'input-panel.c',
 		'client.c',
-		'croscomp-display.c',
 		'seat.c',
 		'surface.c',
 		'wl-shell.c',

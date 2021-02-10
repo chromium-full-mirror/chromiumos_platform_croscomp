@@ -4566,8 +4566,6 @@ desktop_shell_init(struct desktop_shell *shell,
 
 	shell_add_bindings(ec, shell);
 
-	init_croscomp_display(shell);
-
 	clock_gettime(CLOCK_MONOTONIC, &shell->startup_time);
 
 	return 0;

@@ -13,6 +13,7 @@ use std::rc::Rc;
 #[macro_use]
 mod ffi;
 mod terminal;
+mod display;
 mod splash;
 mod protocol;
 
@@ -159,6 +160,12 @@ impl Compositor {
 	    ffi::weston_compositor_set_xkb_rule_names(self.native, names);
 	}
     }
+
+    fn head_iter(&mut self) -> ffi::WlListIter<ffi::weston_head> {
+	let native = unsafe { &mut (*self.native) };
+
+	wl_list_iter!(&mut native.head_list, ffi::weston_head, compositor_link)
+    }
 }
 
 impl Drop for Compositor {
@@ -279,6 +286,8 @@ fn main() {
 
     let shell = Rc::new(RefCell::new(
 	Shell::new(&compositor)));
+
+    display::init(&shell);
 
     terminal::init(&shell);
 
