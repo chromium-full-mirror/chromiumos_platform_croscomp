@@ -2,31 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::ffi;
-
-use crate::NULL_VOID;
-use crate::Void;
 use std::cell::RefCell;
 use std::rc::Rc;
-
-pub mod croscomp_protocol {
-    #![allow(dead_code, non_camel_case_types, unused_unsafe, unused_variables)]
-    #![allow(non_upper_case_globals, non_snake_case, unused_imports)]
-    #![allow(missing_docs, clippy::all)]
-
-    pub(crate) use wayland_sys as sys;
-    pub(crate) use wayland_server::*;
-    pub(crate) use wayland_commons::*;
-    pub(crate) use wayland_commons::wire::*;
-    pub(crate) use wayland_commons::map::*;
-
-    use wayland_server::{
-	protocol::{wl_compositor, wl_shell, wl_output, wl_surface},
-	Display,
-    };
-
-    include!(concat!(env!("OUT_DIR"), "/croscomp_api.rs"));
-}
+use crate::ffi;
+use crate::NULL_VOID;
+use crate::Void;
+use crate::protocol;
 
 struct Splash {
     shell: Rc<RefCell<crate::Shell>>,
@@ -40,7 +21,7 @@ impl Drop for Splash {
 }
 
 fn croscomp_splash_interface() -> *const ffi::wl_interface {
-    <croscomp_protocol::croscomp_splash::CroscompSplash as wayland_server::Interface>
+    <protocol::croscomp_splash::CroscompSplash as wayland_server::Interface>
 	::c_interface() as *const ffi::wl_interface
 }
 
@@ -73,7 +54,7 @@ extern "C" fn dispatcher(
     args: *mut ffi::wl_argument) -> ::std::os::raw::c_int {
     println!("dispatch!");
 
-    use croscomp_protocol::croscomp_splash::Request as Request;
+    use protocol::croscomp_splash::Request as Request;
 
     let resource = object as *mut ffi::wl_resource;
     let client = unsafe { ffi::wl_resource_get_client(resource) };

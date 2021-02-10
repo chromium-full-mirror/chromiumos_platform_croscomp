@@ -14,6 +14,7 @@ use std::rc::Rc;
 mod ffi;
 mod terminal;
 mod splash;
+mod protocol;
 
 fn verify_xdg_runtime_dir() {
     let path = env::var_os("XDG_RUNTIME_DIR")
