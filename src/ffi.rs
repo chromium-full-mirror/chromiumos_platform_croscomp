@@ -28,8 +28,8 @@ macro_rules! container_of_mut {
 
 pub struct WlListIter<'a, T: 'a> {
     offset: usize,
-    head: *mut wl_list,
-    next: *mut wl_list,
+    head: *const wl_list,
+    next: *const wl_list,
     phantom: PhantomData<&'a T>
 }
 
@@ -48,11 +48,11 @@ impl<'a, T> Iterator for WlListIter<'a, T> {
 }
 
 impl wl_list {
-    pub fn iter<'a, T>(&mut self, offset: usize) -> WlListIter<'a, T> {
+    pub fn iter<'a, T>(&self, offset: usize) -> WlListIter<'a, T> {
 	WlListIter {
 	    offset: offset,
-	    head: self as *mut wl_list,
-	    next: self.next as *mut wl_list,
+	    head: self as *const wl_list,
+	    next: self.next as *const wl_list,
 	    phantom: PhantomData
 	}
     }
