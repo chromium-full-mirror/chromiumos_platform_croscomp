@@ -26,14 +26,12 @@ type Void = ::std::os::raw::c_void;
 extern "C"
 fn client_destroy_notify(listener: *mut ffi::wl_listener,
 			 _data: *mut ::std::os::raw::c_void) {
-    let mut t = unsafe { Box::from_raw(
-	container_of_mut!(listener, Terminal, client_destroy_listener))
+    let mut t = unsafe {
+	&mut *container_of_mut!(listener, Terminal, client_destroy_listener)
     };
 
     t.client = None;
     t.client_surface = None;
-
-    Box::into_raw(t);
 }
 
 extern "C"
@@ -41,7 +39,7 @@ fn binding(keyboard: *mut ffi::weston_keyboard,
            _time: *const ffi::timespec,
            key: u32,
            data: *mut Void) {
-    let mut t = unsafe { Box::from_raw(data as *mut Terminal) };
+    let mut t = unsafe { &mut *(data as *mut Terminal) };
     let shell = t.shell.borrow().native;
 
     match (key, t.client_surface) {
@@ -85,15 +83,13 @@ fn binding(keyboard: *mut ffi::weston_keyboard,
 	}
 	_ => ()
     }
-
-    Box::into_raw(t);
 }
 
 extern "C"
 fn surface_create_notify(listener: *mut ffi::wl_listener,
 			 data: *mut ::std::os::raw::c_void) {
-    let mut t = unsafe { Box::from_raw(
-	container_of_mut!(listener, Terminal, surface_create_listener))
+    let mut t = unsafe {
+	&mut *container_of_mut!(listener, Terminal, surface_create_listener)
     };
     let surface = data as *mut ffi::weston_surface;
     let client = unsafe {
@@ -104,8 +100,6 @@ fn surface_create_notify(listener: *mut ffi::wl_listener,
 	println!(" -> match");
 	t.client_surface = Some(surface);
     }
-
-    Box::into_raw(t);
 }
 
 pub fn init(shell: &Rc<RefCell<Shell>>) {
