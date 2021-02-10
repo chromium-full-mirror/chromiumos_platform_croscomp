@@ -39,9 +39,10 @@ impl<'a, T> Iterator for WlListIter<'a, T> {
 	if self.next == self.head {
 	    None
 	} else {
+	    let current = self.next;
 	    self.next = unsafe { (*self.next).next };
 
-	    unsafe { Some(&*(((self.next as usize) - self.offset) as *mut T)) }
+	    unsafe { Some(&*(((current as usize) - self.offset) as *mut T)) }
 	}
     }
 }
