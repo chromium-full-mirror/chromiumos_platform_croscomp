@@ -4,6 +4,8 @@
 #![allow(dead_code)]
 #![allow(unused_macros)]
 
+use std::marker::PhantomData;
+
 // Put these uglies here
 
 macro_rules! offset_of {
@@ -24,5 +26,43 @@ macro_rules! container_of_mut {
     })
 }
 
+pub struct WlListIter<'a, T: 'a> {
+    offset: usize,
+    head: *mut wl_list,
+    next: *mut wl_list,
+    phantom: PhantomData<&'a T>
+}
+
+impl<'a, T> Iterator for WlListIter<'a, T> {
+    type Item = &'a T;
+    fn next(&mut self) -> Option<Self::Item> {
+	if self.next == self.head {
+	    None
+	} else {
+	    self.next = unsafe { (*self.next).next };
+
+	    unsafe { Some(&*(((self.next as usize) - self.offset) as *mut T)) }
+	}
+    }
+}
+
+impl wl_list {
+    pub fn iter<'a, T>(&mut self, offset: usize) -> WlListIter<'a, T> {
+	WlListIter {
+	    offset: offset,
+	    head: self as *mut wl_list,
+	    next: self.next as *mut wl_list,
+	    phantom: PhantomData
+	}
+    }
+}
+
+macro_rules! wl_list_iter {
+    ($ptr:expr, $container:ty, $field:ident) => ({
+	let offset = unsafe { offset_of!($container, $field) };
+
+	$ptr.iter::<$container>(offset)
+    })
+}
 
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
