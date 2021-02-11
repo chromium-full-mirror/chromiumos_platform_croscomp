@@ -159,18 +159,20 @@ pub fn init(shell: &Rc<RefCell<crate::Shell>>) {
 
     unsafe {
 	ffi::wl_global_create(
-	    (*compositor.borrow().native).wl_display,
+	    compositor.borrow().native.wl_display,
 	    croscomp_splash_interface(), 1,
 	    p as *mut Void, Some(bind_splash));
     }
 
     let event_loop = unsafe {
-	&mut *ffi::wl_display_get_event_loop((*compositor.borrow().native).wl_display)
+	&mut *ffi::wl_display_get_event_loop(compositor.borrow().native.wl_display)
     };
 
     unsafe {
 	ffi::wl_event_loop_add_idle(event_loop,
 				    Some(launch_splash_process),
-				    compositor.borrow().native as *mut Void);
+				    &mut compositor.borrow_mut().native
+				    as *mut ffi::weston_compositor
+				    as *mut Void);
     }
 }

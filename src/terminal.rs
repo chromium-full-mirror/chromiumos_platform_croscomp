@@ -116,7 +116,7 @@ pub fn init(shell: &Rc<RefCell<Shell>>) {
 
     // signal add
     unsafe {
-	ffi::wl_list_insert((*compositor.native).create_surface_signal.listener_list.prev,
+	ffi::wl_list_insert(compositor.native.create_surface_signal.listener_list.prev,
 			    &mut t.surface_create_listener.link as *mut ffi::wl_list);
     }
 

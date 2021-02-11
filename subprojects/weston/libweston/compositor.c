@@ -7334,14 +7334,29 @@ weston_compositor_create(struct wl_display *display,
 			 void *user_data)
 {
 	struct weston_compositor *ec;
-	struct wl_event_loop *loop;
-
-	if (!log_ctx)
-		return NULL;
 
 	ec = zalloc(sizeof *ec);
 	if (!ec)
 		return NULL;
+
+	if (weston_compositor_init(ec, display, log_ctx, user_data) == -1) {
+		free(ec);
+		return NULL;
+	}
+
+	return ec;
+}
+
+WL_EXPORT int
+weston_compositor_init(struct weston_compositor *ec,
+		       struct wl_display *display,
+		       struct weston_log_context *log_ctx,
+		       void *user_data)
+{
+	struct wl_event_loop *loop;
+
+	if (!log_ctx)
+		return -1;
 
 	ec->weston_log_ctx = log_ctx;
 	ec->wl_display = display;
@@ -7377,26 +7392,26 @@ weston_compositor_create(struct wl_display *display,
 
 	if (!wl_global_create(ec->wl_display, &wl_compositor_interface, 4,
 			      ec, compositor_bind))
-		goto fail;
+		return 1;
 
 	if (!wl_global_create(ec->wl_display, &wl_subcompositor_interface, 1,
 			      ec, bind_subcompositor))
-		goto fail;
+		return 1;
 
 	if (!wl_global_create(ec->wl_display, &wp_viewporter_interface, 1,
 			      ec, bind_viewporter))
-		goto fail;
+		return 1;
 
 	if (!wl_global_create(ec->wl_display, &zxdg_output_manager_v1_interface, 2,
 			      ec, bind_xdg_output_manager))
-		goto fail;
+		return 1;
 
 	if (!wl_global_create(ec->wl_display, &wp_presentation_interface, 1,
 			      ec, bind_presentation))
-		goto fail;
+		return 1;
 
 	if (weston_input_init(ec) != 0)
-		goto fail;
+		return 1;
 
 	wl_list_init(&ec->view_list);
 	wl_list_init(&ec->plane_list);
@@ -7446,11 +7461,7 @@ weston_compositor_create(struct wl_display *display,
 						weston_timeline_create_subscription,
 						weston_timeline_destroy_subscription,
 						ec);
-	return ec;
-
-fail:
-	free(ec);
-	return NULL;
+	return 0;
 }
 
 /** weston_compositor_shutdown
@@ -7792,6 +7803,13 @@ weston_compositor_add_destroy_listener_once(struct weston_compositor *compositor
 WL_EXPORT void
 weston_compositor_destroy(struct weston_compositor *compositor)
 {
+	weston_compositor_deinit(compositor);
+	free(compositor);
+}
+
+WL_EXPORT void
+weston_compositor_deinit(struct weston_compositor *compositor)
+{
 	/* prevent further rendering while shutting down */
 	compositor->state = WESTON_COMPOSITOR_OFFSCREEN;
 
@@ -7815,8 +7833,6 @@ weston_compositor_destroy(struct weston_compositor *compositor)
 
 	weston_log_scope_destroy(compositor->timeline);
 	compositor->timeline = NULL;
-
-	free(compositor);
 }
 
 /** Instruct the compositor to exit.

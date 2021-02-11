@@ -1765,10 +1765,18 @@ weston_compositor_get_time(struct timespec *time);
 
 void
 weston_compositor_destroy(struct weston_compositor *ec);
+void
+weston_compositor_deinit(struct weston_compositor *compositor);
 
 struct weston_compositor *
 weston_compositor_create(struct wl_display *display,
 			 struct weston_log_context *log_ctx, void *user_data);
+
+int
+weston_compositor_init(struct weston_compositor *ec,
+		       struct wl_display *display,
+		       struct weston_log_context *log_ctx,
+		       void *user_data);
 
 bool
 weston_compositor_add_destroy_listener_once(struct weston_compositor *compositor,

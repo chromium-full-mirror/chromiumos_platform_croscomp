@@ -113,20 +113,24 @@ impl Drop for Display {
 
 #[derive(Debug)]
 pub struct Compositor {
-    native: *mut ffi::weston_compositor
+    native: ffi::weston_compositor
 }
 
 impl Compositor {
-    fn new(display: &Display, ctx: *mut ffi::weston_log_context) -> Self {
-	Compositor { native: unsafe {
-	    ffi::weston_compositor_create(display.native,
-					  ctx, 0 as *mut ::std::os::raw::c_void)
-	} }
+    fn new() -> Self {
+	Compositor { native: unsafe { std::mem::zeroed() } }
+    }
+
+    fn init(&mut self, display: &Display, ctx: *mut ffi::weston_log_context) {
+	unsafe  {
+	    ffi::weston_compositor_init(&mut self.native,
+					display.native, ctx, NULL_VOID)
+	};
     }
 
     fn add_heads_changed_listener(&mut self, listener: &mut ffi::wl_listener) {
 	unsafe {
-	    ffi::weston_compositor_add_heads_changed_listener(self.native,
+	    ffi::weston_compositor_add_heads_changed_listener(&mut self.native,
 							      listener)
 	}
     }
@@ -137,30 +141,28 @@ impl Compositor {
 		       data: *mut ::std::os::raw::c_void) -> *mut ffi::weston_binding{
 	unsafe {
 	    ffi::weston_compositor_add_key_binding(
-		self.native, key, modifier, binding, data)
+		&mut self.native, key, modifier, binding, data)
 	}
     }
 
     fn wake(&mut self) {
-	unsafe { ffi::weston_compositor_wake(self.native) }
+	unsafe { ffi::weston_compositor_wake(&mut self.native) }
     }
 
-    fn flush_heads_changed(&self) {
+    fn flush_heads_changed(&mut self) {
 	unsafe {
-	    ffi::weston_compositor_flush_heads_changed(self.native)
+	    ffi::weston_compositor_flush_heads_changed(&mut self.native)
 	}
     }
 
-    fn set_xkb_rule_names(&self, names: &mut ffi::xkb_rule_names) {
+    fn set_xkb_rule_names(&mut self, names: &mut ffi::xkb_rule_names) {
 	unsafe {
-	    ffi::weston_compositor_set_xkb_rule_names(self.native, names);
+	    ffi::weston_compositor_set_xkb_rule_names(&mut self.native, names);
 	}
     }
 
     fn head_iter(&mut self) -> ffi::WlListIter<ffi::weston_head> {
-	let native = unsafe { &mut (*self.native) };
-
-	wl_list_iter!(&mut native.head_list, ffi::weston_head, compositor_link)
+	wl_list_iter!(&mut self.native.head_list, ffi::weston_head, compositor_link)
     }
 
     fn head_iter_mut(&mut self) -> ffi::WlListIterMut<ffi::weston_head> {
@@ -171,7 +173,7 @@ impl Compositor {
 impl Drop for Compositor {
     fn drop(&mut self) {
 	println!("drop compositor");
-	unsafe { ffi::weston_compositor_destroy(self.native) }
+	unsafe { ffi::weston_compositor_deinit(&mut self.native) }
     }
 }
 
@@ -184,7 +186,7 @@ pub struct Shell {
 
 impl Shell {
     fn new(compositor: &Rc<RefCell<Compositor>>) -> Self {
-	let native = compositor.borrow().native;
+	let native = &mut compositor.borrow_mut().native;
 	let mut shell = Shell {
 	    native: unsafe { std::mem::zeroed() },
 	    compositor: Rc::clone(compositor)
@@ -197,7 +199,7 @@ impl Shell {
 
     fn finish_init(&mut self) {
 	unsafe {
-	    ffi::weston_compositor_init_input(self.compositor.borrow().native);
+	    ffi::weston_compositor_init_input(&mut self.compositor.borrow_mut().native);
 	    ffi::exo_extensions_init(&mut self.native);
 	}
     }
@@ -230,7 +232,8 @@ fn main() {
     let display = Display::new();
 
     let compositor =
-	Rc::new(RefCell::new(Compositor::new(&display, ctx)));
+	Rc::new(RefCell::new(Compositor::new()));
+    compositor.borrow_mut().init(&display, ctx);
 
     println!("set log handler");
     unsafe {
@@ -271,12 +274,12 @@ fn main() {
     };
 
     let _ret = unsafe { ffi::weston_compositor_load_backend(
-	compositor.borrow().native,
+	&mut compositor.borrow_mut().native,
 	ffi::weston_compositor_backend::WESTON_BACKEND_DRM,
 	&mut config.base)
     };
 
-    compositor.borrow().flush_heads_changed();
+    compositor.borrow_mut().flush_heads_changed();
 
     let socket_name = display.add_socket_auto();
 

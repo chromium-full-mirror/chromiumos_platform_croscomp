@@ -179,7 +179,7 @@ pub fn init(shell: &Rc<RefCell<crate::Shell>>) {
 
     unsafe {
 	ffi::wl_global_create(
-	    (*compositor.borrow().native).wl_display,
+	    compositor.borrow().native.wl_display,
 	    croscomp_display_interface(), 1,
 	    p as *mut Void, Some(bind_display));
     }
