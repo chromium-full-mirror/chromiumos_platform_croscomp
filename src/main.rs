@@ -32,59 +32,55 @@ fn verify_xdg_runtime_dir() {
     // Verify permissions 0700 and owned by user?
 }
 
-const NULL_HEAD: *mut ffi::weston_head = 0 as *mut ffi::weston_head;
 const NULL_STR: *mut ::std::os::raw::c_char = 0 as *mut ::std::os::raw::c_char;
 const NULL_VOID: *mut ::std::os::raw::c_void = 0 as *mut ::std::os::raw::c_void;
 type Void = ::std::os::raw::c_void;
 
+impl ffi::weston_head {
+    fn is_enabled(&self) -> bool {
+	unsafe { self.output.as_ref().map_or(false, |output| output.enabled) }
+    }
+}
+
 extern "C"
 fn head_notify(_listener: *mut ffi::wl_listener, data: *mut ::std::os::raw::c_void) {
-    let c = data as *mut ffi::weston_compositor;
+    let native = data as *mut ffi::weston_compositor;
+    let compositor = unsafe { &mut *container_of_mut!(native, Compositor, native) };
+    let c = native;
     println!("listener");
 
-    unsafe {
-	let mut head = ffi::weston_compositor_iterate_heads(c, NULL_HEAD);
-	while head != NULL_HEAD {
-	    let connected = ffi::weston_head_is_connected(head);
-	    let enabled = ffi::weston_head_is_enabled(head);
-	    let changed = ffi::weston_head_is_device_changed(head);
+    for head in compositor.head_iter_mut()
+	.filter(|h| h.connected && !h.is_enabled()) {
+	unsafe {
+	    let output = ffi::weston_compositor_create_output(
+		c, "output\0".as_ptr() as *const i8);
 
-	    println!("head {:?}, connected {}, enabled {}, changed {}",
-		     head, connected, enabled, changed);
+	    ffi::weston_output_attach_head(output, head);
 
-	    if connected && !enabled {
-		let output = ffi::weston_compositor_create_output(c, "output\0".as_ptr() as *const i8);
+	    let api = ffi::weston_plugin_api_get(
+		c,
+		ffi::WESTON_DRM_OUTPUT_API_NAME.as_ptr() as *const i8,
+		std::mem::size_of::<ffi::weston_drm_output_api>() as u64)
+		as *mut ffi::weston_drm_output_api;
 
-		ffi::weston_output_attach_head(output, head);
+	    use ffi::weston_drm_backend_output_mode::*;
+	    let set_mode = (*api).set_mode.unwrap();
+	    set_mode(output, WESTON_DRM_BACKEND_OUTPUT_PREFERRED, NULL_STR);
+	    ffi::weston_output_set_scale(output, 1);
 
-		let api = ffi::weston_plugin_api_get(
-		    c,
-		    ffi::WESTON_DRM_OUTPUT_API_NAME.as_ptr() as *const i8,
-		    std::mem::size_of::<ffi::weston_drm_output_api>() as u64)
-		    as *mut ffi::weston_drm_output_api;
+	    use ffi::wl_output_transform::*;
+	    ffi::weston_output_set_transform(output, WL_OUTPUT_TRANSFORM_NORMAL as u32);
+	    let set_gbm_format = (*api).set_gbm_format.unwrap();
+	    set_gbm_format(output, NULL_STR);
 
-		let set_mode = (*api).set_mode.unwrap();
+	    let set_seat = (*api).set_seat.unwrap();
+	    set_seat(output, "\0".as_ptr() as *const i8);
 
-		set_mode(output, ffi::weston_drm_backend_output_mode::WESTON_DRM_BACKEND_OUTPUT_PREFERRED, NULL_STR);
-
-		ffi::weston_output_set_scale(output, 1);
-
-		ffi::weston_output_set_transform(output,
-						 ffi::wl_output_transform::WL_OUTPUT_TRANSFORM_NORMAL as u32);
-		let set_gbm_format = (*api).set_gbm_format.unwrap();
-		set_gbm_format(output, NULL_STR);
-
-		let set_seat = (*api).set_seat.unwrap();
-		set_seat(output, "\0".as_ptr() as *const i8);
-
-		if ffi::weston_output_enable(output) != 0 {
-		    println!("weston_output_enable return non-0");
-		}
-
-		println!("attached to output {:?}", output);
+	    if ffi::weston_output_enable(output) != 0 {
+		println!("weston_output_enable return non-0");
 	    }
 
-	    head = ffi::weston_compositor_iterate_heads(c, head);
+	    println!("attached to output {:?}", output);
 	}
     }
 }
@@ -165,6 +161,10 @@ impl Compositor {
 	let native = unsafe { &mut (*self.native) };
 
 	wl_list_iter!(&mut native.head_list, ffi::weston_head, compositor_link)
+    }
+
+    fn head_iter_mut(&mut self) -> ffi::WlListIterMut<ffi::weston_head> {
+	wl_list_iter_mut!(&mut self.native.head_list, ffi::weston_head, compositor_link)
     }
 }
 
