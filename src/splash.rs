@@ -115,7 +115,7 @@ extern "C" fn unbind_splash(resource: *mut ffi::wl_resource) {
 	unsafe { ffi::weston_surface_destroy((*view).surface) }
     }
 
-    let shell = splash.shell.borrow();
+    let mut shell = splash.shell.borrow_mut();
     shell.finish_init()
 }
 

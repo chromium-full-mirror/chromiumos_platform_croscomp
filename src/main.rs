@@ -171,23 +171,27 @@ impl Drop for Compositor {
 
 #[derive(Debug)]
 pub struct Shell {
-    native: *mut ffi::desktop_shell,
+    native: ffi::desktop_shell,
     compositor: Rc<RefCell<Compositor>>
 }
 
 impl Shell {
     fn new(compositor: &Rc<RefCell<Compositor>>) -> Self {
 	let native = compositor.borrow().native;
-	Shell {
-	    native: unsafe { ffi::desktop_shell_init(native) },
+	let mut shell = Shell {
+	    native: unsafe { std::mem::zeroed() },
 	    compositor: Rc::clone(compositor)
-	}
+	};
+
+	unsafe { ffi::desktop_shell_init(&mut shell.native, native) };
+
+	shell
     }
 
-    fn finish_init(&self) {
+    fn finish_init(&mut self) {
 	unsafe {
 	    ffi::weston_compositor_init_input(self.compositor.borrow().native);
-	    ffi::exo_extensions_init(self.native);
+	    ffi::exo_extensions_init(&mut self.native);
 	}
     }
 }

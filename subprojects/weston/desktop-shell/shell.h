@@ -282,7 +282,8 @@ find_shell_output_from_weston_output(struct desktop_shell *shell,
 int vlog(const char *fmt, va_list ap);
 int vlog_continue(const char *fmt, va_list argp);
 
-struct desktop_shell *desktop_shell_init(struct weston_compositor *ec);
+int desktop_shell_init(struct desktop_shell *shell,
+		       struct weston_compositor *ec);
 
 struct weston_compositor *
 desktop_shell_get_compositor(struct desktop_shell *shell);

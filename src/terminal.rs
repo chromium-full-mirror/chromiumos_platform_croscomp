@@ -40,7 +40,7 @@ fn binding(keyboard: *mut ffi::weston_keyboard,
            key: u32,
            data: *mut Void) {
     let mut t = unsafe { &mut *(data as *mut Terminal) };
-    let shell = t.shell.borrow().native;
+    let shell = &mut t.shell.borrow_mut().native;
 
     match (key, t.client_surface) {
 	(KEY_F1, Some(surface)) => {
