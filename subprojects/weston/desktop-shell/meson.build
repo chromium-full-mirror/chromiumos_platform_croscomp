@@ -17,8 +17,6 @@ if get_option('shell-desktop')
 		'screenshooter.c',
 		weston_screenshooter_server_protocol_h,
 		weston_screenshooter_protocol_c,
-		weston_desktop_shell_server_protocol_h,
-		weston_desktop_shell_protocol_c,
 		croscomp_server_protocol_h,
 		croscomp_protocol_c,
 		input_method_unstable_v1_server_protocol_h,

@@ -48,7 +48,6 @@ generated_protocols = [
 	[ 'text-input', 'v1' ],
 	[ 'viewporter', 'stable' ],
 	[ 'weston-debug', 'internal' ],
-	[ 'weston-desktop-shell', 'internal' ],
 	[ 'weston-screenshooter', 'internal' ],
 	[ 'weston-content-protection', 'internal' ],
 	[ 'weston-test', 'internal' ],
