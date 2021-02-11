@@ -47,6 +47,27 @@ impl<'a, T> Iterator for WlListIter<'a, T> {
     }
 }
 
+pub struct WlListIterMut<'a, T: 'a> {
+    offset: usize,
+    head: *mut wl_list,
+    next: *mut wl_list,
+    phantom: PhantomData<&'a T>
+}
+
+impl<'a, T> Iterator for WlListIterMut<'a, T> {
+    type Item = &'a mut T;
+    fn next(&mut self) -> Option<Self::Item> {
+	if self.next == self.head {
+	    None
+	} else {
+	    let current = self.next;
+	    self.next = unsafe { (*self.next).next };
+
+	    unsafe { Some(&mut *(((current as usize) - self.offset) as *mut T)) }
+	}
+    }
+}
+
 impl wl_list {
     pub fn iter<'a, T>(&self, offset: usize) -> WlListIter<'a, T> {
 	WlListIter {
@@ -56,6 +77,16 @@ impl wl_list {
 	    phantom: PhantomData
 	}
     }
+
+    pub fn iter_mut<'a, T>(&mut self, offset: usize) -> WlListIterMut<'a, T> {
+	WlListIterMut {
+	    offset: offset,
+	    head: self as *mut wl_list,
+	    next: self.next as *mut wl_list,
+	    phantom: PhantomData
+	}
+    }
+
 }
 
 macro_rules! wl_list_iter {
@@ -63,6 +94,14 @@ macro_rules! wl_list_iter {
 	let offset = unsafe { offset_of!($container, $field) };
 
 	$ptr.iter::<$container>(offset)
+    })
+}
+
+macro_rules! wl_list_iter_mut {
+    ($ptr:expr, $container:ty, $field:ident) => ({
+	let offset = unsafe { offset_of!($container, $field) };
+
+	$ptr.iter_mut::<$container>(offset)
     })
 }
 
