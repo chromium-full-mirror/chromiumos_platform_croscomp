@@ -8,6 +8,7 @@ use crate::Shell;
 
 use crate::ffi;
 use crate::ffi::evdev::{KEY_F1, KEY_F2};
+use crate::Void;
 
 struct Terminal {
     client_surface: Option<*mut ffi::weston_surface>,
@@ -20,7 +21,6 @@ struct Terminal {
     client_destroy_listener: ffi::wl_listener,
 }
 
-type Void = ::std::os::raw::c_void;
 
 extern "C"
 fn client_destroy_notify(listener: *mut ffi::wl_listener,
