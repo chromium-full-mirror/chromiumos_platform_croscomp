@@ -109,6 +109,29 @@ macro_rules! wl_list_iter_mut {
 
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
+type NotifyFunc =
+    unsafe extern "C" fn(listener: *mut wl_listener, data: *mut ::std::os::raw::c_void);
+
+const NULL_LIST: wl_list = wl_list {
+	prev: 0 as *mut _,
+	next: 0 as *mut _
+};
+
+impl wl_listener {
+    pub fn new(notify: NotifyFunc) -> Self {
+	wl_listener {
+	    link: NULL_LIST,
+	    notify: Some(notify)
+	}
+    }
+}
+
+impl weston_keyboard_modifier {
+    pub fn is_set(&self, bit: weston_keyboard_modifier) -> bool {
+	(*self & bit) == bit
+   }
+}
+
 pub mod evdev {
     include!(concat!(env!("OUT_DIR"), "/input.rs"));
 }

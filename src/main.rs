@@ -205,23 +205,6 @@ impl Shell {
     }
 }
 
-const NULL_LIST: ffi::wl_list = ffi::wl_list {
-	prev: 0 as *mut ffi::wl_list,
-	next: 0 as *mut ffi::wl_list
-};
-
-type NotifyFunc =
-    unsafe extern "C" fn(listener: *mut ffi::wl_listener, data: *mut ::std::os::raw::c_void);
-
-impl ffi::wl_listener {
-    fn new(notify: NotifyFunc) -> Self {
-	ffi::wl_listener {
-	    link: NULL_LIST,
-	    notify: Some(notify)
-	}
-    }
-}
-
 fn main() {
     verify_xdg_runtime_dir();
 
