@@ -9,20 +9,20 @@ use std::marker::PhantomData;
 // Put these uglies here
 
 macro_rules! offset_of {
-    ($container:ty, $field:ident) => {
-        &(*(0usize as *const $container)).$field as *const _ as usize
+    ($container:ty, $( $field:ident ).+) => {
+        &(*(0usize as *const $container)).$( $field ).+ as *const _ as usize
     }
 }
 
 macro_rules! container_of {
-    ($ptr:expr, $container:ty, $field:ident) => ({
-        (($ptr as usize) - offset_of!($container, $field)) as *const $container
+    ($ptr:expr, $container:ty, $( $field:ident ).+) => ({
+        (($ptr as usize) - offset_of!($container, $( $field ).+)) as *const $container
     })
 }
 
 macro_rules! container_of_mut {
-    ($ptr:expr, $container:ty, $field:ident) => ({
-        (($ptr as usize) - offset_of!($container, $field)) as *mut $container
+    ($ptr:expr, $container:ty, $( $field:ident ).+) => ({
+        (($ptr as usize) - offset_of!($container, $( $field ).+)) as *mut $container
     })
 }
 
@@ -90,16 +90,16 @@ impl wl_list {
 }
 
 macro_rules! wl_list_iter {
-    ($ptr:expr, $container:ty, $field:ident) => ({
-	let offset = unsafe { offset_of!($container, $field) };
+    ($ptr:expr, $container:ty, $( $field:ident ).+) => ({
+	let offset = unsafe { offset_of!($container, $( $field ).+) };
 
 	$ptr.iter::<$container>(offset)
     })
 }
 
 macro_rules! wl_list_iter_mut {
-    ($ptr:expr, $container:ty, $field:ident) => ({
-	let offset = unsafe { offset_of!($container, $field) };
+    ($ptr:expr, $container:ty, $( $field:ident ).+) => ({
+	let offset = unsafe { offset_of!($container, $( $field ).+) };
 
 	$ptr.iter_mut::<$container>(offset)
     })
