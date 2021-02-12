@@ -106,3 +106,7 @@ macro_rules! wl_list_iter_mut {
 }
 
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+
+pub mod evdev {
+    include!(concat!(env!("OUT_DIR"), "/input.rs"));
+}

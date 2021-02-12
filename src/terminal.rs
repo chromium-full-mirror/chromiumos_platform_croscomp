@@ -7,6 +7,7 @@ use std::rc::Rc;
 use crate::Shell;
 
 use crate::ffi;
+use crate::ffi::evdev::{KEY_F1, KEY_F2};
 
 struct Terminal {
     client_surface: Option<*mut ffi::weston_surface>,
@@ -19,8 +20,6 @@ struct Terminal {
     client_destroy_listener: ffi::wl_listener,
 }
 
-const KEY_F1: u32 = 59; /* 61 and 62 are F3 and F4, which we use for now */
-const KEY_F2: u32 = 60;
 type Void = ::std::os::raw::c_void;
 
 extern "C"

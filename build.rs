@@ -46,6 +46,17 @@ fn main() {
         .write_to_file(out_path.join("bindings.rs"))
         .expect("Couldn't write bindings!");
 
+    let bindings = bindgen::Builder::default()
+        .header("/usr/include/linux/input.h")
+	.generate_comments(false)
+        .generate()
+        .expect("Unable to generate input.h bindings");
+
+    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+    bindings
+        .write_to_file(out_path.join("input.rs"))
+        .expect("Couldn't write bindings!");
+
     println!("cargo:rustc-flags=-Lbuild/subprojects/weston/compositor");
     println!("cargo:rustc-link-lib=exec_weston");
     println!("cargo:rustc-flags=-Lbuild/subprojects/weston/desktop-shell");
