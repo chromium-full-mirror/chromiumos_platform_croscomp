@@ -26,6 +26,7 @@ macro_rules! container_of_mut {
     })
 }
 
+#[derive(Clone)]
 pub struct WlListIter<'a, T: 'a> {
     offset: usize,
     head: *const wl_list,
@@ -47,6 +48,7 @@ impl<'a, T> Iterator for WlListIter<'a, T> {
     }
 }
 
+#[derive(Clone)]
 pub struct WlListIterMut<'a, T: 'a> {
     offset: usize,
     head: *mut wl_list,
