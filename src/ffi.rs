@@ -71,6 +71,11 @@ impl<'a, T> Iterator for WlListIterMut<'a, T> {
 }
 
 impl wl_list {
+    pub fn init(&mut self) {
+	self.next = self as *mut _;
+	self.prev = self as *mut _;
+    }
+
     pub fn iter<'a, T>(&self, offset: usize) -> WlListIter<'a, T> {
 	WlListIter {
 	    offset: offset,
@@ -136,6 +141,52 @@ impl wl_signal {
     pub fn add(&mut self, listener: &mut wl_listener) {
 	unsafe {
 	    wl_list_insert(self.listener_list.prev, &mut listener.link);
+	}
+    }
+}
+
+impl weston_head {
+    pub fn is_enabled(&self) -> bool {
+	unsafe { self.output.as_ref().map_or(false, |output| output.enabled) }
+    }
+}
+
+impl weston_surface {
+    pub fn create_view(&mut self) -> &mut weston_view {
+	unsafe { &mut *weston_view_create(self) }
+    }
+    pub fn set_color(&mut self, r: f32, g: f32, b: f32, a: f32) {
+	unsafe { weston_surface_set_color(self, r, g, b, a); }
+    }
+    pub fn set_size(&mut self, width: i32, height: i32) {
+	unsafe { weston_surface_set_size(self, width, height) }
+    }
+
+    pub fn damage(&mut self) {
+	unsafe { weston_surface_damage(self) }
+    }
+}
+
+impl weston_view {
+    pub fn set_position(&mut self, x: f32, y: f32) {
+	unsafe { weston_view_set_position(self, x, y) }
+    }
+
+    pub fn geometry_dirty(&mut self) {
+	unsafe { weston_view_geometry_dirty(self) }
+    }
+}
+
+impl weston_keyboard {
+    pub fn start_grab(&mut self, grab: *mut weston_keyboard_grab) {
+	unsafe {
+	    weston_keyboard_start_grab(self, grab)
+	}
+    }
+
+    pub fn set_focus(&mut self, surface: Option<*mut weston_surface>) {
+	unsafe {
+	    weston_keyboard_set_focus(self, surface.unwrap_or(0 as *mut _))
 	}
     }
 }

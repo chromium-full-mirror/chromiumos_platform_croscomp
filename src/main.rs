@@ -15,6 +15,7 @@ mod ffi;
 mod terminal;
 mod display;
 mod splash;
+mod switcher;
 mod protocol;
 
 fn verify_xdg_runtime_dir() {
@@ -35,12 +36,6 @@ fn verify_xdg_runtime_dir() {
 const NULL_STR: *mut ::std::os::raw::c_char = 0 as *mut ::std::os::raw::c_char;
 const NULL_VOID: *mut ::std::os::raw::c_void = 0 as *mut ::std::os::raw::c_void;
 type Void = ::std::os::raw::c_void;
-
-impl ffi::weston_head {
-    fn is_enabled(&self) -> bool {
-	unsafe { self.output.as_ref().map_or(false, |output| output.enabled) }
-    }
-}
 
 extern "C"
 fn head_notify(_listener: *mut ffi::wl_listener, data: *mut ::std::os::raw::c_void) {
@@ -188,32 +183,6 @@ pub struct Shell {
     compositor: Rc<RefCell<Compositor>>
 }
 
-impl ffi::weston_surface {
-    fn create_view(&mut self) -> &mut ffi::weston_view {
-	unsafe { &mut *ffi::weston_view_create(self) }
-    }
-    fn set_color(&mut self, r: f32, g: f32, b: f32, a: f32) {
-	unsafe { ffi::weston_surface_set_color(self, r, g, b, a); }
-    }
-    fn set_size(&mut self, width: i32, height: i32) {
-	unsafe { ffi::weston_surface_set_size(self, width, height) }
-    }
-
-    fn damage(&mut self) {
-	unsafe { ffi::weston_surface_damage(self) }
-    }
-}
-
-impl ffi::weston_view {
-    fn set_position(&mut self, x: f32, y: f32) {
-	unsafe { ffi::weston_view_set_position(self, x, y) }
-    }
-
-    fn geometry_dirty(&mut self) {
-	unsafe { ffi::weston_view_geometry_dirty(self) }
-    }
-}
-
 impl Shell {
     fn new(compositor: &Rc<RefCell<Compositor>>) -> Self {
 	Shell {
@@ -335,6 +304,8 @@ fn main() {
     terminal::init(&shell);
 
     splash::init(&shell);
+
+    switcher::init(&shell);
 
     compositor.borrow_mut().wake();
 
