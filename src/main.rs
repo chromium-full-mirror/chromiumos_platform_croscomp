@@ -168,6 +168,10 @@ impl Compositor {
     fn head_iter_mut(&mut self) -> ffi::WlListIterMut<ffi::weston_head> {
 	wl_list_iter_mut!(&mut self.native.head_list, ffi::weston_head, compositor_link)
     }
+
+    fn create_surface(&mut self) -> &mut ffi::weston_surface {
+	unsafe { &mut *ffi::weston_surface_create(&mut self.native) }
+    }
 }
 
 impl Drop for Compositor {
@@ -184,6 +188,32 @@ pub struct Shell {
     compositor: Rc<RefCell<Compositor>>
 }
 
+impl ffi::weston_surface {
+    fn create_view(&mut self) -> &mut ffi::weston_view {
+	unsafe { &mut *ffi::weston_view_create(self) }
+    }
+    fn set_color(&mut self, r: f32, g: f32, b: f32, a: f32) {
+	unsafe { ffi::weston_surface_set_color(self, r, g, b, a); }
+    }
+    fn set_size(&mut self, width: i32, height: i32) {
+	unsafe { ffi::weston_surface_set_size(self, width, height) }
+    }
+
+    fn damage(&mut self) {
+	unsafe { ffi::weston_surface_damage(self) }
+    }
+}
+
+impl ffi::weston_view {
+    fn set_position(&mut self, x: f32, y: f32) {
+	unsafe { ffi::weston_view_set_position(self, x, y) }
+    }
+
+    fn geometry_dirty(&mut self) {
+	unsafe { ffi::weston_view_geometry_dirty(self) }
+    }
+}
+
 impl Shell {
     fn new(compositor: &Rc<RefCell<Compositor>>) -> Self {
 	Shell {
@@ -198,6 +228,7 @@ impl Shell {
 	    ffi::desktop_shell_init(&mut self.native, native)
 	};
 
+	self.create_background_surface();
     }
 
     fn finish_init(&mut self) {
@@ -206,6 +237,29 @@ impl Shell {
 	    ffi::exo_extensions_init(&mut self.native);
 	}
     }
+
+    fn create_background_surface(&mut self) {
+	let mut compositor = self.compositor.borrow_mut();
+	let mut surface = compositor.create_surface();
+
+	surface.committed = None;
+	// xx set label func
+	surface.set_color(0.2, 0.2, 0.2, 1.0);
+	surface.set_size(1024 * 1024, 1024 * 1024);
+	surface.damage();
+
+	let view = surface.create_view();
+	view.set_position(10.0, 10.0);
+	view.geometry_dirty();
+	view.is_mapped = true;
+
+	unsafe {
+	    ffi::weston_layer_entry_insert(&mut self.native.background_layer.view_list,
+					   &mut view.layer_link);
+	}
+
+    }
+
 }
 
 fn main() {
