@@ -186,15 +186,18 @@ pub struct Shell {
 
 impl Shell {
     fn new(compositor: &Rc<RefCell<Compositor>>) -> Self {
-	let native = &mut compositor.borrow_mut().native;
-	let mut shell = Shell {
+	Shell {
 	    native: unsafe { std::mem::zeroed() },
 	    compositor: Rc::clone(compositor)
+	}
+    }
+
+    fn init(&mut self) {
+	unsafe {
+	    let native = &mut self.compositor.borrow_mut().native;
+	    ffi::desktop_shell_init(&mut self.native, native)
 	};
 
-	unsafe { ffi::desktop_shell_init(&mut shell.native, native) };
-
-	shell
     }
 
     fn finish_init(&mut self) {
@@ -270,8 +273,8 @@ fn main() {
 	panic!("failed to create listening socket")
     }
 
-    let shell = Rc::new(RefCell::new(
-	Shell::new(&compositor)));
+    let shell = Rc::new(RefCell::new(Shell::new(&compositor)));
+    shell.borrow_mut().init();
 
     display::init(&shell);
 
