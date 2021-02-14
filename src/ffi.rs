@@ -132,6 +132,14 @@ impl weston_keyboard_modifier {
    }
 }
 
+impl wl_signal {
+    pub fn add(&mut self, listener: &mut wl_listener) {
+	unsafe {
+	    wl_list_insert(self.listener_list.prev, &mut listener.link);
+	}
+    }
+}
+
 pub mod evdev {
     include!(concat!(env!("OUT_DIR"), "/input.rs"));
 }
