@@ -39,32 +39,31 @@ type Void = ::std::os::raw::c_void;
 
 extern "C"
 fn head_notify(_listener: *mut ffi::wl_listener, data: *mut ::std::os::raw::c_void) {
-    let native = data as *mut ffi::weston_compositor;
-    let compositor = unsafe { &mut *container_of_mut!(native, Compositor, native) };
-    let c = native;
+    let native = unsafe { &mut *(data as *mut ffi::weston_compositor) };
+    let compositor = unsafe {
+	&mut *container_of_mut!(native as *mut _, Compositor, native)
+    };
     println!("listener");
 
     for head in compositor.head_iter_mut()
 	.filter(|h| h.connected && !h.is_enabled()) {
 	unsafe {
-	    let output = ffi::weston_compositor_create_output(
-		c, "output\0".as_ptr() as *const i8);
-
-	    ffi::weston_output_attach_head(output, head);
-
 	    let api = ffi::weston_plugin_api_get(
-		c,
+		native,
 		ffi::WESTON_DRM_OUTPUT_API_NAME.as_ptr() as *const i8,
 		std::mem::size_of::<ffi::weston_drm_output_api>() as u64)
 		as *mut ffi::weston_drm_output_api;
 
+	    let output = native.create_output("output\0");
+	    output.attach_head(head);
+
 	    use ffi::weston_drm_backend_output_mode::*;
 	    let set_mode = (*api).set_mode.unwrap();
 	    set_mode(output, WESTON_DRM_BACKEND_OUTPUT_PREFERRED, NULL_STR);
-	    ffi::weston_output_set_scale(output, 1);
+	    output.set_scale(1);
 
 	    use ffi::wl_output_transform::*;
-	    ffi::weston_output_set_transform(output, WL_OUTPUT_TRANSFORM_NORMAL as u32);
+	    output.set_transform(WL_OUTPUT_TRANSFORM_NORMAL);
 	    let set_gbm_format = (*api).set_gbm_format.unwrap();
 	    set_gbm_format(output, NULL_STR);
 

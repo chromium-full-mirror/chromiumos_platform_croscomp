@@ -151,6 +151,18 @@ impl weston_head {
     }
 }
 
+impl weston_compositor {
+    pub fn schedule_repaint(&mut self) {
+	unsafe { weston_compositor_schedule_repaint(self) }
+    }
+
+    pub fn create_output(&mut self, name: &str) -> &mut weston_output {
+	unsafe {
+	    &mut *weston_compositor_create_output(self, name.as_ptr() as *const i8)
+	}
+    }
+}
+
 impl weston_surface {
     pub fn create_view(&mut self) -> &mut weston_view {
 	unsafe { &mut *weston_view_create(self) }
@@ -167,9 +179,31 @@ impl weston_surface {
     }
 }
 
+impl weston_output {
+    pub fn attach_head(&mut self, head: &mut weston_head) -> i32 {
+	unsafe { weston_output_attach_head(self, head) }
+    }
+
+    pub fn set_scale(&mut self, scale: i32) {
+	unsafe { weston_output_set_scale(self, scale) }
+    }
+
+    pub fn set_transform(&mut self, transform: wl_output_transform) {
+	unsafe { weston_output_set_transform(self, transform as u32) }
+    }
+
+    pub fn enable(&mut self) -> i32 {
+	unsafe { weston_output_enable(self) }
+    }
+}
+
 impl weston_view {
     pub fn set_position(&mut self, x: f32, y: f32) {
 	unsafe { weston_view_set_position(self, x, y) }
+    }
+
+    pub fn set_output(&mut self, output: *mut weston_output) {
+	unsafe { weston_view_set_output(self, output) }
     }
 
     pub fn geometry_dirty(&mut self) {

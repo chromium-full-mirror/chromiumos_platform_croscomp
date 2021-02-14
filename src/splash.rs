@@ -38,11 +38,12 @@ fn splash_committed(psurface: *mut ffi::weston_surface, _sx: i32, _sy: i32) {
     if !view.is_mapped {
 	unsafe {
 	    ffi::weston_layer_entry_insert(&mut layer.view_list, &mut view.layer_link);
-	    ffi::weston_view_set_position(view, output.x as f32, output.y as f32);
-	    surface.is_mapped = true;
-	    view.is_mapped = true;
-	    ffi::weston_compositor_schedule_repaint(compositor);
 	}
+	
+	view.set_position(output.x as f32, output.y as f32);
+	surface.is_mapped = true;
+	view.is_mapped = true;
+	compositor.schedule_repaint();
     }
 }
 
@@ -86,15 +87,11 @@ extern "C" fn dispatcher(
 		return 0;
 	    }
 
-	    let view = unsafe {
-		ffi::weston_view_create(surface)
-	    };
-
 	    surface.committed = Some(splash_committed);
 	    surface.output = head.output;
-	    unsafe {
-		ffi::weston_view_set_output(view, head.output)
-	    };
+
+	    let view = surface.create_view();
+	    view.set_output(head.output);
 
 	    splash.views.push(view);
 	    surface.ref_count += 1;

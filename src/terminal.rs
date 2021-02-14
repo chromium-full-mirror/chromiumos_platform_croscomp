@@ -114,10 +114,8 @@ pub fn init(shell: &Rc<RefCell<Shell>>) {
     let mut compositor = s.compositor.borrow_mut();
 
     // signal add
-    unsafe {
-	ffi::wl_list_insert(compositor.native.create_surface_signal.listener_list.prev,
-			    &mut t.surface_create_listener.link as *mut ffi::wl_list);
-    }
+    compositor.native.create_surface_signal.add(
+	&mut t.surface_create_listener);
 
     let p = Box::into_raw(t);
 
