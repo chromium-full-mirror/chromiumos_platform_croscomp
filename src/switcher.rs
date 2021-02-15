@@ -14,20 +14,70 @@ struct Switcher {
     shell: Rc<RefCell<crate::Shell>>,
     grab: ffi::weston_keyboard_grab,
     current: Option<*mut ffi::weston_view>,
-    view_destroy_listener: ffi::wl_listener
+    view_destroy_listener: ffi::wl_listener,
+
+    ui: Vec<*mut ffi::weston_view>
 }
 
 impl Switcher {
     fn start(&mut self, keyboard: *mut ffi::weston_keyboard) {
-	let keyboard = &mut unsafe { *keyboard };
+	println!("keyboard {:?}", keyboard);
+	let keyboard = unsafe { &mut *keyboard };
+	println!("ref keyboard {:?}", keyboard as *mut _);
+
 	unsafe {
 	    ffi::lower_fullscreen_layer(&mut self.shell.borrow_mut().native, 0 as *mut _);
-
-	    keyboard.start_grab(&mut self.grab as *mut _);
-	    keyboard.set_focus(None);
 	}
 
+	keyboard.start_grab(&mut self.grab as *mut _);
+	keyboard.set_focus(0 as * mut _);
+
+	self.build_ui();
+
 	self.pick(true);
+    }
+
+    fn build_ui(&mut self) {
+	let mut shell = self.shell.borrow_mut();
+	{
+	    let compositor = shell.compositor.borrow_mut();
+
+	    for head in compositor.head_iter().filter(|h| h.is_enabled()) {
+		let mut surface = {
+		    unsafe { &mut (*compositor.create_surface()) }
+		};
+
+		let output = unsafe { &(*(*head).output) };
+		let mode = unsafe { *output.current_mode };
+
+		let q = mode.height / 4;
+		let margin = 30;
+
+		surface.committed = None;
+		// xx set label func
+		surface.set_color(0.3, 0.3, 0.3, 0.8);
+		surface.set_size(mode.width - 2 * margin, mode.height - 2 * q);
+		surface.damage();
+
+		let view = surface.create_view();
+		view.set_position((output.x + margin) as f32,
+				  (output.y + q) as f32);
+		view.radius = 100.0;
+		view.geometry_dirty();
+		view.is_mapped = true;
+
+		self.ui.push(view);
+	    }
+
+	}
+
+	for view in &self.ui {
+	    unsafe {
+		ffi::weston_layer_entry_insert(
+		    &mut shell.native.fullscreen_layer.view_list,
+		    &mut (**view).layer_link);
+	    }
+	}
     }
 
     fn pick(&mut self, _forwards: bool) {
@@ -73,16 +123,17 @@ impl Switcher {
 
 	println!("new current: {:?}", self.current);
 
-	let current = unsafe { &mut (*self.current.unwrap()) };
-	let surface = unsafe { &mut (*current.surface) };
-	for view in wl_list_iter_mut!(&mut surface.views,
-				      ffi::weston_view, surface_link) {
-	    view.alpha = 1.0;
-	}
+	if let Some(current) = self.current.map(|p| unsafe { &mut (*p) }) {
+	    let surface = unsafe { &mut (*current.surface) };
+	    for view in wl_list_iter_mut!(&mut surface.views,
+					  ffi::weston_view, surface_link) {
+		view.alpha = 1.0;
+	    }
 
-	unsafe {
-	    ffi::wl_list_remove(&mut self.view_destroy_listener.link);
-	    current.destroy_signal.add(&mut self.view_destroy_listener);
+	    unsafe {
+		ffi::wl_list_remove(&mut self.view_destroy_listener.link);
+		current.destroy_signal.add(&mut self.view_destroy_listener);
+	    }
 	}
     }
 
@@ -107,6 +158,13 @@ impl Switcher {
 	    unsafe {
 		ffi::activate(&mut shell.native, view, seat,
 			      ffi::weston_activate_flag::WESTON_ACTIVATE_FLAG_CONFIGURE as u32);
+	    }
+	}
+
+	for view in self.ui.drain(..) {
+	    unsafe {
+		let surface = (*view).surface;
+		ffi::weston_surface_destroy(surface);
 	    }
 	}
 
@@ -198,7 +256,8 @@ pub fn init(shell: &Rc<RefCell<Shell>>) {
 	    keyboard: 0 as *mut _
 	},
 	current: None,
-	view_destroy_listener: ffi::wl_listener::new(view_destroy_notify)
+	view_destroy_listener: ffi::wl_listener::new(view_destroy_notify),
+	ui: Vec::new()
     });
 
     switcher.view_destroy_listener.link.init();

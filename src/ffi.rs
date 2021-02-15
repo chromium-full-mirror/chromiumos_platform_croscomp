@@ -218,9 +218,9 @@ impl weston_keyboard {
 	}
     }
 
-    pub fn set_focus(&mut self, surface: Option<*mut weston_surface>) {
+    pub fn set_focus(&mut self, surface: *mut weston_surface) {
 	unsafe {
-	    weston_keyboard_set_focus(self, surface.unwrap_or(0 as *mut _))
+	    weston_keyboard_set_focus(self, surface)
 	}
     }
 }

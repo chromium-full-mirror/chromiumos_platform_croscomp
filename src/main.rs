@@ -155,16 +155,17 @@ impl Compositor {
 	}
     }
 
-    fn head_iter(&mut self) -> ffi::WlListIter<ffi::weston_head> {
-	wl_list_iter!(&mut self.native.head_list, ffi::weston_head, compositor_link)
+    fn head_iter(&self) -> ffi::WlListIter<ffi::weston_head> {
+	wl_list_iter!(&self.native.head_list, ffi::weston_head, compositor_link)
     }
 
     fn head_iter_mut(&mut self) -> ffi::WlListIterMut<ffi::weston_head> {
 	wl_list_iter_mut!(&mut self.native.head_list, ffi::weston_head, compositor_link)
     }
 
-    fn create_surface(&mut self) -> &mut ffi::weston_surface {
-	unsafe { &mut *ffi::weston_surface_create(&mut self.native) }
+    fn create_surface(&self) -> *mut ffi::weston_surface {
+	unsafe { ffi::weston_surface_create(&self.native
+					    as *const _ as *mut _) }
     }
 }
 
@@ -207,17 +208,17 @@ impl Shell {
     }
 
     fn create_background_surface(&mut self) {
-	let mut compositor = self.compositor.borrow_mut();
-	let mut surface = compositor.create_surface();
+	let compositor = self.compositor.borrow_mut();
+	let mut surface = unsafe { &mut (*compositor.create_surface()) };
 
 	surface.committed = None;
 	// xx set label func
-	surface.set_color(0.2, 0.2, 0.2, 1.0);
 	surface.set_size(1024 * 1024, 1024 * 1024);
+	surface.set_color(0.2, 0.1, 0.1, 1.0);
 	surface.damage();
 
 	let view = surface.create_view();
-	view.set_position(10.0, 10.0);
+	view.set_position(0.0, 0.0);
 	view.geometry_dirty();
 	view.is_mapped = true;
 
