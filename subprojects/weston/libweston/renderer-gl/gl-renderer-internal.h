@@ -36,6 +36,7 @@ struct gl_shader {
 	GLint proj_uniform;
 	GLint tex_uniforms[3];
 	GLint alpha_uniform;
+	GLint radius_uniform;
 	GLint color_uniform;
 	const char *vertex_source, *fragment_source;
 };

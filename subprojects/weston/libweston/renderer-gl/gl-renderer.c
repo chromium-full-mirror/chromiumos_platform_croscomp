@@ -641,7 +641,7 @@ texture_region(struct weston_view *ev, pixman_region32_t *region,
 	/* worst case we can have 8 vertices per rect (ie. clipped into
 	 * an octagon):
 	 */
-	v = wl_array_add(&gr->vertices, nrects * nsurf * 8 * 4 * sizeof *v);
+	v = wl_array_add(&gr->vertices, nrects * nsurf * 8 * 6 * sizeof *v);
 	vtxcnt = wl_array_add(&gr->vtxcnt, nrects * nsurf * sizeof *vtxcnt);
 
 	inv_width = 1.0 / gs->pitch;
@@ -690,6 +690,9 @@ texture_region(struct weston_view *ev, pixman_region32_t *region,
 				} else {
 					*(v++) = (gs->height - by) * inv_height;
 				}
+
+				*(v++) = gs->pitch;
+				*(v++) = gs->height;
 			}
 
 			vtxcnt[nvtx++] = n;
@@ -765,12 +768,16 @@ repaint_region(struct weston_view *ev, pixman_region32_t *region,
 	vtxcnt = gr->vtxcnt.data;
 
 	/* position: */
-	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof *v, &v[0]);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 6 * sizeof *v, &v[0]);
 	glEnableVertexAttribArray(0);
 
 	/* texcoord: */
-	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof *v, &v[2]);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 6 * sizeof *v, &v[2]);
 	glEnableVertexAttribArray(1);
+
+	/* size: */
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 6 * sizeof *v, &v[4]);
+	glEnableVertexAttribArray(2);
 
 	for (i = 0, first = 0; i < nfans; i++) {
 		glDrawArrays(GL_TRIANGLE_FAN, first, vtxcnt[i]);
@@ -779,6 +786,7 @@ repaint_region(struct weston_view *ev, pixman_region32_t *region,
 		first += vtxcnt[i];
 	}
 
+	glDisableVertexAttribArray(2);
 	glDisableVertexAttribArray(1);
 	glDisableVertexAttribArray(0);
 
@@ -858,6 +866,7 @@ shader_uniforms(struct gl_shader *shader,
 			   1, GL_FALSE, go->output_matrix.d);
 	glUniform4fv(shader->color_uniform, 1, gs->color);
 	glUniform1f(shader->alpha_uniform, view->alpha);
+	glUniform1f(shader->radius_uniform, view->radius);
 
 	for (i = 0; i < gs->num_textures; i++)
 		glUniform1i(shader->tex_uniforms[i], i);
@@ -1003,6 +1012,11 @@ draw_view(struct weston_view *ev, struct weston_output *output,
 	 * have a valid buffer or a proper shader set up so skip rendering. */
 	if (!gs->shader && !gs->direct_display)
 		return;
+
+	if (gs->buffer_type == BUFFER_TYPE_SOLID) {
+		gs->pitch = ev->surface->width;
+		gs->height = ev->surface->height;
+	}
 
 	pixman_region32_init(&repaint);
 	pixman_region32_intersect(&repaint,
@@ -2681,8 +2695,6 @@ gl_renderer_surface_set_color(struct weston_surface *surface,
 	gs->color[2] = blue;
 	gs->color[3] = alpha;
 	gs->buffer_type = BUFFER_TYPE_SOLID;
-	gs->pitch = 1;
-	gs->height = 1;
 
 	gs->shader = &gr->solid_shader;
 }
@@ -2799,6 +2811,7 @@ gl_renderer_surface_copy_content(struct weston_surface *surface,
 
 	glUniformMatrix4fv(gs->shader->proj_uniform, 1, GL_FALSE, proj);
 	glUniform1f(gs->shader->alpha_uniform, 1.0f);
+	glUniform1f(gs->shader->radius_uniform, 0.0f);
 
 	for (i = 0; i < gs->num_textures; i++) {
 		glUniform1i(gs->shader->tex_uniforms[i], i);
@@ -2927,10 +2940,13 @@ static const char vertex_shader[] =
 	"attribute vec2 position;\n"
 	"attribute vec2 texcoord;\n"
 	"varying vec2 v_texcoord;\n"
+	"attribute vec2 size;\n"
+	"varying vec2 v_size;\n"
 	"void main()\n"
 	"{\n"
 	"   gl_Position = proj * vec4(position, 0.0, 1.0);\n"
 	"   v_texcoord = texcoord;\n"
+	"   v_size = size;\n"
 	"}\n";
 
 /* Declare common fragment shader uniforms */
@@ -2943,6 +2959,36 @@ static const char vertex_shader[] =
 	"  gl_FragColor.b = y + 2.01723214 * u;\n"			\
 	"  gl_FragColor.a = alpha;\n"
 
+#define ROUNDED_CORNER							\
+        "   vec2 pos = v_texcoord * v_size;\n"				\
+	"   bool outside = false;\n"					\
+	"   if (pos.x < radius) {\n"					\
+	"     pos.x = (radius - pos.x) / radius;\n"			\
+	"     outside = true;\n"					\
+	"   } else if (pos.x > v_size.x - radius) {\n"			\
+	"     pos.x = (pos.x - (v_size.x - radius)) / radius;\n"	\
+	"     outside = true;\n"					\
+	"   } else {\n"							\
+	"     pos.x = 0.0;\n"						\
+	"   }\n"							\
+									\
+	"   if (pos.y < radius) {\n"					\
+	"     pos.y = (radius - pos.y) / radius;\n"			\
+	"     outside = true;\n"					\
+	"   } else if (pos.y > v_size.y - radius) {\n"			\
+	"     pos.y = (pos.y - (v_size.y - radius)) / radius;\n"	\
+	"     outside = true;\n"					\
+	"   } else {\n"							\
+	"     pos.y = 0.0;\n"						\
+	"   }\n"							\
+									\
+	"   float a = alpha;\n"						\
+	"   if (outside) {\n"						\
+	"     float dist = pos.x * pos.x * pos.x + pos.y * pos.y * pos.y;\n" \
+	"     if (dist > 1.0)\n"					\
+	"       a = 0.0\n;"						\
+	"   }\n"
+
 static const char fragment_debug[] =
 	"  gl_FragColor = vec4(0.0, 0.3, 0.0, 0.2) + gl_FragColor * 0.8;\n";
 
@@ -2952,33 +2998,42 @@ static const char fragment_brace[] =
 static const char texture_fragment_shader_rgba[] =
 	"precision mediump float;\n"
 	"varying vec2 v_texcoord;\n"
+	"varying vec2 v_size;\n"
 	"uniform sampler2D tex;\n"
 	"uniform float alpha;\n"
+	"uniform float radius;\n"
 	"void main()\n"
 	"{\n"
-	"   gl_FragColor = alpha * texture2D(tex, v_texcoord)\n;"
+	ROUNDED_CORNER
+	"   gl_FragColor = a * texture2D(tex, v_texcoord)\n;"
 	;
 
 static const char texture_fragment_shader_rgbx[] =
 	"precision mediump float;\n"
 	"varying vec2 v_texcoord;\n"
+	"varying vec2 v_size;\n"
 	"uniform sampler2D tex;\n"
 	"uniform float alpha;\n"
+	"uniform float radius;\n"
 	"void main()\n"
 	"{\n"
-	"   gl_FragColor.rgb = alpha * texture2D(tex, v_texcoord).rgb\n;"
-	"   gl_FragColor.a = alpha;\n"
+	ROUNDED_CORNER
+	"   gl_FragColor.rgb = a * texture2D(tex, v_texcoord).rgb\n;"
+	"   gl_FragColor.a = a;\n"
 	;
 
 static const char texture_fragment_shader_egl_external[] =
 	"#extension GL_OES_EGL_image_external : require\n"
 	"precision mediump float;\n"
 	"varying vec2 v_texcoord;\n"
+	"varying vec2 v_size;\n"
 	"uniform samplerExternalOES tex;\n"
 	"uniform float alpha;\n"
+	"uniform float radius;\n"
 	"void main()\n"
 	"{\n"
-	"   gl_FragColor = alpha * texture2D(tex, v_texcoord)\n;"
+	ROUNDED_CORNER
+	"   gl_FragColor = a * texture2D(tex, v_texcoord)\n;"
 	;
 
 static const char texture_fragment_shader_y_uv[] =
@@ -3037,9 +3092,13 @@ static const char solid_fragment_shader[] =
 	"precision mediump float;\n"
 	"uniform vec4 color;\n"
 	"uniform float alpha;\n"
+	"uniform float radius;\n"
+	"varying vec2 v_texcoord;\n"
+	"varying vec2 v_size;\n"
 	"void main()\n"
 	"{\n"
-	"   gl_FragColor = alpha * color\n;"
+	ROUNDED_CORNER
+	"   gl_FragColor = a * color\n;"
 	;
 
 static int
@@ -3112,6 +3171,7 @@ shader_init(struct gl_shader *shader, struct gl_renderer *renderer,
 	shader->tex_uniforms[2] = glGetUniformLocation(shader->program, "tex2");
 	shader->alpha_uniform = glGetUniformLocation(shader->program, "alpha");
 	shader->color_uniform = glGetUniformLocation(shader->program, "color");
+	shader->radius_uniform = glGetUniformLocation(shader->program, "radius");
 
 	return 0;
 }

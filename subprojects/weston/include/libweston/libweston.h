@@ -1233,6 +1233,7 @@ struct weston_view {
 
 	pixman_region32_t clip;          /* See weston_view_damage_below() */
 	float alpha;                     /* part of geometry, see below */
+	float radius;                    /* part of geometry, see below */
 
 	void *renderer_state;
 
