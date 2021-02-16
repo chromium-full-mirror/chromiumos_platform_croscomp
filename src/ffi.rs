@@ -255,6 +255,14 @@ impl weston_matrix {
     }
 }
 
+pub fn fixed_from_double(f: f32) -> wl_fixed_t {
+    (f * 65536.0) as wl_fixed_t
+}
+
+pub fn fixed_to_int(f: wl_fixed_t) -> i32 {
+    f >> 16
+}
+
 pub mod evdev {
     include!(concat!(env!("OUT_DIR"), "/input.rs"));
 }

@@ -16,6 +16,7 @@ mod terminal;
 mod display;
 mod splash;
 mod switcher;
+mod move_resize;
 mod protocol;
 
 const SCALE: i32 = 2;
@@ -139,6 +140,34 @@ impl Compositor {
 	    ffi::weston_compositor_add_key_binding(
 		&mut self.native, key, modifier, binding, data)
 	}
+    }
+
+    fn bind_button<F>(&mut self, button: u32,
+		      modifier: ffi::weston_keyboard_modifier,
+		      f: F)
+    where F: Fn(*mut ffi::weston_pointer, *const ffi::timespec, u32) {
+	extern "C"
+	fn call_button_closure<F>(pointer: *mut ffi::weston_pointer,
+				  time: *const ffi::timespec,
+				  key: u32,
+				  data: *mut Void)
+	where F: Fn(*mut ffi::weston_pointer, *const ffi::timespec, u32) {
+	    let handler = unsafe {
+		Box::from_raw(data as *mut F)
+	    };
+
+	    handler(pointer, time, key);
+	    Box::into_raw(handler);
+	}
+
+	let handler = Box::new(f);
+
+	unsafe {
+	    ffi::weston_compositor_add_button_binding(
+		&mut self.native, button, modifier,
+		Some(call_button_closure::<F>),
+		Box::into_raw(handler) as *mut _)
+	};
     }
 
     fn wake(&mut self) {
@@ -308,6 +337,8 @@ fn main() {
     splash::init(&shell);
 
     switcher::init(&shell);
+
+    move_resize::init(&shell);
 
     compositor.borrow_mut().wake();
 
