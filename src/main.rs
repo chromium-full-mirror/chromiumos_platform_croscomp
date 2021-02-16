@@ -219,7 +219,7 @@ impl Shell {
 	surface.set_color(0.2, 0.1, 0.1, 1.0);
 	surface.damage();
 
-	let view = surface.create_view();
+	let view = unsafe { &mut *surface.create_view() };
 	view.set_position(0.0, 0.0);
 	view.geometry_dirty();
 	view.is_mapped = true;

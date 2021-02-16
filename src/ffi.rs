@@ -117,7 +117,7 @@ include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 type NotifyFunc =
     unsafe extern "C" fn(listener: *mut wl_listener, data: *mut ::std::os::raw::c_void);
 
-const NULL_LIST: wl_list = wl_list {
+pub const NULL_LIST: wl_list = wl_list {
 	prev: 0 as *mut _,
 	next: 0 as *mut _
 };
@@ -164,8 +164,8 @@ impl weston_compositor {
 }
 
 impl weston_surface {
-    pub fn create_view(&mut self) -> &mut weston_view {
-	unsafe { &mut *weston_view_create(self) }
+    pub fn create_view(&mut self) -> *mut weston_view {
+	unsafe { weston_view_create(self) }
     }
     pub fn set_color(&mut self, r: f32, g: f32, b: f32, a: f32) {
 	unsafe { weston_surface_set_color(self, r, g, b, a); }
@@ -222,6 +222,36 @@ impl weston_keyboard {
 	unsafe {
 	    weston_keyboard_set_focus(self, surface)
 	}
+    }
+}
+
+impl weston_matrix {
+    pub fn new() -> weston_matrix {
+	weston_matrix {
+	    d: [ 1.0, 0.0, 0.0, 0.0,
+		 0.0, 1.0, 0.0, 0.0,
+		 0.0, 0.0, 1.0, 0.0,
+		 0.0, 0.0, 0.0, 1.0 ],
+	    type_: 0
+	}
+    }
+
+    pub fn multiply(&mut self, other: &Self) {
+	unsafe { weston_matrix_multiply(self, other) }
+    }
+
+    pub fn scale(&mut self, x: f32, y: f32, z: f32) -> &mut Self{
+	let m = weston_matrix {
+	    d: [ x,   0.0, 0.0, 0.0,
+		 0.0, y,   0.0, 0.0,
+		 0.0, 0.0, z,   0.0,
+		 0.0, 0.0, 0.0, 1.0 ],
+	    type_: weston_matrix_transform_type::WESTON_MATRIX_TRANSFORM_SCALE as u32
+	};
+
+	self.multiply(&m);
+
+	self
     }
 }
 

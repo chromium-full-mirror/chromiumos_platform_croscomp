@@ -90,7 +90,7 @@ extern "C" fn dispatcher(
 	    surface.committed = Some(splash_committed);
 	    surface.output = head.output;
 
-	    let view = surface.create_view();
+	    let view = unsafe { &mut *surface.create_view() };
 	    view.set_output(head.output);
 
 	    splash.views.push(view);
