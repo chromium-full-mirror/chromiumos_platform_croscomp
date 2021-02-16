@@ -18,6 +18,8 @@ mod splash;
 mod switcher;
 mod protocol;
 
+const SCALE: i32 = 2;
+
 fn verify_xdg_runtime_dir() {
     let path = env::var_os("XDG_RUNTIME_DIR")
 	.expect("environment variable XDG_RUNTIME_DIR is not set.")
@@ -60,7 +62,7 @@ fn head_notify(_listener: *mut ffi::wl_listener, data: *mut ::std::os::raw::c_vo
 	    use ffi::weston_drm_backend_output_mode::*;
 	    let set_mode = (*api).set_mode.unwrap();
 	    set_mode(output, WESTON_DRM_BACKEND_OUTPUT_PREFERRED, NULL_STR);
-	    output.set_scale(1);
+	    output.set_scale(SCALE);
 
 	    use ffi::wl_output_transform::*;
 	    output.set_transform(WL_OUTPUT_TRANSFORM_NORMAL);
