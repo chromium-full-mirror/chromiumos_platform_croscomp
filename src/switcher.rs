@@ -181,10 +181,10 @@ mod grab {
     use ffi::evdev::KEY_TAB;
     use ffi::wl_keyboard_key_state;
 
-    pub extern "C" fn key(grab: *mut ffi::weston_keyboard_grab,
-			  _time: *const ffi::timespec,
-			  key: u32,
-			  state: u32) {
+    extern "C" fn key(grab: *mut ffi::weston_keyboard_grab,
+		      _time: *const ffi::timespec,
+		      key: u32,
+		      state: u32) {
 	let switcher = unsafe { &mut *container_of_mut!(grab, super::Switcher, grab) };
 	let seat = unsafe { &mut *(*switcher.grab.keyboard).seat };
 
@@ -196,12 +196,12 @@ mod grab {
 	    }
     }
 
-    pub extern "C" fn modifiers(grab: *mut ffi::weston_keyboard_grab,
-				_serial: u32,
-				_mods_depressed: u32,
-				_mods_latched: u32,
-				_mods_locked: u32,
-				_group: u32) {
+    extern "C" fn modifiers(grab: *mut ffi::weston_keyboard_grab,
+			    _serial: u32,
+			    _mods_depressed: u32,
+			    _mods_latched: u32,
+			    _mods_locked: u32,
+			    _group: u32) {
 	let switcher = unsafe { &mut *container_of_mut!(grab, super::Switcher, grab) };
 	let seat = unsafe { &mut *(*switcher.grab.keyboard).seat };
 
@@ -210,11 +210,18 @@ mod grab {
 	}
     }
 
-    pub extern "C" fn cancel(grab: *mut ffi::weston_keyboard_grab) {
+    extern "C" fn cancel(grab: *mut ffi::weston_keyboard_grab) {
 	let switcher = unsafe { &mut *container_of_mut!(grab, super::Switcher, grab) };
 
 	switcher.shutdown();
     }
+
+    pub static INTERFACE: ffi::weston_keyboard_grab_interface =
+	ffi::weston_keyboard_grab_interface {
+	    key: Some(key),
+	    modifiers: Some(modifiers),
+	    cancel: Some(cancel)
+	};
 }
     
 extern "C"
@@ -241,17 +248,10 @@ fn binding(keyboard: *mut ffi::weston_keyboard,
 }
 
 pub fn init(shell: &Rc<RefCell<Shell>>) {
-    static GRAB_INTERFACE: ffi::weston_keyboard_grab_interface =
-	ffi::weston_keyboard_grab_interface {
-	    key: Some(grab::key),
-	    modifiers: Some(grab::modifiers),
-	    cancel: Some(grab::cancel)
-	};
-
     let mut switcher = Box::new(Switcher {
 	shell: Rc::clone(shell),
 	grab: ffi::weston_keyboard_grab {
-	    interface: &GRAB_INTERFACE as *const _,
+	    interface: &grab::INTERFACE as *const _,
 	    keyboard: 0 as *mut _
 	},
 	current: 0,
