@@ -150,15 +150,6 @@ struct desktop_shell {
 	struct wl_global *xdg_shell_v6;  /* Unstable xdg_shell_unstable_v6 protocol. */
 	struct wl_global *wl_shell;
 
-	struct {
-		struct wl_client *client;
-		struct wl_resource *desktop_shell;
-		struct wl_listener client_destroy_listener;
-
-		unsigned deathcount;
-		struct timespec deathstamp;
-	} child;
-
 	bool locked;
 	bool showing_input_panels;
 	bool prepare_event_sent;

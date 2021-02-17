@@ -65,11 +65,6 @@ enum weston_desktop_shell_cursor {
 	WESTON_DESKTOP_SHELL_CURSOR_BUSY = 11,
 };
 
-static inline void
-weston_desktop_shell_send_grab_cursor(struct wl_resource *resource_, uint32_t cursor)
-{
-}
-
 struct focus_state {
 	struct desktop_shell *shell;
 	struct weston_seat *seat;
@@ -286,8 +281,6 @@ shell_grab_start(struct shell_grab *grab,
 		 struct weston_pointer *pointer,
 		 enum weston_desktop_shell_cursor cursor)
 {
-	struct desktop_shell *shell = shsurf->shell;
-
 	weston_seat_break_desktop_grabs(pointer->seat);
 
 	grab->grab.interface = interface;
@@ -298,14 +291,8 @@ shell_grab_start(struct shell_grab *grab,
 
 	shsurf->grabbed = 1;
 	weston_pointer_start_grab(pointer, &grab->grab);
-	if (shell->child.desktop_shell) {
-		weston_desktop_shell_send_grab_cursor(shell->child.desktop_shell,
-					       cursor);
-		weston_pointer_set_focus(pointer,
-					 get_default_view(shell->grab_surface),
-					 wl_fixed_from_int(0),
-					 wl_fixed_from_int(0));
-	}
+
+	// xxx set cursor
 }
 
 void
@@ -349,8 +336,6 @@ shell_touch_grab_start(struct shell_touch_grab *grab,
 		       struct shell_surface *shsurf,
 		       struct weston_touch *touch)
 {
-	struct desktop_shell *shell = shsurf->shell;
-
 	weston_seat_break_desktop_grabs(touch->seat);
 
 	grab->grab.interface = interface;
@@ -363,9 +348,8 @@ shell_touch_grab_start(struct shell_touch_grab *grab,
 	shsurf->grabbed = 1;
 
 	weston_touch_start_grab(touch, &grab->grab);
-	if (shell->child.desktop_shell)
-		weston_touch_set_focus(touch,
-				       get_default_view(shell->grab_surface));
+
+	// xxx remove focus
 }
 
 static void
@@ -4152,12 +4136,6 @@ shell_destroy(struct wl_listener *listener, void *data)
 
 	/* Force state to unlocked so we don't try to fade */
 	shell->locked = false;
-
-	if (shell->child.client) {
-		/* disable respawn */
-		wl_list_remove(&shell->child.client_destroy_listener.link);
-		wl_client_destroy(shell->child.client);
-	}
 
 	wl_list_remove(&shell->destroy_listener.link);
 	wl_list_remove(&shell->idle_listener.link);
