@@ -1406,82 +1406,13 @@ noop_grab_frame(struct weston_pointer_grab *grab)
 {
 }
 
-static void
-constrain_position(struct weston_move_grab *move, int *cx, int *cy)
-{
-	struct weston_pointer *pointer = move->base.grab.pointer;
-
-	*cx = wl_fixed_to_int(pointer->x + move->dx);
-	*cy = wl_fixed_to_int(pointer->y + move->dy);
-}
-
-static void
-move_grab_motion(struct weston_pointer_grab *grab,
-		 const struct timespec *time,
-		 struct weston_pointer_motion_event *event)
-{
-	struct weston_move_grab *move = (struct weston_move_grab *) grab;
-	struct weston_pointer *pointer = grab->pointer;
-	struct shell_surface *shsurf = move->base.shsurf;
-	struct weston_surface *surface;
-	int cx, cy;
-
-	weston_pointer_move(pointer, event);
-	if (!shsurf)
-		return;
-
-	surface = weston_desktop_surface_get_surface(shsurf->desktop_surface);
-
-	constrain_position(move, &cx, &cy);
-
-	weston_view_set_position(shsurf->view, cx, cy);
-
-	weston_compositor_schedule_repaint(surface->compositor);
-}
-
-static void
-move_grab_button(struct weston_pointer_grab *grab,
-		 const struct timespec *time, uint32_t button, uint32_t state_w)
-{
-	struct shell_grab *shell_grab = container_of(grab, struct shell_grab,
-						    grab);
-	struct weston_pointer *pointer = grab->pointer;
-	enum wl_pointer_button_state state = state_w;
-
-	if (pointer->button_count == 0 &&
-	    state == WL_POINTER_BUTTON_STATE_RELEASED) {
-		shell_grab_end(shell_grab);
-		free(grab);
-	}
-}
-
-static void
-move_grab_cancel(struct weston_pointer_grab *grab)
-{
-	struct shell_grab *shell_grab =
-		container_of(grab, struct shell_grab, grab);
-
-	shell_grab_end(shell_grab);
-	free(grab);
-}
-
-static const struct weston_pointer_grab_interface move_grab_interface = {
-	noop_grab_focus,
-	move_grab_motion,
-	move_grab_button,
-	noop_grab_axis,
-	noop_grab_axis_source,
-	noop_grab_frame,
-	move_grab_cancel,
-};
-
+void
+move_view(struct weston_view *view, struct weston_pointer *pointer);
 
 static int
 surface_move(struct shell_surface *shsurf, struct weston_pointer *pointer,
 	     bool client_initiated)
 {
-	struct weston_move_grab *move;
-
 	if (!shsurf)
 		return -1;
 
@@ -1490,18 +1421,7 @@ surface_move(struct shell_surface *shsurf, struct weston_pointer *pointer,
 	    weston_desktop_surface_get_maximized(shsurf->desktop_surface))
 		return 0;
 
-	move = malloc(sizeof *move);
-	if (!move)
-		return -1;
-
-	move->dx = wl_fixed_from_double(shsurf->view->geometry.x) -
-		   pointer->grab_x;
-	move->dy = wl_fixed_from_double(shsurf->view->geometry.y) -
-		   pointer->grab_y;
-	move->client_initiated = client_initiated;
-
-	shell_grab_start(&move->base, &move_grab_interface, shsurf,
-			 pointer, WESTON_DESKTOP_SHELL_CURSOR_MOVE);
+	move_view(shsurf->view, pointer);
 
 	return 0;
 }
@@ -2940,32 +2860,6 @@ weston_desktop_api_set_xwayland_position(struct desktop_shell *shell,
 }
 
 static void
-move_binding(struct weston_pointer *pointer, const struct timespec *time,
-	     uint32_t button, void *data)
-{
-	struct weston_surface *focus;
-	struct weston_surface *surface;
-	struct shell_surface *shsurf;
-
-	if (pointer->focus == NULL)
-		return;
-
-	focus = pointer->focus->surface;
-
-	surface = weston_surface_get_main_surface(focus);
-	if (surface == NULL)
-		return;
-
-	shsurf = get_shell_surface(surface);
-	if (shsurf == NULL ||
-	    weston_desktop_surface_get_fullscreen(shsurf->desktop_surface) ||
-	    weston_desktop_surface_get_maximized(shsurf->desktop_surface))
-		return;
-
-	surface_move(shsurf, pointer, false);
-}
-
-static void
 maximize_binding(struct weston_keyboard *keyboard, const struct timespec *time,
 		 uint32_t button, void *data)
 {
@@ -4222,8 +4116,6 @@ shell_add_bindings(struct weston_compositor *ec, struct desktop_shell *shell)
 					  maximize_binding, NULL);
 	weston_compositor_add_key_binding(ec, KEY_F, mod | MODIFIER_SHIFT,
 					  fullscreen_binding, NULL);
-	weston_compositor_add_button_binding(ec, BTN_LEFT, mod, move_binding,
-					     shell);
 	weston_compositor_add_touch_binding(ec, mod, touch_move_binding, shell);
 	weston_compositor_add_button_binding(ec, BTN_RIGHT, mod,
 					     resize_binding, shell);

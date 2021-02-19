@@ -18,6 +18,7 @@ mod splash;
 mod switcher;
 mod move_resize;
 mod protocol;
+mod input;
 
 const SCALE: i32 = 2;
 
