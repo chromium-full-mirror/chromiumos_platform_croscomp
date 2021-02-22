@@ -126,6 +126,57 @@ struct shell_output {
 	} fade;
 };
 
+struct shell_surface {
+	struct wl_signal destroy_signal;
+
+	struct weston_desktop_surface *desktop_surface;
+	struct weston_view *view;
+	int32_t last_width, last_height;
+
+	struct desktop_shell *shell;
+
+	struct wl_list children_list;
+	struct wl_list children_link;
+
+	int32_t saved_x, saved_y;
+	bool saved_position_valid;
+	bool saved_rotation_valid;
+	int unresponsive, grabbed;
+	uint32_t resize_edges;
+
+	struct {
+		struct weston_transform transform;
+		struct weston_matrix rotation;
+	} rotation;
+
+	struct {
+		struct weston_transform transform; /* matrix from x, y */
+		struct weston_view *black_view;
+	} fullscreen;
+
+	struct weston_transform workspace_transform;
+
+	struct weston_output *fullscreen_output;
+	struct weston_output *output;
+	struct wl_listener output_destroy_listener;
+
+	struct surface_state {
+		bool fullscreen;
+		bool maximized;
+		bool lowered;
+	} state;
+
+	struct {
+		bool is_set;
+		int32_t x;
+		int32_t y;
+	} xwayland;
+
+	int focus_count;
+
+	bool destroying;
+};
+
 struct desktop_shell {
 	struct weston_compositor *compositor;
 
@@ -216,6 +267,12 @@ get_default_view(struct weston_surface *surface);
 
 struct shell_surface *
 get_shell_surface(struct weston_surface *surface);
+
+void
+shell_surface_set_size(struct shell_surface *shsurf,
+		       int32_t width, int32_t height);
+void
+shell_surface_set_resizing(struct shell_surface *shsurf, uint32_t edges);
 
 struct workspace *
 get_current_workspace(struct desktop_shell *shell);

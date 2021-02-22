@@ -209,6 +209,51 @@ impl weston_view {
     pub fn geometry_dirty(&mut self) {
 	unsafe { weston_view_geometry_dirty(self) }
     }
+
+    pub fn from_global(&mut self, x: i32, y: i32) -> (i32, i32) {
+	let mut out = (0, 0);
+
+	unsafe {
+	    weston_view_from_global(self, x, y, &mut out.0, &mut out.1);
+	}
+
+	out
+    }
+
+    pub fn from_global_fixed(&mut self, x: wl_fixed_t, y: wl_fixed_t) -> (wl_fixed_t, wl_fixed_t) {
+	let mut out = (0, 0);
+
+	unsafe {
+	    weston_view_from_global(self, x, y, &mut out.0, &mut out.1);
+	}
+
+	out
+    }
+}
+
+impl shell_surface {
+    pub fn get<'a>(surface: &mut weston_surface) -> Option<&'a mut shell_surface> {
+	unsafe { get_shell_surface(surface).as_mut() }
+    }
+
+    pub fn set_size(&mut self, width: i32, height: i32) {
+	unsafe { shell_surface_set_size(self, width, height) }
+    }
+
+    pub fn set_resizing(&mut self, edges: wl_shell_surface_resize) {
+	unsafe { shell_surface_set_resizing(self, edges.0) }
+    }
+
+    pub fn get_geometry(&mut self) -> weston_geometry {
+	unsafe { weston_desktop_surface_get_geometry(self.desktop_surface) }
+    }
+
+}
+
+impl wl_shell_surface_resize {
+    pub fn has(&self, bit: wl_shell_surface_resize) -> bool {
+	*self & bit == bit
+    }
 }
 
 impl weston_keyboard {

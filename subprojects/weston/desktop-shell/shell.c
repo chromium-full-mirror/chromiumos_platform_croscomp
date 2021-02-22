@@ -113,57 +113,6 @@ struct focus_state {
  *     (shsurf->parent != NULL) ⇒ !wl_list_is_empty(shsurf->children_link)
  */
 
-struct shell_surface {
-	struct wl_signal destroy_signal;
-
-	struct weston_desktop_surface *desktop_surface;
-	struct weston_view *view;
-	int32_t last_width, last_height;
-
-	struct desktop_shell *shell;
-
-	struct wl_list children_list;
-	struct wl_list children_link;
-
-	int32_t saved_x, saved_y;
-	bool saved_position_valid;
-	bool saved_rotation_valid;
-	int unresponsive, grabbed;
-	uint32_t resize_edges;
-
-	struct {
-		struct weston_transform transform;
-		struct weston_matrix rotation;
-	} rotation;
-
-	struct {
-		struct weston_transform transform; /* matrix from x, y */
-		struct weston_view *black_view;
-	} fullscreen;
-
-	struct weston_transform workspace_transform;
-
-	struct weston_output *fullscreen_output;
-	struct weston_output *output;
-	struct wl_listener output_destroy_listener;
-
-	struct surface_state {
-		bool fullscreen;
-		bool maximized;
-		bool lowered;
-	} state;
-
-	struct {
-		bool is_set;
-		int32_t x;
-		int32_t y;
-	} xwayland;
-
-	int focus_count;
-
-	bool destroying;
-};
-
 struct shell_grab {
 	struct weston_pointer_grab grab;
 	struct shell_surface *shsurf;
@@ -1426,114 +1375,15 @@ surface_move(struct shell_surface *shsurf, struct weston_pointer *pointer,
 	return 0;
 }
 
-struct weston_resize_grab {
-	struct shell_grab base;
-	uint32_t edges;
-	int32_t width, height;
-};
+int
+resize_view(struct weston_view *view, struct weston_pointer *pointer, uint32_t edges);
 
-static void
-resize_grab_motion(struct weston_pointer_grab *grab,
-		   const struct timespec *time,
-		   struct weston_pointer_motion_event *event)
+static int
+surface_resize(struct shell_surface *shsurf,
+	       struct weston_pointer *pointer, uint32_t edges)
 {
-	struct weston_resize_grab *resize = (struct weston_resize_grab *) grab;
-	struct weston_pointer *pointer = grab->pointer;
-	struct shell_surface *shsurf = resize->base.shsurf;
-	int32_t width, height;
-	struct weston_size min_size, max_size;
-	wl_fixed_t from_x, from_y;
-	wl_fixed_t to_x, to_y;
-
-	weston_pointer_move(pointer, event);
-
-	if (!shsurf)
-		return;
-
-	weston_view_from_global_fixed(shsurf->view,
-				      pointer->grab_x, pointer->grab_y,
-				      &from_x, &from_y);
-	weston_view_from_global_fixed(shsurf->view,
-				      pointer->x, pointer->y, &to_x, &to_y);
-
-	width = resize->width;
-	if (resize->edges & WL_SHELL_SURFACE_RESIZE_LEFT) {
-		width += wl_fixed_to_int(from_x - to_x);
-	} else if (resize->edges & WL_SHELL_SURFACE_RESIZE_RIGHT) {
-		width += wl_fixed_to_int(to_x - from_x);
-	}
-
-	height = resize->height;
-	if (resize->edges & WL_SHELL_SURFACE_RESIZE_TOP) {
-		height += wl_fixed_to_int(from_y - to_y);
-	} else if (resize->edges & WL_SHELL_SURFACE_RESIZE_BOTTOM) {
-		height += wl_fixed_to_int(to_y - from_y);
-	}
-
-	max_size = weston_desktop_surface_get_max_size(shsurf->desktop_surface);
-	min_size = weston_desktop_surface_get_min_size(shsurf->desktop_surface);
-
-	min_size.width = MAX(1, min_size.width);
-	min_size.height = MAX(1, min_size.height);
-
-	if (width < min_size.width)
-		width = min_size.width;
-	else if (max_size.width > 0 && width > max_size.width)
-		width = max_size.width;
-	if (height < min_size.height)
-		height = min_size.height;
-	else if (max_size.width > 0 && width > max_size.width)
-		width = max_size.width;
-	weston_desktop_surface_set_size(shsurf->desktop_surface, width, height);
+	return resize_view(shsurf->view, pointer, edges);
 }
-
-static void
-resize_grab_button(struct weston_pointer_grab *grab,
-		   const struct timespec *time,
-		   uint32_t button, uint32_t state_w)
-{
-	struct weston_resize_grab *resize = (struct weston_resize_grab *) grab;
-	struct weston_pointer *pointer = grab->pointer;
-	enum wl_pointer_button_state state = state_w;
-
-	if (pointer->button_count == 0 &&
-	    state == WL_POINTER_BUTTON_STATE_RELEASED) {
-		if (resize->base.shsurf != NULL) {
-			struct weston_desktop_surface *desktop_surface =
-				resize->base.shsurf->desktop_surface;
-			weston_desktop_surface_set_resizing(desktop_surface,
-							    false);
-		}
-
-		shell_grab_end(&resize->base);
-		free(grab);
-	}
-}
-
-static void
-resize_grab_cancel(struct weston_pointer_grab *grab)
-{
-	struct weston_resize_grab *resize = (struct weston_resize_grab *) grab;
-
-	if (resize->base.shsurf != NULL) {
-		struct weston_desktop_surface *desktop_surface =
-			resize->base.shsurf->desktop_surface;
-		weston_desktop_surface_set_resizing(desktop_surface, false);
-	}
-
-	shell_grab_end(&resize->base);
-	free(grab);
-}
-
-static const struct weston_pointer_grab_interface resize_grab_interface = {
-	noop_grab_focus,
-	resize_grab_motion,
-	resize_grab_button,
-	noop_grab_axis,
-	noop_grab_axis_source,
-	noop_grab_frame,
-	resize_grab_cancel,
-};
 
 /*
  * Returns the bounding box of a surface and all its sub-surfaces,
@@ -1568,47 +1418,6 @@ surface_subsurfaces_boundingbox(struct weston_surface *surface, int32_t *x,
 		*h = box->y2 - box->y1;
 
 	pixman_region32_fini(&region);
-}
-
-static int
-surface_resize(struct shell_surface *shsurf,
-	       struct weston_pointer *pointer, uint32_t edges)
-{
-	struct weston_resize_grab *resize;
-	const unsigned resize_topbottom =
-		WL_SHELL_SURFACE_RESIZE_TOP | WL_SHELL_SURFACE_RESIZE_BOTTOM;
-	const unsigned resize_leftright =
-		WL_SHELL_SURFACE_RESIZE_LEFT | WL_SHELL_SURFACE_RESIZE_RIGHT;
-	const unsigned resize_any = resize_topbottom | resize_leftright;
-	struct weston_geometry geometry;
-
-	if (shsurf->grabbed ||
-	    weston_desktop_surface_get_fullscreen(shsurf->desktop_surface) ||
-	    weston_desktop_surface_get_maximized(shsurf->desktop_surface))
-		return 0;
-
-	/* Check for invalid edge combinations. */
-	if (edges == WL_SHELL_SURFACE_RESIZE_NONE || edges > resize_any ||
-	    (edges & resize_topbottom) == resize_topbottom ||
-	    (edges & resize_leftright) == resize_leftright)
-		return 0;
-
-	resize = malloc(sizeof *resize);
-	if (!resize)
-		return -1;
-
-	resize->edges = edges;
-
-	geometry = weston_desktop_surface_get_geometry(shsurf->desktop_surface);
-	resize->width = geometry.width;
-	resize->height = geometry.height;
-
-	shsurf->resize_edges = edges;
-	weston_desktop_surface_set_resizing(shsurf->desktop_surface, true);
-	shell_grab_start(&resize->base, &resize_grab_interface, shsurf,
-			 pointer, edges);
-
-	return 0;
 }
 
 static void
@@ -1800,6 +1609,23 @@ notify_output_destroy(struct wl_listener *listener, void *data)
 
 	shsurf->output = NULL;
 	shsurf->output_destroy_listener.notify = NULL;
+}
+
+void
+shell_surface_set_size(struct shell_surface *shsurf,
+		       int32_t width, int32_t height)
+{
+	weston_desktop_surface_set_size(shsurf->desktop_surface, width, height);
+}
+
+void
+shell_surface_set_resizing(struct shell_surface *shsurf,
+			   enum weston_desktop_surface_edge edges)
+{
+	bool enable = edges != WL_SHELL_SURFACE_RESIZE_NONE;
+
+	weston_desktop_surface_set_resizing(shsurf->desktop_surface, enable);
+	shsurf->resize_edges = edges;
 }
 
 static void
@@ -2923,53 +2749,6 @@ touch_move_binding(struct weston_touch *touch, const struct timespec *time, void
 		return;
 
 	surface_touch_move(shsurf, touch);
-}
-
-static void
-resize_binding(struct weston_pointer *pointer, const struct timespec *time,
-	       uint32_t button, void *data)
-{
-	struct weston_surface *focus;
-	struct weston_surface *surface;
-	uint32_t edges = 0;
-	int32_t x, y;
-	struct shell_surface *shsurf;
-
-	if (pointer->focus == NULL)
-		return;
-
-	focus = pointer->focus->surface;
-
-	surface = weston_surface_get_main_surface(focus);
-	if (surface == NULL)
-		return;
-
-	shsurf = get_shell_surface(surface);
-	if (shsurf == NULL ||
-	    weston_desktop_surface_get_fullscreen(shsurf->desktop_surface) ||
-	    weston_desktop_surface_get_maximized(shsurf->desktop_surface))
-		return;
-
-	weston_view_from_global(shsurf->view,
-				wl_fixed_to_int(pointer->grab_x),
-				wl_fixed_to_int(pointer->grab_y),
-				&x, &y);
-
-	if (x < surface->width / 3)
-		edges |= WL_SHELL_SURFACE_RESIZE_LEFT;
-	else if (x < 2 * surface->width / 3)
-		edges |= 0;
-	else
-		edges |= WL_SHELL_SURFACE_RESIZE_RIGHT;
-
-	if (y < surface->height / 3)
-		edges |= WL_SHELL_SURFACE_RESIZE_TOP;
-	else if (y < 2 * surface->height / 3)
-		edges |= 0;
-	else
-		edges |= WL_SHELL_SURFACE_RESIZE_BOTTOM;
-
-	surface_resize(shsurf, pointer, edges);
 }
 
 static void
@@ -4117,11 +3896,6 @@ shell_add_bindings(struct weston_compositor *ec, struct desktop_shell *shell)
 	weston_compositor_add_key_binding(ec, KEY_F, mod | MODIFIER_SHIFT,
 					  fullscreen_binding, NULL);
 	weston_compositor_add_touch_binding(ec, mod, touch_move_binding, shell);
-	weston_compositor_add_button_binding(ec, BTN_RIGHT, mod,
-					     resize_binding, shell);
-	weston_compositor_add_button_binding(ec, BTN_LEFT,
-					     mod | MODIFIER_SHIFT,
-					     resize_binding, shell);
 
 	if (ec->capabilities & WESTON_CAP_ROTATION_ANY)
 		weston_compositor_add_button_binding(ec, BTN_MIDDLE, mod,

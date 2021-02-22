@@ -28,7 +28,6 @@ impl input::PointerGrabHandler for MoveGrab {
 	view.set_position(ffi::fixed_to_int(pointer.x + self.dx) as f32,
 			  ffi::fixed_to_int(pointer.y + self.dy) as f32);
 	compositor.schedule_repaint();
-
     }
 
     fn button(&mut self,
@@ -67,6 +66,133 @@ impl MoveGrab {
     }
 }
 
+struct ResizeGrab {
+    view_destroy_listener: ffi::wl_listener,
+    edges: ffi::wl_shell_surface_resize,
+    width: i32,
+    height: i32,
+    grab: input::PointerGrab
+}
+
+impl input::PointerGrabHandler for ResizeGrab {
+    fn motion(&mut self,
+	      pointer: &mut ffi::weston_pointer,
+	      _time: &ffi::timespec,
+	      event: *mut ffi::weston_pointer_motion_event) {
+	let view = unsafe { &mut *pointer.focus };
+	use ffi::wl_shell_surface_resize as resize;
+
+	pointer.r#move(event);
+
+	let (from_x, from_y) =
+	    view.from_global_fixed(pointer.grab_x, pointer.grab_y);
+	let (to_x, to_y) =
+	    view.from_global_fixed(pointer.x, pointer.y);
+
+	let width = self.width +
+	    if self.edges.has(resize::WL_SHELL_SURFACE_RESIZE_LEFT) {
+		ffi::fixed_to_int(from_x - to_x)
+	    } else if self.edges.has(resize::WL_SHELL_SURFACE_RESIZE_RIGHT) {
+		ffi::fixed_to_int(to_x - from_x)
+	    } else {
+		0
+	    };
+	let height = self.height +
+	    if self.edges.has(resize::WL_SHELL_SURFACE_RESIZE_TOP) {
+		ffi::fixed_to_int(from_y - to_y)
+	    } else if self.edges.has(resize::WL_SHELL_SURFACE_RESIZE_BOTTOM) {
+		ffi::fixed_to_int(to_y - from_y)
+	    } else {
+		0
+	    };
+
+	// xxx check max/min sizes
+
+	let surface = unsafe { &mut *(view.surface) };
+	if let Some(shsurf) = ffi::shell_surface::get(surface) {
+	    shsurf.set_size(width, height);
+	}
+
+    }
+
+    fn button(&mut self,
+	      pointer: &mut ffi::weston_pointer,
+	      _time: &ffi::timespec,
+	      _button: u32,
+	      state: u32) {
+	if pointer.button_count == 0 &&
+	    state == ffi::wl_pointer_button_state::WL_POINTER_BUTTON_STATE_RELEASED as u32 {
+		self.stop(pointer);
+	    }
+    }
+
+    fn cancel(&mut self,
+	      pointer: &mut ffi::weston_pointer) {
+	self.stop(pointer);
+    }
+}
+
+impl ResizeGrab {
+    fn start(pointer: *mut ffi::weston_pointer,
+	     view: *mut ffi::weston_view,
+	     edges: ffi::wl_shell_surface_resize) {
+	let pointer = unsafe { &mut *pointer };
+	let view = unsafe { &mut *view };
+	let surface = unsafe { &mut *(view.surface) };
+	use ffi::wl_shell_surface_resize as resize;
+
+	// xxx reject if shsurf->grabbed or fullscreen or maximized.
+
+	const LEFT_RIGHT: resize = resize(1 | 2);
+	const TOP_BOTTOM: resize = resize(4 | 8);
+
+	if edges == resize::WL_SHELL_SURFACE_RESIZE_NONE ||
+	    edges & TOP_BOTTOM == TOP_BOTTOM ||
+	    edges & LEFT_RIGHT == LEFT_RIGHT {
+	    // Invalid edges, fail silently
+	    return;
+	}
+
+	let (width, height) =
+	    if let Some(shsurf) = ffi::shell_surface::get(surface) {
+		let geometry = shsurf.get_geometry();
+		(geometry.width, geometry.height)
+	    } else {
+		(surface.width, surface.height)
+	    };
+
+	let mut handler = Box::new(ResizeGrab {
+	    view_destroy_listener: ffi::wl_listener::new(view_destroy_notify),
+	    edges: edges,
+	    width: width,
+	    height: height,
+	    grab: input::PointerGrab::new(pointer)
+	});
+
+	if let Some(shsurf) = ffi::shell_surface::get(surface) {
+	    shsurf.set_resizing(edges);
+	}
+
+	let p = handler.as_mut() as *mut _;
+	handler.grab.start(p);
+	Box::into_raw(handler);
+    }
+
+    fn stop(&mut self, pointer: &mut ffi::weston_pointer,) {
+	let view = unsafe { &mut *pointer.focus };
+	let surface = unsafe { &mut *(view.surface) };
+	use ffi::wl_shell_surface_resize as resize;
+
+	if let Some(shsurf) = ffi::shell_surface::get(surface) {
+	    shsurf.set_resizing(resize::WL_SHELL_SURFACE_RESIZE_NONE);
+	}
+
+	// xxx unset shsurf resizing
+	let _ = unsafe { Box::from_raw(self as *mut _) };
+    }
+}
+
+
 extern "C"
 fn view_destroy_notify(listener: *mut ffi::wl_listener,
 		       _data: *mut ::std::os::raw::c_void) {
@@ -79,7 +205,7 @@ pub fn init(shell: &Rc<RefCell<Shell>>) {
     let shell = shell.borrow();
     let mut compositor = shell.compositor.borrow_mut();
 
-    use crate::ffi::evdev::BTN_LEFT;
+    use crate::ffi::evdev::{BTN_LEFT, BTN_RIGHT};;
 
     compositor.bind_button(
 	BTN_LEFT,
@@ -90,12 +216,60 @@ pub fn init(shell: &Rc<RefCell<Shell>>) {
 		MoveGrab::start(pointer, pointer.focus);
 	    }
 	});
+
+    let resize = |pointer: *mut ffi::weston_pointer, _, _| {
+	let pointer = unsafe { &mut *pointer };
+	if pointer.focus != 0 as *mut _ {
+	    let view = unsafe { &mut *pointer.focus };
+	    let surface = unsafe { &mut *view.surface };
+	    use ffi::wl_shell_surface_resize as resize;
+
+	    let (x, y) = view.from_global(
+		ffi::fixed_to_int(pointer.grab_x),
+		ffi::fixed_to_int(pointer.grab_y));
+
+	    let hmargin = surface.width / 3;
+	    let vmargin = surface.height / 3;
+	    let edges = if x < hmargin {
+		resize::WL_SHELL_SURFACE_RESIZE_LEFT
+	    } else if x < surface.width - hmargin {
+		resize::WL_SHELL_SURFACE_RESIZE_NONE
+	    } else {
+		resize::WL_SHELL_SURFACE_RESIZE_RIGHT
+	    } | if y < vmargin {
+		resize::WL_SHELL_SURFACE_RESIZE_TOP
+	    } else if y < surface.height - vmargin {
+		resize::WL_SHELL_SURFACE_RESIZE_NONE
+	    } else {
+		resize::WL_SHELL_SURFACE_RESIZE_BOTTOM
+	    };
+
+	    ResizeGrab::start(pointer, pointer.focus,
+			      edges as ffi::wl_shell_surface_resize)
+	}
+    };
+
+    compositor.bind_button(
+	BTN_RIGHT,
+	ffi::weston_keyboard_modifier(shell.native.binding_modifier), resize);
+    compositor.bind_button(
+	BTN_LEFT,
+	ffi::weston_keyboard_modifier(shell.native.binding_modifier) |
+	ffi::weston_keyboard_modifier::MODIFIER_SHIFT, resize);
 }
 
 #[no_mangle]
 pub extern "C"
 fn move_view(view: *mut ffi::weston_view,
 	     pointer: *mut ffi::weston_pointer) {
-    MoveGrab::start(pointer, view);    
+    MoveGrab::start(pointer, view);
+}
+
+#[no_mangle]
+pub extern "C"
+fn resize_view(view: *mut ffi::weston_view,
+	       pointer: *mut ffi::weston_pointer,
+	       edges: u32) {
+    ResizeGrab::start(pointer, view, ffi::wl_shell_surface_resize(edges));
 }
 

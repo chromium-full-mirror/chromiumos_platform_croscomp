@@ -36,6 +36,7 @@ fn main() {
 	.generate_comments(false)
 	.default_enum_style(bindgen::EnumVariation::Rust{non_exhaustive: true})
 	.bitfield_enum("weston_keyboard_modifier")
+	.bitfield_enum("wl_shell_surface_resize")
 	.layout_tests(false)
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))
         .generate()
