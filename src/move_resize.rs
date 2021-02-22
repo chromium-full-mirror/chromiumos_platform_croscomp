@@ -21,18 +21,14 @@ impl input::PointerGrabHandler for MoveGrab {
 	      pointer: &mut ffi::weston_pointer,
 	      _time: &ffi::timespec,
 	      event: *mut ffi::weston_pointer_motion_event) {
-	let view = unsafe { &mut *(*pointer).focus };
+	let view = unsafe { &mut *pointer.focus };
+	let compositor = unsafe { &mut *(*view.surface).compositor };
 
-	unsafe {
-	    ffi::weston_pointer_move(pointer, event);
-	}
-
+	pointer.r#move(event);
 	view.set_position(ffi::fixed_to_int(pointer.x + self.dx) as f32,
 			  ffi::fixed_to_int(pointer.y + self.dy) as f32);
+	compositor.schedule_repaint();
 
-	unsafe {
-	    ffi::weston_compositor_schedule_repaint((*view.surface).compositor);
-	}
     }
 
     fn button(&mut self,

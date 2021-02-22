@@ -263,6 +263,12 @@ pub fn fixed_to_int(f: wl_fixed_t) -> i32 {
     f >> 8
 }
 
+impl weston_pointer {
+    pub fn r#move(&mut self, event: *mut weston_pointer_motion_event) {
+	unsafe { weston_pointer_move(self, event) }
+    }
+}
+
 pub mod evdev {
     include!(concat!(env!("OUT_DIR"), "/input.rs"));
 }
