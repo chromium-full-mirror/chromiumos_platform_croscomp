@@ -166,12 +166,6 @@ struct shell_surface {
 		bool lowered;
 	} state;
 
-	struct {
-		bool is_set;
-		int32_t x;
-		int32_t y;
-	} xwayland;
-
 	int focus_count;
 
 	bool destroying;
@@ -477,11 +471,6 @@ weston_desktop_api_maximized_requested(struct desktop_shell *shell,
 void
 weston_desktop_api_minimized_requested(struct desktop_shell *shell,
 				       struct weston_desktop_surface *surface);
-
-void
-weston_desktop_api_set_xwayland_position(struct desktop_shell *shell,
-					 struct weston_desktop_surface *surface,
-					 int32_t x, int32_t y);
 
 struct weston_desktop_seat *
 weston_desktop_seat_from_seat(struct weston_seat *wseat);

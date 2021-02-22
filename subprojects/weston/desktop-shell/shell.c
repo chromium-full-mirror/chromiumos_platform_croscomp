@@ -2047,28 +2047,6 @@ set_maximized_position(struct desktop_shell *shell,
 }
 
 static void
-set_position_from_xwayland(struct shell_surface *shsurf)
-{
-	struct weston_geometry geometry;
-	float x;
-	float y;
-
-	assert(shsurf->xwayland.is_set);
-
-	geometry = weston_desktop_surface_get_geometry(shsurf->desktop_surface);
-	x = shsurf->xwayland.x - geometry.x;
-	y = shsurf->xwayland.y - geometry.y;
-
-	weston_view_set_position(shsurf->view, x, y);
-
-#ifdef WM_DEBUG
-	weston_log("%s: XWM %d, %d; geometry %d, %d; view %f, %f\n",
-		   __func__, shsurf->xwayland.x, shsurf->xwayland.y,
-		   geometry.x, geometry.y, x, y);
-#endif
-}
-
-static void
 map(struct desktop_shell *shell, struct shell_surface *shsurf,
     int32_t sx, int32_t sy)
 {
@@ -2083,8 +2061,6 @@ map(struct desktop_shell *shell, struct shell_surface *shsurf,
 		shell_map_fullscreen(shsurf);
 	} else if (shsurf->state.maximized) {
 		set_maximized_position(shell, shsurf);
-	} else if (shsurf->xwayland.is_set) {
-		set_position_from_xwayland(shsurf);
 	} else {
 		weston_view_set_initial_position(shsurf->view, shell);
 	}
@@ -2660,19 +2636,6 @@ weston_desktop_api_minimized_requested(struct desktop_shell *shell,
 
 	 /* apply compositor's own minimization logic (hide) */
 	set_minimized(surface);
-}
-
-void
-weston_desktop_api_set_xwayland_position(struct desktop_shell *shell,
-					 struct weston_desktop_surface *surface,
-					 int32_t x, int32_t y)
-{
-	struct shell_surface *shsurf =
-		weston_desktop_surface_get_user_data(surface);
-
-	shsurf->xwayland.x = x;
-	shsurf->xwayland.y = y;
-	shsurf->xwayland.is_set = true;
 }
 
 static void
