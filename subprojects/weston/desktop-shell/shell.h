@@ -197,9 +197,7 @@ struct desktop_shell {
 	struct wl_listener pointer_focus_listener;
 	struct weston_surface *grab_surface;
 
-	struct wl_global *xdg_wm_base;	 /* Stable protocol xdg_shell replaces xdg_shell_unstable_v6 */
-	struct wl_global *xdg_shell_v6;  /* Unstable xdg_shell_unstable_v6 protocol. */
-	struct wl_global *wl_shell;
+	struct wl_global *xdg_wm_base;
 
 	bool locked;
 	bool showing_input_panels;

@@ -2266,16 +2266,6 @@ weston_desktop_create(struct weston_compositor *compositor, struct desktop_shell
 	if (shell->xdg_wm_base == NULL)
 		return -1;
 
-	shell->xdg_shell_v6 =
-		weston_desktop_xdg_shell_v6_create(shell, display);
-	if (shell->xdg_shell_v6 == NULL)
-		return -1;
-
-	shell->wl_shell =
-		weston_desktop_wl_shell_create(shell, display);
-	if (shell->wl_shell == NULL)
-		return -1;
-
 	return 0;
 }
 
@@ -3831,10 +3821,6 @@ shell_destroy(struct wl_listener *listener, void *data)
 		workspace_destroy(*ws);
 	wl_array_release(&shell->workspaces.array);
 
-	if (shell->wl_shell != NULL)
-		wl_global_destroy(shell->wl_shell);
-	if (shell->xdg_shell_v6 != NULL)
-		wl_global_destroy(shell->xdg_shell_v6);
 	if (shell->xdg_wm_base != NULL)
 		wl_global_destroy(shell->xdg_wm_base);
 
