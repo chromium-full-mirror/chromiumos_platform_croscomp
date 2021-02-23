@@ -71,6 +71,10 @@ impl<'a, T> Iterator for WlListIterMut<'a, T> {
 }
 
 impl wl_list {
+    pub fn zeroed() -> Self {
+	unsafe { std::mem::zeroed() }
+    }
+
     pub fn init(&mut self) {
 	self.next = self as *mut _;
 	self.prev = self as *mut _;
@@ -117,15 +121,10 @@ include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 type NotifyFunc =
     unsafe extern "C" fn(listener: *mut wl_listener, data: *mut ::std::os::raw::c_void);
 
-pub const NULL_LIST: wl_list = wl_list {
-	prev: 0 as *mut _,
-	next: 0 as *mut _
-};
-
 impl wl_listener {
     pub fn new(notify: NotifyFunc) -> Self {
 	wl_listener {
-	    link: NULL_LIST,
+	    link: wl_list::zeroed(),
 	    notify: Some(notify)
 	}
     }

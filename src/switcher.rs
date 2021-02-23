@@ -8,7 +8,6 @@ use std::rc::Rc;
 use crate::Shell;
 use crate::ffi;
 use crate::ffi::evdev::KEY_TAB;
-use crate::Void;
 
 struct Thumbnail {
     view: *mut ffi::weston_view,
@@ -97,7 +96,7 @@ impl Switcher {
 			view: icon as *mut ffi::weston_view,
 			transform: ffi::weston_transform {
 			    matrix: matrix,
-			    link: ffi::NULL_LIST
+			    link: ffi::wl_list::zeroed(),
 			}
 		    }
 		}).collect();
@@ -239,7 +238,7 @@ extern "C"
 fn binding(keyboard: *mut ffi::weston_keyboard,
            _time: *const ffi::timespec,
            _key: u32,
-           data: *mut Void) {
+           data: *mut std::ffi::c_void) {
     let switcher = unsafe { &mut *(data as *mut Switcher) };
     
     println!("alt-tab!");
@@ -269,9 +268,9 @@ pub fn init(shell: &Rc<RefCell<Shell>>) {
 
     compositor.add_key_binding(KEY_TAB,
 			       ffi::weston_keyboard_modifier::MODIFIER_ALT,
-			       Some(binding), ptr as *mut Void);
+			       Some(binding), ptr as *mut _);
     compositor.add_key_binding(KEY_TAB,
 			       ffi::weston_keyboard_modifier::MODIFIER_ALT |
 			       ffi::weston_keyboard_modifier::MODIFIER_SHIFT,
-			       Some(binding), ptr as *mut Void);
+			       Some(binding), ptr as *mut _);
 }

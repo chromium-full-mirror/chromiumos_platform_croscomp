@@ -8,7 +8,6 @@ use crate::Shell;
 
 use crate::ffi;
 use crate::ffi::evdev::{KEY_F1, KEY_F2};
-use crate::Void;
 
 struct Terminal {
     client_surface: Option<*mut ffi::weston_surface>,
@@ -37,7 +36,7 @@ extern "C"
 fn binding(keyboard: *mut ffi::weston_keyboard,
            _time: *const ffi::timespec,
            key: u32,
-           data: *mut Void) {
+           data: *mut std::ffi::c_void) {
     let mut t = unsafe { &mut *(data as *mut Terminal) };
     let shell = &mut t.shell.borrow_mut().native;
 
@@ -122,11 +121,11 @@ pub fn init(shell: &Rc<RefCell<Shell>>) {
     compositor.add_key_binding(KEY_F1,
 			       ffi::weston_keyboard_modifier::MODIFIER_CTRL |
 			       ffi::weston_keyboard_modifier::MODIFIER_ALT,
-			       Some(binding), p as *mut Void);
+			       Some(binding), p as *mut _);
     compositor.add_key_binding(KEY_F2,
 			       ffi::weston_keyboard_modifier::MODIFIER_CTRL |
 			       ffi::weston_keyboard_modifier::MODIFIER_ALT,
-			       Some(binding), p as *mut Void);
+			       Some(binding), p as *mut _);
 
     println!("init_terminal");
 }

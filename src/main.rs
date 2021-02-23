@@ -37,10 +37,6 @@ fn verify_xdg_runtime_dir() {
     // Verify permissions 0700 and owned by user?
 }
 
-const NULL_STR: *mut ::std::os::raw::c_char = 0 as *mut ::std::os::raw::c_char;
-const NULL_VOID: *mut ::std::os::raw::c_void = 0 as *mut ::std::os::raw::c_void;
-type Void = ::std::os::raw::c_void;
-
 extern "C"
 fn head_notify(_listener: *mut ffi::wl_listener, data: *mut ::std::os::raw::c_void) {
     let native = unsafe { &mut *(data as *mut ffi::weston_compositor) };
@@ -63,13 +59,13 @@ fn head_notify(_listener: *mut ffi::wl_listener, data: *mut ::std::os::raw::c_vo
 
 	    use ffi::weston_drm_backend_output_mode::*;
 	    let set_mode = (*api).set_mode.unwrap();
-	    set_mode(output, WESTON_DRM_BACKEND_OUTPUT_PREFERRED, NULL_STR);
+	    set_mode(output, WESTON_DRM_BACKEND_OUTPUT_PREFERRED, std::ptr::null());
 	    output.set_scale(SCALE);
 
 	    use ffi::wl_output_transform::*;
 	    output.set_transform(WL_OUTPUT_TRANSFORM_NORMAL);
 	    let set_gbm_format = (*api).set_gbm_format.unwrap();
-	    set_gbm_format(output, NULL_STR);
+	    set_gbm_format(output, std::ptr::null());
 
 	    let set_seat = (*api).set_seat.unwrap();
 	    set_seat(output, "\0".as_ptr() as *const i8);
@@ -122,7 +118,7 @@ impl Compositor {
     fn init(&mut self, display: &Display, ctx: *mut ffi::weston_log_context) {
 	unsafe  {
 	    ffi::weston_compositor_init(&mut self.native,
-					display.native, ctx, NULL_VOID)
+					display.native, ctx, std::ptr::null_mut())
 	};
     }
 
@@ -151,7 +147,7 @@ impl Compositor {
 	fn call_button_closure<F>(pointer: *mut ffi::weston_pointer,
 				  time: *const ffi::timespec,
 				  key: u32,
-				  data: *mut Void)
+				  data: *mut std::ffi::c_void)
 	where F: Fn(*mut ffi::weston_pointer, *const ffi::timespec, u32) {
 	    let handler = unsafe {
 		Box::from_raw(data as *mut F)
@@ -289,11 +285,11 @@ fn main() {
     compositor.borrow_mut().add_heads_changed_listener(&mut listener);
 
     let mut rules = ffi::xkb_rule_names {
-	rules: NULL_STR,
-	model: NULL_STR,
-	layout: NULL_STR,
-	variant: NULL_STR,
-	options: NULL_STR
+	rules: std::ptr::null(),
+	model: std::ptr::null(),
+	layout: std::ptr::null(),
+	variant: std::ptr::null(),
+	options: std::ptr::null()
     };
 
     compositor.borrow_mut().set_xkb_rule_names(&mut rules);
@@ -305,11 +301,11 @@ fn main() {
 	},
 	tty: -1,
 	use_pixman: false,
-	seat_id: NULL_STR,
-	gbm_format: NULL_STR,
+	seat_id: std::ptr::null_mut(),
+	gbm_format: std::ptr::null_mut(),
 	configure_device: None,
 	pageflip_timeout: 0,
-	specific_device: NULL_STR,
+	specific_device: std::ptr::null_mut(),
 	use_pixman_shadow: false,
 	continue_without_input: true
     };
@@ -324,7 +320,7 @@ fn main() {
 
     let socket_name = display.add_socket_auto();
 
-    if socket_name == NULL_STR {
+    if socket_name == std::ptr::null() {
 	panic!("failed to create listening socket")
     }
 

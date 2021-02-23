@@ -5,8 +5,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use crate::ffi;
-use crate::NULL_VOID;
-use crate::Void;
 use crate::protocol;
 
 use wayland_server::MessageGroup;
@@ -93,7 +91,7 @@ extern "C" fn bind_display(
     unsafe {
 	ffi::wl_resource_set_dispatcher(
 	    raw_resource,
-	    Some(dispatcher), NULL_VOID,
+	    Some(dispatcher), std::ptr::null(),
 	    (display as *mut Display) as *mut ::std::os::raw::c_void,
 	    Some(unbind_display))
     };
@@ -111,8 +109,9 @@ extern "C" fn bind_display(
 	unsafe {
 	    ffi::wl_resource_set_dispatcher(
 		raw_output_resource,
-		Some(output_dispatcher), NULL_VOID,
-		NULL_VOID,
+		Some(output_dispatcher),
+		std::ptr::null(),
+		std::ptr::null_mut(),
 		Some(unbind_output))
 	};
 
@@ -181,6 +180,6 @@ pub fn init(shell: &Rc<RefCell<crate::Shell>>) {
 	ffi::wl_global_create(
 	    compositor.borrow().native.wl_display,
 	    croscomp_display_interface(), 1,
-	    p as *mut Void, Some(bind_display));
+	    p as *mut _, Some(bind_display));
     }
 }

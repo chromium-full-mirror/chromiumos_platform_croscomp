@@ -5,8 +5,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use crate::ffi;
-use crate::NULL_VOID;
-use crate::Void;
 use crate::protocol;
 
 struct Splash {
@@ -128,7 +126,7 @@ extern "C" fn bind_splash(
 
     unsafe {
 	ffi::wl_resource_set_dispatcher(r,
-					Some(dispatcher), NULL_VOID,
+					Some(dispatcher), std::ptr::null(),
 					data, Some(unbind_splash))
     };
 }
@@ -158,7 +156,7 @@ pub fn init(shell: &Rc<RefCell<crate::Shell>>) {
 	ffi::wl_global_create(
 	    compositor.borrow().native.wl_display,
 	    croscomp_splash_interface(), 1,
-	    p as *mut Void, Some(bind_splash));
+	    p as *mut _, Some(bind_splash));
     }
 
     let event_loop = unsafe {
@@ -170,6 +168,6 @@ pub fn init(shell: &Rc<RefCell<crate::Shell>>) {
 				    Some(launch_splash_process),
 				    &mut compositor.borrow_mut().native
 				    as *mut ffi::weston_compositor
-				    as *mut Void);
+				    as *mut _);
     }
 }
