@@ -54,13 +54,13 @@ pub fn init(shell: &Rc<RefCell<Shell>>) {
         | ffi::weston_keyboard_modifier::MODIFIER_SHIFT;
 
     compositor.bind_key(KEY_F3, mods, move |keyboard, _, _| {
-        let focus = unsafe { &mut *(*keyboard).focus };
+        let focus = unsafe { &mut *keyboard.focus };
 
         key_rotate(focus)
     });
 
-    compositor.bind_button(BTN_LEFT, mods, |pointer: *mut ffi::weston_pointer, _, _| {
-        let focus = unsafe { &mut *(*pointer).focus };
+    compositor.bind_button(BTN_LEFT, mods, |pointer: &mut ffi::weston_pointer, _, _| {
+        let focus = unsafe { &mut *pointer.focus };
 
         pointer_rotate(focus)
     });

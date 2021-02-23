@@ -133,13 +133,14 @@ impl Compositor {
     fn bind_key<F>(&mut self, key: u32,
 		   modifier: ffi::weston_keyboard_modifier,
 		   f: F)
-    where F: Fn(*mut ffi::weston_keyboard, *const ffi::timespec, u32) {
+    where F: Fn(&mut ffi::weston_keyboard, *const ffi::timespec, u32) {
 	extern "C"
 	fn call_key_closure<F>(keyboard: *mut ffi::weston_keyboard,
 			       time: *const ffi::timespec,
 			       key: u32,
 			       data: *mut std::ffi::c_void)
-	where F: Fn(*mut ffi::weston_keyboard, *const ffi::timespec, u32) {
+	where F: Fn(&mut ffi::weston_keyboard, *const ffi::timespec, u32) {
+	    let keyboard = unsafe { &mut *keyboard };
 	    (unsafe { &mut *(data as *mut F) })(keyboard, time, key)
 	}
 
@@ -156,13 +157,14 @@ impl Compositor {
     fn bind_button<F>(&mut self, button: u32,
 		      modifier: ffi::weston_keyboard_modifier,
 		      f: F)
-    where F: Fn(*mut ffi::weston_pointer, *const ffi::timespec, u32) {
+    where F: Fn(&mut ffi::weston_pointer, *const ffi::timespec, u32) {
 	extern "C"
 	fn call_button_closure<F>(pointer: *mut ffi::weston_pointer,
 				  time: *const ffi::timespec,
 				  key: u32,
 				  data: *mut std::ffi::c_void)
-	where F: Fn(*mut ffi::weston_pointer, *const ffi::timespec, u32) {
+	where F: Fn(&mut ffi::weston_pointer, *const ffi::timespec, u32) {
+	    let pointer = unsafe { &mut *pointer };
 	    (unsafe { &mut *(data as *mut F) })(pointer, time, key)
 	}
 

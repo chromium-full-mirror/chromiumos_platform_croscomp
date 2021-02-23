@@ -211,14 +211,12 @@ pub fn init(shell: &Rc<RefCell<Shell>>) {
 	BTN_LEFT,
 	ffi::weston_keyboard_modifier(shell.native.binding_modifier),
 	|pointer, _, _| {
-	    let pointer = unsafe { &mut *pointer };
 	    if !pointer.focus.is_null() {
 		MoveGrab::start(pointer, pointer.focus);
 	    }
 	});
 
-    let resize = |pointer: *mut ffi::weston_pointer, _, _| {
-	let pointer = unsafe { &mut *pointer };
+    let resize = |pointer: &mut ffi::weston_pointer, _, _| {
 	if !pointer.focus.is_null() {
 	    let view = unsafe { &mut *pointer.focus };
 	    let surface = unsafe { &mut *view.surface };

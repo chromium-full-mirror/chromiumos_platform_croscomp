@@ -46,7 +46,7 @@ impl Terminal {
 	}
     }
 
-    fn show(&mut self, keyboard: *mut ffi::weston_keyboard) {
+    fn show(&mut self, keyboard: &mut ffi::weston_keyboard) {
 	let mut shell = self.shell.borrow_mut();
 
 	match (self.client_surface, self.client) {
@@ -55,7 +55,7 @@ impl Terminal {
 		    let ds = ffi::weston_surface_get_desktop_surface(surface);
 		    let view = ffi::get_default_view(surface);
 		    ffi::activate(
-			&mut shell.native, view, (*keyboard).seat,
+			&mut shell.native, view, keyboard.seat,
 			ffi::weston_activate_flag::WESTON_ACTIVATE_FLAG_CONFIGURE as u32);
 
 		    ffi::weston_desktop_api_fullscreen_requested(&mut shell.native, ds,

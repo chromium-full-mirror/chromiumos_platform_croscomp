@@ -27,9 +27,7 @@ struct Switcher {
 
 impl Switcher {
     fn start(shell: &Rc<RefCell<Shell>>,
-	     keyboard: *mut ffi::weston_keyboard) {
-	let keyboard = unsafe { &mut *keyboard };
-
+	     keyboard: &mut ffi::weston_keyboard) {
 	let mut switcher = Box::new(Switcher {
 	    shell: Rc::clone(shell),
 	    grab: input::KeyboardGrab::new(keyboard),
