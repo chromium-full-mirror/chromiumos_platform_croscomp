@@ -12,7 +12,7 @@ wayland-sys = { path = "third_party/wayland-sys" }
 wayland-server = { path = "third_party/wayland-server", features = ["use_system_lib"] }
 drm = { path = "third_party/drm" }
 once_cell = { path = "third_party/once_cell" }
-nix = "0.19"
+nix = "0.14"
 bitflags = "1.0"
 
 tempfile = ">=2.0, <4.0"
