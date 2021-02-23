@@ -10,14 +10,7 @@ wayland-scanner = { path = "third_party/wayland-scanner" }
 wayland-commons = { path = "third_party/wayland-commons" }
 wayland-sys = { path = "third_party/wayland-sys" }
 wayland-server = { path = "third_party/wayland-server", features = ["use_system_lib"] }
-drm = { path = "third_party/drm" }
-once_cell = { path = "third_party/once_cell" }
-dlib = { path = "third_party/dlib" }
-nix = "0.14"
 bitflags = "1.0"
-
-tempfile = ">=2.0, <4.0"
-libc = "0.2.65"
 
 [build-dependencies]
 wayland-scanner = { version = "0.28.2", path = "third_party/wayland-scanner" }
