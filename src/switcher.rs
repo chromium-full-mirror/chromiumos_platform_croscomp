@@ -8,6 +8,7 @@ use std::rc::Rc;
 use crate::Shell;
 use crate::ffi;
 use crate::ffi::evdev::KEY_TAB;
+use crate::input;
 
 struct Thumbnail {
     view: *mut ffi::weston_view,
@@ -16,7 +17,7 @@ struct Thumbnail {
 
 struct Switcher {
     shell: Rc<RefCell<crate::Shell>>,
-    grab: ffi::weston_keyboard_grab,
+    grab: input::KeyboardGrab,
     current: usize,
     view_destroy_listener: ffi::wl_listener,
 
@@ -31,10 +32,7 @@ impl Switcher {
 
 	let mut switcher = Box::new(Switcher {
 	    shell: Rc::clone(shell),
-	    grab: ffi::weston_keyboard_grab {
-		interface: &grab::INTERFACE as *const _,
-		keyboard: 0 as *mut _
-	    },
+	    grab: input::KeyboardGrab::new(keyboard),
 	    current: 0,
 	    view_destroy_listener: ffi::wl_listener::new(view_destroy_notify),
 	    ui: Vec::new(),
@@ -49,8 +47,10 @@ impl Switcher {
 	}
 
 	let output = unsafe { &(*(*keyboard.focus).output) };
-	keyboard.start_grab(&mut switcher.grab as *mut _);
 	keyboard.set_focus(0 as * mut _);
+
+	let p = switcher.as_mut() as * mut _;
+	switcher.grab.start(p);
 
 	switcher.build_ui(output);
 
@@ -146,12 +146,9 @@ impl Switcher {
 	}
     }
 
-    fn pick(&mut self, _forwards: bool) {
-	let seat = unsafe { &mut *(*self.grab.keyboard).seat };
-
+    fn pick(&mut self, forwards: bool) {
 	let len = self.thumbnails.len();
-	if seat.modifier_state.is_set(
-	    ffi::weston_keyboard_modifier::MODIFIER_SHIFT) {
+	if forwards {
 	    self.current = (self.current + len - 1) % len;
 	} else {
 	    self.current = (self.current + 1) % len;
@@ -170,9 +167,7 @@ impl Switcher {
 
     fn shutdown(&mut self) {
 	let mut shell = self.shell.borrow_mut();
-	let seat = unsafe { &mut *(*self.grab.keyboard).seat };
-
-	unsafe { ffi::weston_keyboard_end_grab(self.grab.keyboard) };
+	let seat = unsafe { &mut *(*self.grab.grab.keyboard).seat };
 
 	let t = &mut self.thumbnails[self.current as usize];
 	unsafe {
@@ -196,52 +191,44 @@ impl Switcher {
     }
 }
 
-mod grab {
-    use super::ffi;
-    use ffi::evdev::KEY_TAB;
-    use ffi::wl_keyboard_key_state;
+impl input::KeyboardGrabHandler for Switcher {
+    fn key(&mut self,
+	   keyboard: &mut ffi::weston_keyboard,
+	   _time: &ffi::timespec,
+	   key: u32,
+	   state: u32) {
+	use ffi::wl_keyboard_key_state::*;
+	const SHIFT: ffi::weston_keyboard_modifier =
+	    ffi::weston_keyboard_modifier::MODIFIER_SHIFT;
 
-    extern "C" fn key(grab: *mut ffi::weston_keyboard_grab,
-		      _time: *const ffi::timespec,
-		      key: u32,
-		      state: u32) {
-	let switcher = unsafe { &mut *container_of_mut!(grab, super::Switcher, grab) };
-	let seat = unsafe { &mut *(*switcher.grab.keyboard).seat };
-
-	let forwards = !seat.modifier_state.is_set(ffi::weston_keyboard_modifier::MODIFIER_SHIFT);
+	let seat = unsafe { &mut *(*keyboard).seat };
+	let forwards = !seat.modifier_state.is_set(SHIFT);
 
 	if key == KEY_TAB &&
-	    state == wl_keyboard_key_state::WL_KEYBOARD_KEY_STATE_PRESSED as u32 {
-		switcher.pick(forwards);
+	    state == WL_KEYBOARD_KEY_STATE_PRESSED as u32 {
+		self.pick(forwards);
 	    }
-    }
+    }	
 
-    extern "C" fn modifiers(grab: *mut ffi::weston_keyboard_grab,
-			    _serial: u32,
-			    _mods_depressed: u32,
-			    _mods_latched: u32,
-			    _mods_locked: u32,
-			    _group: u32) {
-	let switcher = unsafe { &mut *container_of_mut!(grab, super::Switcher, grab) };
-	let seat = unsafe { &mut *(*switcher.grab.keyboard).seat };
+    fn modifiers(&mut self,
+		 keyboard: &mut ffi::weston_keyboard,
+		 _serial: u32,
+		 _mods_depressed: u32,
+		 _mods_latched: u32,
+		 _mods_locked: u32,
+		 _group: u32) {
+	let seat = unsafe { &mut *(*keyboard).seat };
 
 	if !seat.modifier_state.is_set(ffi::weston_keyboard_modifier::MODIFIER_ALT) {
-	    switcher.shutdown()
+	    self.shutdown()
 	}
     }
 
-    extern "C" fn cancel(grab: *mut ffi::weston_keyboard_grab) {
-	let switcher = unsafe { &mut *container_of_mut!(grab, super::Switcher, grab) };
-
-	switcher.shutdown();
+    fn cancel(&mut self,
+	      _keyboard: &mut ffi::weston_keyboard) {
+	self.shutdown()
     }
 
-    pub static INTERFACE: ffi::weston_keyboard_grab_interface =
-	ffi::weston_keyboard_grab_interface {
-	    key: Some(key),
-	    modifiers: Some(modifiers),
-	    cancel: Some(cancel)
-	};
 }
     
 extern "C"

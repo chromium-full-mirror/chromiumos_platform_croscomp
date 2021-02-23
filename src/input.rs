@@ -140,3 +140,93 @@ impl Drop for PointerGrab {
 	}
     }
 }
+
+pub trait KeyboardGrabHandler {
+    fn key(&mut self,
+	   _keyboard: &mut ffi::weston_keyboard,
+	   _time: &ffi::timespec,
+	   _key: u32,
+	   _state: u32) { }
+
+    fn modifiers(&mut self,
+		 _keyboard: &mut ffi::weston_keyboard,
+		 _serial: u32,
+		 _mods_depressed: u32,
+		 _mods_latched: u32,
+		 _mods_locked: u32,
+		 _group: u32) { }
+
+    fn cancel(&mut self,
+	      _keyboard: &mut ffi::weston_keyboard) { }
+}
+
+pub struct KeyboardGrab {
+    pub grab: ffi::weston_keyboard_grab,
+    handler: Option<NonNull<dyn KeyboardGrabHandler>>
+}
+
+impl KeyboardGrab {
+    fn cast(grab: *mut ffi::weston_keyboard_grab) ->
+	(&'static mut ffi::weston_keyboard, &'static mut dyn KeyboardGrabHandler) {
+	let grab = unsafe { &mut *container_of_mut!(grab, KeyboardGrab, grab) };
+	unsafe { (&mut *grab.grab.keyboard,  &mut *grab.handler.unwrap().as_ptr()) }
+    }
+
+    extern "C" fn key(grab: *mut ffi::weston_keyboard_grab,
+		      time: *const ffi::timespec,
+		      key: u32,
+		      state: u32) {
+	let (keyboard, handler) = Self::cast(grab);
+	let time = unsafe { &*time };
+	handler.key(keyboard, time, key, state);
+    }
+
+    extern "C" fn modifiers(grab: *mut ffi::weston_keyboard_grab,
+			    serial: u32,
+			    mods_depressed: u32,
+			    mods_latched: u32,
+			    mods_locked: u32,
+			    group: u32) {
+	let (keyboard, handler) = Self::cast(grab);
+	handler.modifiers(keyboard, serial, mods_depressed, mods_latched,
+			  mods_locked, group)
+    }
+
+    extern "C" fn cancel(grab: *mut ffi::weston_keyboard_grab) {
+	let (keyboard, handler) = Self::cast(grab);
+	handler.cancel(keyboard)
+    }
+
+    pub fn new(keyboard: *mut ffi::weston_keyboard) -> KeyboardGrab {
+	static INTERFACE: ffi::weston_keyboard_grab_interface =
+	    ffi::weston_keyboard_grab_interface {
+		key: Some(KeyboardGrab::key),
+		modifiers: Some(KeyboardGrab::modifiers),
+		cancel: Some(KeyboardGrab::cancel)
+	    };
+
+	KeyboardGrab {
+	    grab: ffi::weston_keyboard_grab {
+		interface: &INTERFACE,
+		keyboard: keyboard
+	    },
+	    handler: None
+	}
+    }
+
+    pub fn start(&mut self, handler: *mut dyn KeyboardGrabHandler) {
+	self.handler = NonNull::new(handler);
+	unsafe {
+	    ffi::weston_keyboard_start_grab(self.grab.keyboard, &mut self.grab)
+	};
+    }
+}
+
+impl Drop for KeyboardGrab {
+    fn drop(&mut self) {
+	unsafe {
+	    ffi::weston_keyboard_end_grab(self.grab.keyboard)
+	}
+    }
+}
+
