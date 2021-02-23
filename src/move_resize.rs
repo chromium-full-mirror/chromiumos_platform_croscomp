@@ -205,7 +205,7 @@ pub fn init(shell: &Rc<RefCell<Shell>>) {
     let shell = shell.borrow();
     let mut compositor = shell.compositor.borrow_mut();
 
-    use crate::ffi::evdev::{BTN_LEFT, BTN_RIGHT};;
+    use crate::ffi::evdev::{BTN_LEFT, BTN_RIGHT};
 
     compositor.bind_button(
 	BTN_LEFT,
