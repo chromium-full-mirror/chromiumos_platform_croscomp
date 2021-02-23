@@ -88,12 +88,6 @@ struct exposay {
 	bool mod_invalid;
 };
 
-struct focus_surface {
-	struct weston_surface *surface;
-	struct weston_view *view;
-	struct weston_transform workspace_transform;
-};
-
 struct workspace {
 	struct weston_layer layer;
 
@@ -265,9 +259,28 @@ shell_surface_set_size(struct shell_surface *shsurf,
 		       int32_t width, int32_t height);
 void
 shell_surface_set_resizing(struct shell_surface *shsurf, uint32_t edges);
+void
+shell_surface_update_child_surface_layers (struct shell_surface *shsurf);
 
 struct workspace *
 get_current_workspace(struct desktop_shell *shell);
+
+void
+drop_focus_state(struct desktop_shell *shell, struct workspace *ws,
+		 struct weston_surface *surface);
+struct focus_state *
+ensure_focus_state(struct desktop_shell *shell, struct weston_seat *seat);
+struct weston_surface *
+focus_state_set_focus(struct focus_state *state,
+		      struct weston_surface *surface);
+void
+animate_focus_change(struct desktop_shell *shell, struct workspace *ws,
+		     struct weston_view *from, struct weston_view *to);
+int
+init_workspaces(struct desktop_shell *shell);
+void
+destroy_workspaces(struct desktop_shell *shell);
+
 
 void
 get_output_work_area(struct desktop_shell *shell,

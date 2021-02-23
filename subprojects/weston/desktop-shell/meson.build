@@ -12,6 +12,7 @@ if get_option('shell-desktop')
 		'xdg-shell.c',
 		'exo-extensions.c',
 		'screenshooter.c',
+		'workspace.c',
 		weston_screenshooter_server_protocol_h,
 		weston_screenshooter_protocol_c,
 		croscomp_server_protocol_h,
