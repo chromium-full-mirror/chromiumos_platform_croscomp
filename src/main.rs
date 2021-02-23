@@ -19,6 +19,7 @@ mod switcher;
 mod move_resize;
 mod protocol;
 mod input;
+mod rotate;
 
 const SCALE: i32 = 2;
 
@@ -344,6 +345,8 @@ fn main() {
     switcher::init(&shell);
 
     move_resize::init(&shell);
+
+    rotate::init(&shell);
 
     compositor.borrow_mut().wake();
 
