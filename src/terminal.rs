@@ -32,54 +32,52 @@ fn client_destroy_notify(listener: *mut ffi::wl_listener,
     t.client_surface = None;
 }
 
-extern "C"
-fn binding(keyboard: *mut ffi::weston_keyboard,
-           _time: *const ffi::timespec,
-           key: u32,
-           data: *mut std::ffi::c_void) {
-    let mut t = unsafe { &mut *(data as *mut Terminal) };
-    let shell = &mut t.shell.borrow_mut().native;
+impl Terminal {
+    fn hide(&mut self) {
+	let mut shell = self.shell.borrow_mut();
 
-    match (key, t.client_surface) {
-	(KEY_F1, Some(surface)) => {
+	if let Some(surface) = self.client_surface {
 	    unsafe {
 		let ds = ffi::weston_surface_get_desktop_surface(surface);
-		ffi::weston_desktop_api_fullscreen_requested(shell, ds, false,
-							     0 as *mut ffi::weston_output);
-		ffi::weston_desktop_api_minimized_requested(shell, ds);
+		ffi::weston_desktop_api_fullscreen_requested(&mut shell.native, ds, false,
+							     0 as *mut _);
+		ffi::weston_desktop_api_minimized_requested(&mut shell.native, ds);
 	    }
-	},
-	(KEY_F2, Some(surface)) => {
-	    unsafe {
-		let ds = ffi::weston_surface_get_desktop_surface(surface);
-		let view = ffi::get_default_view(surface);
-		ffi::activate(
-		    shell, view, (*keyboard).seat,
-		    ffi::weston_activate_flag::WESTON_ACTIVATE_FLAG_CONFIGURE as u32);
-			 
-		ffi::weston_desktop_api_fullscreen_requested(shell, ds,
-							     true, (*surface).output);
-	    }
-	},
-	(KEY_F2, None) => {
-	    if t.client == None {
+	}
+    }
+
+    fn show(&mut self, keyboard: *mut ffi::weston_keyboard) {
+	let mut shell = self.shell.borrow_mut();
+
+	match (self.client_surface, self.client) {
+	    (Some(surface), _) => {
+		unsafe {
+		    let ds = ffi::weston_surface_get_desktop_surface(surface);
+		    let view = ffi::get_default_view(surface);
+		    ffi::activate(
+			&mut shell.native, view, (*keyboard).seat,
+			ffi::weston_activate_flag::WESTON_ACTIVATE_FLAG_CONFIGURE as u32);
+
+		    ffi::weston_desktop_api_fullscreen_requested(&mut shell.native, ds,
+								 true, (*surface).output);
+		}
+	    },
+	    (None, None) => {
 		let terminal_client_path = "/usr/bin/croscomp-terminal\0";
 
 		let client = unsafe {
-		    ffi::weston_client_start((*shell).compositor,
+		    ffi::weston_client_start(&mut shell.compositor.borrow_mut().native,
 					     terminal_client_path.as_ptr() as *const i8)
-		    // add destroy listener
 		};
-
-		t.client = Some(client);
 		unsafe {
 		    ffi::wl_client_add_destroy_listener(
 			client,
-			&mut t.client_destroy_listener as *mut ffi::wl_listener);
-		}
-	    }
+			&mut self.client_destroy_listener as *mut ffi::wl_listener)
+		};
+		self.client = Some(client);
+	    },
+	    _ => {}
 	}
-	_ => ()
     }
 }
 
@@ -95,37 +93,35 @@ fn surface_create_notify(listener: *mut ffi::wl_listener,
     };
 
     if t.client == Some(client) {
-	println!(" -> match");
 	t.client_surface = Some(surface);
     }
 }
 
 pub fn init(shell: &Rc<RefCell<Shell>>) {
-    let mut t = Box::new(Terminal {
+    let t = Rc::new(RefCell::new(Terminal {
 	client_surface: None,
 	shell: Rc::clone(shell),
 	client: None,
 	surface_create_listener: ffi::wl_listener::new(surface_create_notify),
 	client_destroy_listener: ffi::wl_listener::new(client_destroy_notify),
-    });
+    }));
     
     let s = shell.borrow();
     let mut compositor = s.compositor.borrow_mut();
 
     // signal add
     compositor.native.create_surface_signal.add(
-	&mut t.surface_create_listener);
+	&mut t.borrow_mut().surface_create_listener);
 
-    let p = Box::into_raw(t);
+    let rc = Rc::clone(&t);
+    compositor.bind_key(KEY_F1,
+			ffi::weston_keyboard_modifier::MODIFIER_CTRL |
+			ffi::weston_keyboard_modifier::MODIFIER_ALT,
+			move |_, _, _| { rc.borrow_mut().hide() });
 
-    compositor.add_key_binding(KEY_F1,
-			       ffi::weston_keyboard_modifier::MODIFIER_CTRL |
-			       ffi::weston_keyboard_modifier::MODIFIER_ALT,
-			       Some(binding), p as *mut _);
-    compositor.add_key_binding(KEY_F2,
-			       ffi::weston_keyboard_modifier::MODIFIER_CTRL |
-			       ffi::weston_keyboard_modifier::MODIFIER_ALT,
-			       Some(binding), p as *mut _);
-
-    println!("init_terminal");
+    let rc = Rc::clone(&t);
+    compositor.bind_key(KEY_F2,
+			ffi::weston_keyboard_modifier::MODIFIER_CTRL |
+			ffi::weston_keyboard_modifier::MODIFIER_ALT,
+			move |keyboard, _, _| { rc.borrow_mut().show(keyboard) });
 }

@@ -25,20 +25,38 @@ struct Switcher {
 }
 
 impl Switcher {
-    fn start(&mut self, keyboard: *mut ffi::weston_keyboard) {
+    fn start(shell: &Rc<RefCell<Shell>>,
+	     keyboard: *mut ffi::weston_keyboard) {
 	let keyboard = unsafe { &mut *keyboard };
 
+	let mut switcher = Box::new(Switcher {
+	    shell: Rc::clone(shell),
+	    grab: ffi::weston_keyboard_grab {
+		interface: &grab::INTERFACE as *const _,
+		keyboard: 0 as *mut _
+	    },
+	    current: 0,
+	    view_destroy_listener: ffi::wl_listener::new(view_destroy_notify),
+	    ui: Vec::new(),
+	    thumbnails: Vec::new()
+	});
+
+	switcher.view_destroy_listener.link.init();
+
 	unsafe {
-	    ffi::lower_fullscreen_layer(&mut self.shell.borrow_mut().native, 0 as *mut _);
+	    ffi::lower_fullscreen_layer(&mut switcher.shell.borrow_mut().native,
+					0 as *mut _);
 	}
 
 	let output = unsafe { &(*(*keyboard.focus).output) };
-	keyboard.start_grab(&mut self.grab as *mut _);
+	keyboard.start_grab(&mut switcher.grab as *mut _);
 	keyboard.set_focus(0 as * mut _);
 
-	self.build_ui(output);
+	switcher.build_ui(output);
 
-	self.pick(true);
+	switcher.pick(true);
+
+	let _ = Box::into_raw(switcher);
     }
 
     fn build_ui(&mut self, output: &ffi::weston_output) {
@@ -172,6 +190,9 @@ impl Switcher {
 	for t in self.thumbnails.drain(..) {
 	    unsafe { ffi::weston_view_destroy(t.view) };
 	}
+
+	drop(shell);
+	let _ = unsafe { Box::from_raw(self as *mut _) };
     }
 }
 
@@ -234,43 +255,20 @@ fn view_destroy_notify(listener: *mut ffi::wl_listener,
     switcher.pick(true);
 }
 
-extern "C"
-fn binding(keyboard: *mut ffi::weston_keyboard,
-           _time: *const ffi::timespec,
-           _key: u32,
-           data: *mut std::ffi::c_void) {
-    let switcher = unsafe { &mut *(data as *mut Switcher) };
-    
-    println!("alt-tab!");
-
-    switcher.start(keyboard)
-}
-
-pub fn init(shell: &Rc<RefCell<Shell>>) {
-    let mut switcher = Box::new(Switcher {
-	shell: Rc::clone(shell),
-	grab: ffi::weston_keyboard_grab {
-	    interface: &grab::INTERFACE as *const _,
-	    keyboard: 0 as *mut _
-	},
-	current: 0,
-	view_destroy_listener: ffi::wl_listener::new(view_destroy_notify),
-	ui: Vec::new(),
-	thumbnails: Vec::new()
-    });
-
-    switcher.view_destroy_listener.link.init();
-
-    let ptr = Box::into_raw(switcher);
-
-    let shell = shell.borrow();
+pub fn init(rc: &Rc<RefCell<Shell>>) {
+    let shell = rc.borrow();
     let mut compositor = shell.compositor.borrow_mut();
 
-    compositor.add_key_binding(KEY_TAB,
-			       ffi::weston_keyboard_modifier::MODIFIER_ALT,
-			       Some(binding), ptr as *mut _);
-    compositor.add_key_binding(KEY_TAB,
-			       ffi::weston_keyboard_modifier::MODIFIER_ALT |
-			       ffi::weston_keyboard_modifier::MODIFIER_SHIFT,
-			       Some(binding), ptr as *mut _);
+    let shell = Rc::clone(&rc);
+    compositor.bind_key(KEY_TAB,
+			ffi::weston_keyboard_modifier::MODIFIER_ALT,
+			move |keyboard, _, _|
+			Switcher::start(&shell, keyboard));
+
+    let shell = Rc::clone(&rc);
+    compositor.bind_key(KEY_TAB,
+			ffi::weston_keyboard_modifier::MODIFIER_ALT |
+			ffi::weston_keyboard_modifier::MODIFIER_SHIFT,
+			move |keyboard, _, _|
+			Switcher::start(&shell, keyboard));
 }

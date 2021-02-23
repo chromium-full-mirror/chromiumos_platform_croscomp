@@ -129,14 +129,27 @@ impl Compositor {
 	}
     }
 
-    fn add_key_binding(&mut self, key: u32,
-		       modifier: ffi::weston_keyboard_modifier,
-		       binding: ffi::weston_key_binding_handler_t,
-		       data: *mut ::std::os::raw::c_void) -> *mut ffi::weston_binding{
+    fn bind_key<F>(&mut self, key: u32,
+		   modifier: ffi::weston_keyboard_modifier,
+		   f: F)
+    where F: Fn(*mut ffi::weston_keyboard, *const ffi::timespec, u32) {
+	extern "C"
+	fn call_key_closure<F>(keyboard: *mut ffi::weston_keyboard,
+			       time: *const ffi::timespec,
+			       key: u32,
+			       data: *mut std::ffi::c_void)
+	where F: Fn(*mut ffi::weston_keyboard, *const ffi::timespec, u32) {
+	    (unsafe { &mut *(data as *mut F) })(keyboard, time, key)
+	}
+
+	let handler = Box::new(f);
+
 	unsafe {
 	    ffi::weston_compositor_add_key_binding(
-		&mut self.native, key, modifier, binding, data)
-	}
+		&mut self.native, key, modifier,
+		Some(call_key_closure::<F>),
+		Box::into_raw(handler) as *mut _)
+	};
     }
 
     fn bind_button<F>(&mut self, button: u32,
@@ -149,12 +162,7 @@ impl Compositor {
 				  key: u32,
 				  data: *mut std::ffi::c_void)
 	where F: Fn(*mut ffi::weston_pointer, *const ffi::timespec, u32) {
-	    let handler = unsafe {
-		Box::from_raw(data as *mut F)
-	    };
-
-	    handler(pointer, time, key);
-	    Box::into_raw(handler);
+	    (unsafe { &mut *(data as *mut F) })(pointer, time, key)
 	}
 
 	let handler = Box::new(f);
