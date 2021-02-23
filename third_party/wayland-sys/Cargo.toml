@@ -11,7 +11,7 @@ edition = "2018"
 readme = "README.md"
 
 [dependencies]
-dlib = { version = "0.4", optional = true }
+dlib = { path = "../dlib", optional = true }
 libc = { version = "0.2", optional = true }
 lazy_static = { version = "1", optional = true }
 
