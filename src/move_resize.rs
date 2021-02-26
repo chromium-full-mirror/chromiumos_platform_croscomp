@@ -13,7 +13,8 @@ struct MoveGrab {
     view_destroy_listener: ffi::wl_listener,
     dx: ffi::wl_fixed_t,
     dy: ffi::wl_fixed_t,
-    grab: input::PointerGrab
+    pointer_grab: input::PointerGrab,
+    keyboard_grab: input::KeyboardGrab,
 }
 
 impl input::PointerGrabHandler for MoveGrab {
@@ -37,14 +38,43 @@ impl input::PointerGrabHandler for MoveGrab {
 	      state: u32) {
 	if pointer.button_count == 0 &&
 	    state == ffi::wl_pointer_button_state::WL_POINTER_BUTTON_STATE_RELEASED as u32 {
-		// Put it back in the box and drop it
-		let _ = unsafe { Box::from_raw(self as *mut _) };
+		self.shutdown()
 	    }
     }
 
     fn cancel(&mut self,
 	      _pointer: &mut ffi::weston_pointer) {
-	let _ = unsafe { Box::from_raw(self as *mut _) };
+	self.shutdown()
+    }
+}
+
+impl input::KeyboardGrabHandler for MoveGrab {
+    fn key(&mut self,
+	   keyboard: &mut ffi::weston_keyboard,
+	   _time: &ffi::timespec,
+	   key: u32,
+	   state: u32) {
+	use ffi::wl_keyboard_key_state::*;
+	use crate::ffi::evdev::KEY_ESC;
+
+	if key == KEY_ESC &&
+	    state == WL_KEYBOARD_KEY_STATE_PRESSED as u32 {
+		let seat = unsafe { &mut *keyboard.seat };
+		let pointer = unsafe { &mut *seat.pointer_state };
+		let view = unsafe { &mut *pointer.focus };
+		let compositor = unsafe { &mut *(*view.surface).compositor };
+
+		view.set_position((pointer.grab_x + self.dx).into(),
+				  (pointer.grab_y + self.dy).into());
+		compositor.schedule_repaint();
+
+		self.shutdown()
+	    }
+    }
+
+    fn cancel(&mut self,
+	      _keyboard: &mut ffi::weston_keyboard) {
+	self.shutdown()
     }
 }
 
@@ -52,26 +82,39 @@ impl MoveGrab {
     fn start(pointer: *mut ffi::weston_pointer, view: *mut ffi::weston_view) {
 	let pointer = unsafe { &mut *pointer };
 	let view = unsafe { &mut *view };
+	let seat = unsafe { &mut *pointer.seat };
+	let keyboard = unsafe { &mut *seat.keyboard_state };
 
 	let mut handler = Box::new(MoveGrab {
 	    view_destroy_listener: ffi::wl_listener::new(view_destroy_notify),
-	    grab: input::PointerGrab::new(pointer),
 	    dx: ffi::wl_fixed_t::from(view.geometry.x) - pointer.grab_x,
 	    dy: ffi::wl_fixed_t::from(view.geometry.y) - pointer.grab_y,
+	    pointer_grab: input::PointerGrab::new(pointer),
+	    keyboard_grab: input::KeyboardGrab::new(keyboard)
 	});
 
-	let p = handler.as_mut() as *mut _;
-	handler.grab.start(p);
+	let p = handler.as_mut() as *mut Self;
+	handler.pointer_grab.start(p);
+	handler.keyboard_grab.start(p);
 	Box::into_raw(handler);
+    }
+
+    fn shutdown(&mut self) {
+	// xxx this is kind of crazy, the caller still thinks self is
+	// valid when we return...
+	let _ = unsafe { Box::from_raw(self as *mut _) };
     }
 }
 
 struct ResizeGrab {
     view_destroy_listener: ffi::wl_listener,
     edges: ffi::wl_shell_surface_resize,
+    origin_x: f32,
+    origin_y: f32,
     width: i32,
     height: i32,
-    grab: input::PointerGrab
+    pointer_grab: input::PointerGrab,
+    keyboard_grab: input::KeyboardGrab,
 }
 
 impl input::PointerGrabHandler for ResizeGrab {
@@ -121,13 +164,47 @@ impl input::PointerGrabHandler for ResizeGrab {
 	      state: u32) {
 	if pointer.button_count == 0 &&
 	    state == ffi::wl_pointer_button_state::WL_POINTER_BUTTON_STATE_RELEASED as u32 {
-		self.stop(pointer);
+		self.shutdown(pointer);
 	    }
     }
 
     fn cancel(&mut self,
 	      pointer: &mut ffi::weston_pointer) {
-	self.stop(pointer);
+	self.shutdown(pointer);
+    }
+}
+impl input::KeyboardGrabHandler for ResizeGrab {
+    fn key(&mut self,
+	   keyboard: &mut ffi::weston_keyboard,
+	   _time: &ffi::timespec,
+	   key: u32,
+	   state: u32) {
+	use ffi::wl_keyboard_key_state::*;
+	use crate::ffi::evdev::KEY_ESC;
+
+	if key == KEY_ESC &&
+	    state == WL_KEYBOARD_KEY_STATE_PRESSED as u32 {
+		let seat = unsafe { &mut *keyboard.seat };
+		let pointer = unsafe { &mut *seat.pointer_state };
+		let view = unsafe { &mut *pointer.focus };
+
+		let surface = unsafe { &mut *(view.surface) };
+		if let Some(shsurf) = ffi::shell_surface::get(surface) {
+
+		    view.set_position(self.origin_x, self.origin_y);
+		    shsurf.set_size(self.width, self.height);
+		}
+
+		self.shutdown(pointer)
+	    }
+    }
+
+    fn cancel(&mut self,
+	      keyboard: &mut ffi::weston_keyboard) {
+	let seat = unsafe { &mut *keyboard.seat };
+	let pointer = unsafe { &mut *seat.pointer_state };
+
+	self.shutdown(pointer)
     }
 }
 
@@ -136,6 +213,8 @@ impl ResizeGrab {
 	     view: *mut ffi::weston_view,
 	     edges: ffi::wl_shell_surface_resize) {
 	let pointer = unsafe { &mut *pointer };
+	let seat = unsafe { &mut *pointer.seat };
+	let keyboard = unsafe { &mut *seat.keyboard_state };
 	let view = unsafe { &mut *view };
 	let surface = unsafe { &mut *(view.surface) };
 	use ffi::wl_shell_surface_resize as resize;
@@ -163,21 +242,25 @@ impl ResizeGrab {
 	let mut handler = Box::new(ResizeGrab {
 	    view_destroy_listener: ffi::wl_listener::new(view_destroy_notify),
 	    edges: edges,
+	    origin_x: view.geometry.x,
+	    origin_y: view.geometry.y,
 	    width: width,
 	    height: height,
-	    grab: input::PointerGrab::new(pointer)
+	    pointer_grab: input::PointerGrab::new(pointer),
+	    keyboard_grab: input::KeyboardGrab::new(keyboard)
 	});
 
 	if let Some(shsurf) = ffi::shell_surface::get(surface) {
 	    shsurf.set_resizing(edges);
 	}
 
-	let p = handler.as_mut() as *mut _;
-	handler.grab.start(p);
+	let p = handler.as_mut() as *mut Self;
+	handler.pointer_grab.start(p);
+	handler.keyboard_grab.start(p);
 	Box::into_raw(handler);
     }
 
-    fn stop(&mut self, pointer: &mut ffi::weston_pointer,) {
+    fn shutdown(&mut self, pointer: &mut ffi::weston_pointer,) {
 	let view = unsafe { &mut *pointer.focus };
 	let surface = unsafe { &mut *(view.surface) };
 	use ffi::wl_shell_surface_resize as resize;
