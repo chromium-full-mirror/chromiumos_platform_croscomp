@@ -34,6 +34,7 @@ fn main() {
         .header("./subprojects/weston/desktop-shell/shell.h")
         .header("./subprojects/weston/compositor/weston.h")
 	.generate_comments(false)
+	.new_type_alias("wl_fixed_t")
 	.default_enum_style(bindgen::EnumVariation::Rust{non_exhaustive: true})
 	.bitfield_enum("weston_keyboard_modifier")
 	.bitfield_enum("wl_shell_surface_resize")

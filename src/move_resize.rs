@@ -25,8 +25,8 @@ impl input::PointerGrabHandler for MoveGrab {
 	let compositor = unsafe { &mut *(*view.surface).compositor };
 
 	pointer.r#move(event);
-	view.set_position(ffi::fixed_to_int(pointer.x + self.dx) as f32,
-			  ffi::fixed_to_int(pointer.y + self.dy) as f32);
+	view.set_position((pointer.x + self.dx).into(),
+			  (pointer.y + self.dy).into());
 	compositor.schedule_repaint();
     }
 
@@ -55,9 +55,9 @@ impl MoveGrab {
 
 	let mut handler = Box::new(MoveGrab {
 	    view_destroy_listener: ffi::wl_listener::new(view_destroy_notify),
-	    dx: ffi::fixed_from_double(view.geometry.x) - pointer.grab_x,
-	    dy: ffi::fixed_from_double(view.geometry.y) - pointer.grab_y,
-	    grab: input::PointerGrab::new(pointer)
+	    grab: input::PointerGrab::new(pointer),
+	    dx: ffi::wl_fixed_t::from(view.geometry.x) - pointer.grab_x,
+	    dy: ffi::wl_fixed_t::from(view.geometry.y) - pointer.grab_y,
 	});
 
 	let p = handler.as_mut() as *mut _;
@@ -84,24 +84,24 @@ impl input::PointerGrabHandler for ResizeGrab {
 
 	pointer.r#move(event);
 
-	let (from_x, from_y) =
-	    view.from_global_fixed(pointer.grab_x, pointer.grab_y);
-	let (to_x, to_y) =
-	    view.from_global_fixed(pointer.x, pointer.y);
+	let (from_x, from_y): (ffi::wl_fixed_t, _) =
+	    view.from_global(pointer.grab_x, pointer.grab_y);
+	let (to_x, to_y): (ffi::wl_fixed_t, _)  =
+	    view.from_global(pointer.x, pointer.y);
 
 	let width = self.width +
 	    if self.edges.has(resize::WL_SHELL_SURFACE_RESIZE_LEFT) {
-		ffi::fixed_to_int(from_x - to_x)
+		(from_x - to_x).into()
 	    } else if self.edges.has(resize::WL_SHELL_SURFACE_RESIZE_RIGHT) {
-		ffi::fixed_to_int(to_x - from_x)
+		(to_x - from_x).into()
 	    } else {
 		0
 	    };
 	let height = self.height +
 	    if self.edges.has(resize::WL_SHELL_SURFACE_RESIZE_TOP) {
-		ffi::fixed_to_int(from_y - to_y)
+		(from_y - to_y).into()
 	    } else if self.edges.has(resize::WL_SHELL_SURFACE_RESIZE_BOTTOM) {
-		ffi::fixed_to_int(to_y - from_y)
+		(to_y - from_y).into()
 	    } else {
 		0
 	    };
@@ -112,7 +112,6 @@ impl input::PointerGrabHandler for ResizeGrab {
 	if let Some(shsurf) = ffi::shell_surface::get(surface) {
 	    shsurf.set_size(width, height);
 	}
-
     }
 
     fn button(&mut self,
@@ -222,9 +221,8 @@ pub fn init(shell: &Rc<RefCell<Shell>>) {
 	    let surface = unsafe { &mut *view.surface };
 	    use ffi::wl_shell_surface_resize as resize;
 
-	    let (x, y) = view.from_global(
-		ffi::fixed_to_int(pointer.grab_x),
-		ffi::fixed_to_int(pointer.grab_y));
+	    let (x, y): (i32, _)  =
+		view.from_global(pointer.grab_x, pointer.grab_y);
 
 	    let hmargin = surface.width / 3;
 	    let vmargin = surface.height / 3;

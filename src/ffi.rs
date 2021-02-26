@@ -5,6 +5,8 @@
 #![allow(unused_macros)]
 
 use std::marker::PhantomData;
+use std::convert::{From, Into};
+use std::ops;
 
 // Put these uglies here
 
@@ -209,24 +211,15 @@ impl weston_view {
 	unsafe { weston_view_geometry_dirty(self) }
     }
 
-    pub fn from_global(&mut self, x: i32, y: i32) -> (i32, i32) {
+    pub fn from_global<T: Into<i32>, U: From<i32>>(&mut self, x: T, y: T) -> (U, U) {
 	let mut out = (0, 0);
 
 	unsafe {
-	    weston_view_from_global(self, x, y, &mut out.0, &mut out.1);
+	    weston_view_from_global(self, x.into(), y.into(),
+				    &mut out.0, &mut out.1);
 	}
 
-	out
-    }
-
-    pub fn from_global_fixed(&mut self, x: wl_fixed_t, y: wl_fixed_t) -> (wl_fixed_t, wl_fixed_t) {
-	let mut out = (0, 0);
-
-	unsafe {
-	    weston_view_from_global(self, x, y, &mut out.0, &mut out.1);
-	}
-
-	out
+	(out.0.into(), out.1.into())
     }
 }
 
@@ -299,12 +292,44 @@ impl weston_matrix {
     }
 }
 
-pub fn fixed_from_double(f: f32) -> wl_fixed_t {
-    (f * 256.0) as wl_fixed_t
+impl From<f32> for wl_fixed_t {
+    fn from(item: f32) -> Self {
+        wl_fixed_t((item * 256.0) as i32)
+    }
 }
 
-pub fn fixed_to_int(f: wl_fixed_t) -> i32 {
-    f >> 8
+impl From<wl_fixed_t> for f32 {
+    fn from(item: wl_fixed_t) -> Self {
+        item.0 as f32 / 256.0
+    }
+}
+
+impl From<i32> for wl_fixed_t {
+    fn from(item: i32) -> Self {
+        wl_fixed_t(item << 8)
+    }
+}
+
+impl From<wl_fixed_t> for i32 {
+    fn from(item: wl_fixed_t) -> Self {
+        item.0 >> 8
+    }
+}
+
+impl ops::Add<wl_fixed_t> for wl_fixed_t {
+    type Output = wl_fixed_t;
+
+    fn add(self, rhs: wl_fixed_t) -> wl_fixed_t {
+	wl_fixed_t(self.0 + rhs.0)
+    }
+}
+
+impl ops::Sub<wl_fixed_t> for wl_fixed_t {
+    type Output = wl_fixed_t;
+
+    fn sub(self, rhs: wl_fixed_t) -> wl_fixed_t {
+	wl_fixed_t(self.0 - rhs.0)
+    }
 }
 
 impl weston_pointer {
