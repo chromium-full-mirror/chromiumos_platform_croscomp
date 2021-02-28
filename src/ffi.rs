@@ -1,3 +1,7 @@
+// Copyright 2021 The Chromium OS Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
@@ -211,15 +215,19 @@ impl weston_view {
 	unsafe { weston_view_geometry_dirty(self) }
     }
 
-    pub fn from_global<T: Into<i32>, U: From<i32>>(&mut self, x: T, y: T) -> (U, U) {
-	let mut out = (0, 0);
+    pub fn from_global<T: Into<f32>, U: From<f32>>(&mut self, x: T, y: T) -> (U, U) {
+	let local =
+	    if self.transform.enabled {
+		let global = weston_vector { f: [ x.into(), y.into(), 0.0, 1.0 ] };
+		let local = self.transform.inverse.transform(&global);
 
-	unsafe {
-	    weston_view_from_global(self, x.into(), y.into(),
-				    &mut out.0, &mut out.1);
-	}
-
-	(out.0.into(), out.1.into())
+		((local.f[0] / local.f[3]),
+		 (local.f[1] / local.f[3]))
+	    } else {
+		(x.into() - self.geometry.x,
+		 y.into() - self.geometry.y)
+	    };
+	(local.0.into(), local.1.into())
     }
 }
 
@@ -289,6 +297,15 @@ impl weston_matrix {
 	self.multiply(&m);
 
 	self
+    }
+
+    pub fn transform(&mut self, v: &weston_vector) -> weston_vector {
+	let mut r = weston_vector { f: [ 0.0; 4 ] };
+	for i in 0..4_usize {
+	    r.f[i] = (0..4_usize).map(|j| v.f[j] * self.d[i + j * 4]).sum()
+	}
+
+	r
     }
 }
 

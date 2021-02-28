@@ -304,9 +304,11 @@ pub fn init(shell: &Rc<RefCell<Shell>>) {
 	    let surface = unsafe { &mut *view.surface };
 	    use ffi::wl_shell_surface_resize as resize;
 
-	    let (x, y): (i32, _)  =
-		view.from_global(pointer.grab_x, pointer.grab_y);
+	    let (x, y) =
+		view.from_global::<_,f32>(pointer.grab_x,
+					  pointer.grab_y);
 
+	    let (x, y) = (x as i32, y as i32);
 	    let hmargin = surface.width / 3;
 	    let vmargin = surface.height / 3;
 	    let edges = if x < hmargin {

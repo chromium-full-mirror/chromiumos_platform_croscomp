@@ -1262,7 +1262,7 @@ struct weston_view {
 	 * This is updated by weston_view_update_transform().
 	 */
 	struct {
-		int dirty;
+		bool dirty;
 
 		/* Approximations in global coordinates:
 		 * - boundingbox is guaranteed to include the whole view in
@@ -1276,7 +1276,7 @@ struct weston_view {
 		/* matrix and inverse are used only if enabled = 1.
 		 * If enabled = 0, use x, y, width, height directly.
 		 */
-		int enabled;
+		bool enabled;
 		struct weston_matrix matrix;
 		struct weston_matrix inverse;
 
@@ -1554,6 +1554,9 @@ void
 weston_view_to_global_float(struct weston_view *view,
 			    float sx, float sy, float *x, float *y);
 
+void
+weston_view_from_global_float(struct weston_view *view,
+			      float x, float y, float *vx, float *vy);
 void
 weston_view_from_global(struct weston_view *view,
 			int32_t x, int32_t y, int32_t *vx, int32_t *vy);
