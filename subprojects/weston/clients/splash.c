@@ -45,7 +45,7 @@
 #include "shared/os-compatibility.h"
 #include "shared/helpers.h"
 #include "shared/image-loader.h"
-#include "shared/zalloc.h"
+#include "shared/xalloc.h"
 
 #include "croscomp-client-protocol.h"
 #include "linux-dmabuf-unstable-v1-client-protocol.h"
@@ -78,14 +78,15 @@ struct buffer {
 	int size;
 };
 
-struct window {
+struct splash {
 	struct display *display;
+	struct wl_output *output;
 	int width, height;
 	struct wl_surface *surface;
 	struct buffer buffers[3];
 	struct buffer *prev_buffer;
 	struct wl_callback *callback;
-	bool wait_for_configure;
+	int scale;
 };
 
 static void
@@ -170,69 +171,25 @@ create_dma_buf(struct display *display, struct buffer *buffer,
 	return 0;
 }
 
-static struct window *
-create_window(struct display *display, struct wl_output *output, int width, int height)
-{
-	struct window *window;
-
-	window = zalloc(sizeof *window);
-	if (!window)
-		return NULL;
-
-	window->callback = NULL;
-	window->display = display;
-	window->width = width;
-	window->height = height;
-	window->surface = wl_compositor_create_surface(display->compositor);
-
-	struct wl_region *region =
-		wl_compositor_create_region(display->compositor);
-	wl_region_add(region, 0, 0, width, height);
-	wl_surface_set_opaque_region(window->surface, region);
-	wl_region_destroy(region);
-
-	croscomp_splash_set(display->splash, output, window->surface);
-	redraw(window, NULL, 0);
-
-	return window;
-}
-
-#if 0
-static void
-destroy_window(struct window *window)
-{
-	if (window->callback)
-		wl_callback_destroy(window->callback);
-
-	if (window->buffers[0].buffer)
-		wl_buffer_destroy(window->buffers[0].buffer);
-	if (window->buffers[1].buffer)
-		wl_buffer_destroy(window->buffers[1].buffer);
-
-	wl_surface_destroy(window->surface);
-	free(window);
-}
-#endif
-
 static struct buffer *
-window_next_buffer(struct window *window)
+splash_next_buffer(struct splash *splash)
 {
 	struct buffer *buffer;
 	int ret = 0;
 	uint32_t i;
 
-	for (i = 0; i < ARRAY_LENGTH(window->buffers); i++) {
-		if (!window->buffers[i].busy)
+	for (i = 0; i < ARRAY_LENGTH(splash->buffers); i++) {
+		if (!splash->buffers[i].busy)
 			break;
 	}
 
-	if (i == ARRAY_LENGTH(window->buffers))
+	if (i == ARRAY_LENGTH(splash->buffers))
 		return NULL;
 
-	buffer = &window->buffers[i];
+	buffer = &splash->buffers[i];
 	if (!buffer->buffer) {
-		ret = create_dma_buf(window->display, buffer,
-				     window->width, window->height,
+		ret = create_dma_buf(splash->display, buffer,
+				     splash->width, splash->height,
 				     DRM_FORMAT_ARGB8888);
 
 		if (ret < 0)
@@ -264,12 +221,12 @@ clflush_range(void *start, size_t size)
 static void
 redraw(void *data, struct wl_callback *callback, uint32_t time)
 {
-	struct window *window = data;
-	struct display *display = window->display;
+	struct splash *splash = data;
+	struct display *display = splash->display;
 	struct buffer *buffer;
 	struct dma_buf_sync sync;
 
-	buffer = window_next_buffer(window);
+	buffer = splash_next_buffer(splash);
 	if (!buffer) {
 		fprintf(stderr,
 			!callback ? "Failed to create the first buffer.\n" :
@@ -291,18 +248,18 @@ redraw(void *data, struct wl_callback *callback, uint32_t time)
 
 	pixman_image_t *src = display->frames[frame];
 	pixman_image_t *dst = pixman_image_create_bits(PIXMAN_a8r8g8b8,
-						       window->width, window->height,
+						       splash->width, splash->height,
 						       buffer->data,
 						       buffer->stride);
 
 	uint32_t width = pixman_image_get_width(src);
 	uint32_t height = pixman_image_get_height(src);
-	uint32_t x = (window->width - width) / 2;
-	uint32_t y = (window->height - height) / 2;
+	uint32_t x = (splash->width - width) / 2;
+	uint32_t y = (splash->height - height) / 2;
 
 
 	if (!buffer->cleared) {
-		pixman_rectangle16_t rects = { 0, 0, window->width, window->height };
+		pixman_rectangle16_t rects = { 0, 0, splash->width, splash->height };
 		pixman_color_t color = { 0xfefe, 0xfefe, 0xfefe, 0xffff };
 
 		pixman_image_fill_rectangles(PIXMAN_OP_SRC, dst, &color, 1, &rects);
@@ -331,18 +288,19 @@ redraw(void *data, struct wl_callback *callback, uint32_t time)
 
 	clflush_range(buffer->data, buffer->size);
 
-	wl_surface_attach(window->surface, buffer->buffer, 0, 0);
-	wl_surface_damage(window->surface, x, y, width, height);
+	wl_surface_attach(splash->surface, buffer->buffer, 0, 0);
+	wl_surface_set_buffer_scale(splash->surface, splash->scale);
+	wl_surface_damage(splash->surface, x, y, width, height);
 
 	if (callback)
 		wl_callback_destroy(callback);
 
 	if (frame < display->frame_count) {
-		window->callback = wl_surface_frame(window->surface);
-		wl_callback_add_listener(window->callback, &frame_listener, window);
+		splash->callback = wl_surface_frame(splash->surface);
+		wl_callback_add_listener(splash->callback, &frame_listener, splash);
 	}
 
-	wl_surface_commit(window->surface);
+	wl_surface_commit(splash->surface);
 	buffer->busy = 1;
 }
 
@@ -371,16 +329,30 @@ output_handle_mode(void *data,
 		   int height,
 		   int refresh)
 {
-	struct display *display = data;
+	struct splash *splash = data;
 
-	if (flags & WL_OUTPUT_MODE_CURRENT)
-		create_window(display, wl_output, width, height);
+	if (flags & WL_OUTPUT_MODE_CURRENT) {
+		splash->width = width;
+		splash->height = height;
+	}
 }
 
 static void
 output_handle_done(void *data,
                    struct wl_output *wl_output)
 {
+	struct splash *splash = data;
+	struct display *display = splash->display;
+
+	splash->surface = wl_compositor_create_surface(display->compositor);
+
+	struct wl_region *region = wl_compositor_create_region(display->compositor);
+	wl_region_add(region, 0, 0, splash->width, splash->height);
+	wl_surface_set_opaque_region(splash->surface, region);
+	wl_region_destroy(region);
+
+	croscomp_splash_set(display->splash, splash->output, splash->surface);
+	redraw(splash, NULL, 0);
 }
 
 static void
@@ -388,6 +360,9 @@ output_handle_scale(void *data,
                     struct wl_output *wl_output,
                     int32_t scale)
 {
+	struct splash *splash = data;
+
+	splash->scale = scale;
 }
 
 static const struct wl_output_listener output_listener = {
@@ -406,7 +381,7 @@ registry_handle_global(void *data, struct wl_registry *registry,
 	if (strcmp(interface, "wl_compositor") == 0) {
 		d->compositor =
 			wl_registry_bind(registry,
-					 id, &wl_compositor_interface, 1);
+					 id, &wl_compositor_interface, 4);
 	} else if (strcmp(interface, "croscomp_splash") == 0) {
 		d->splash = wl_registry_bind(registry,
 					      id, &croscomp_splash_interface, 1);
@@ -414,10 +389,12 @@ registry_handle_global(void *data, struct wl_registry *registry,
 		d->linux_dmabuf = wl_registry_bind(registry,
 						   id, &zwp_linux_dmabuf_v1_interface, 3);
 	} else if (strcmp(interface, "wl_output") == 0) {
-		struct wl_output *output=
+		struct splash *splash = xzalloc(sizeof(*splash));
+		splash->display = d;
+		splash->output =
 			wl_registry_bind(registry,
-					 id, &wl_output_interface, 1);
-		wl_output_add_listener(output, &output_listener, d);
+					 id, &wl_output_interface, 3);
+		wl_output_add_listener(splash->output, &output_listener, splash);
 	}
 }
 
@@ -437,11 +414,7 @@ create_display(void)
 {
 	struct display *display;
 
-	display = malloc(sizeof *display);
-	if (display == NULL) {
-		fprintf(stderr, "out of memory\n");
-		exit(1);
-	}
+	display = xzalloc(sizeof *display);
 	display->display = wl_display_connect(NULL);
 	assert(display->display);
 
