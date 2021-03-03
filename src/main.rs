@@ -9,6 +9,7 @@ use std::env;
 use std::fs::metadata;
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::marker::PhantomData;
 
 #[macro_use]
 mod ffi;
@@ -20,6 +21,7 @@ mod move_resize;
 mod protocol;
 mod input;
 mod rotate;
+mod exo;
 
 const SCALE: i32 = 2;
 
@@ -74,8 +76,89 @@ fn head_notify(_listener: *mut ffi::wl_listener, data: *mut ::std::os::raw::c_vo
 	    if ffi::weston_output_enable(output) != 0 {
 		println!("weston_output_enable return non-0");
 	    }
+	}
+    }
+}
 
-	    println!("attached to output {:?}", output);
+pub struct Resource<I> {
+    native: *mut ffi::wl_resource,
+    phantom: PhantomData<I>
+}
+
+struct GlobalHandlers<I>
+where I: wayland_server::Interface {
+    handle_bind: Option<Box<dyn Fn(&mut Resource<I>)>>,
+    dispatcher: Option<Box<dyn Fn(&mut Resource<I>, &I::Request)>>,
+    handle_destroy: Option<Box<dyn Fn(&mut Resource<I>)>>,
+}
+
+pub struct Global<I>
+where I: wayland_server::Interface {
+    native: *mut ffi::wl_global,
+    handlers: Box<GlobalHandlers<I>>
+}
+
+impl<I: wayland_server::Interface> Global<I> {
+    pub fn on_bind<F>(mut self, f: F) -> Self
+    where F: 'static + Fn(&mut Resource<I>) {
+	// hook for handling bind time checks or allocations
+	self.handlers.handle_bind = Some(Box::new(f));
+	self
+    }
+
+    pub fn on_request<F>(mut self, f: F) -> Self
+    where F: 'static + Fn(&mut Resource<I>, &I::Request) {
+	println!("set dispatcher for {}: {:?}", I::NAME, &f as *const _);
+	self.handlers.dispatcher = Some(Box::new(f));
+	self
+    }
+
+    pub fn on_destroy<F>(mut self, f: F) -> Self
+    where F: 'static + Fn(&mut Resource<I>) {
+	self.handlers.handle_destroy = Some(Box::new(f));
+	self
+    }
+}
+
+impl<I: wayland_server::Interface> Resource<I> {
+    pub fn set_dispatcher<F>(&mut self,
+			     f: F)
+    where F: 'static + Fn(&mut Resource<I>, &I::Request) {
+	extern "C" fn dispatcher<I, F>(
+	    data: *const ::std::ffi::c_void,
+	    object: *mut ::std::ffi::c_void,
+	    opcode: u32,
+	    _message: *const ffi::wl_message,
+	    args: *mut ffi::wl_argument) -> ::std::os::raw::c_int
+	where I: wayland_server::Interface,
+	      F: 'static + Fn(&mut Resource<I>, &I::Request) {
+	    let request = unsafe {
+		<I::Request as wayland_server::MessageGroup>
+		    ::from_raw_c(object, opcode, args as *const wayland_sys::common::wl_argument)
+	    };
+
+	    let mut resource = Resource::<I> {
+		native: object as *mut ffi::wl_resource,
+		phantom: PhantomData
+	    };
+	    let handler = unsafe { &*(data as *mut Box<F>) };
+	    if let Ok(request) = request {
+		(*handler)(&mut resource, &request);
+	    } else {
+		panic!("illegal request");
+	    };
+
+	    0
+	}
+
+	let b = Box::new(f);
+	unsafe {
+	    ffi::wl_resource_set_dispatcher(
+		self.native,
+		Some(dispatcher::<I, F>),
+		Box::into_raw(b) as *mut _,
+		std::ptr::null_mut(),
+		None)
 	}
     }
 }
@@ -108,12 +191,12 @@ impl Drop for Display {
 
 #[derive(Debug)]
 pub struct Compositor {
-    native: ffi::weston_compositor
+    native: ffi::weston_compositor,
 }
 
 impl Compositor {
     fn new() -> Self {
-	Compositor { native: unsafe { std::mem::zeroed() } }
+	Compositor { native: unsafe { std::mem::zeroed() }, }
     }
 
     fn init(&mut self, display: &Display, ctx: *mut ffi::weston_log_context) {
@@ -175,6 +258,33 @@ impl Compositor {
 		&mut self.native, button, modifier,
 		Some(call_button_closure::<F>),
 		Box::into_raw(handler) as *mut _)
+	};
+    }
+
+    fn when_idle<F>(&mut self, f: F)
+    where F: FnOnce() {
+	let event_loop = unsafe {
+	    &mut *ffi::wl_display_get_event_loop(self.native.wl_display)
+	};
+
+	extern "C" fn call_closure<F>(data: *mut ::std::os::raw::c_void)
+	where F: FnOnce() {
+	    let f = unsafe { Box::from_raw(data as *mut F) };
+
+	    f()
+	}
+
+	let p = Box::into_raw(Box::new(f));
+
+	unsafe {
+	    ffi::wl_event_loop_add_idle(event_loop,
+					Some(call_closure::<F>), p as *mut _);
+	}
+    }
+
+    fn start_client(&mut self, path: &str) {
+	unsafe {
+	    ffi::weston_client_start(&mut self.native, path.as_ptr() as *const i8)
 	};
     }
 
@@ -347,6 +457,8 @@ fn main() {
     switcher::init(&shell);
 
     move_resize::init(&shell);
+
+    exo::init(&shell);
 
     rotate::init(&shell);
 

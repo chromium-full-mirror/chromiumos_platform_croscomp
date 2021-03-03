@@ -7,22 +7,6 @@ use std::rc::Rc;
 use crate::ffi;
 use crate::protocol;
 
-struct Splash {
-    shell: Rc<RefCell<crate::Shell>>,
-    views: Vec<*mut ffi::weston_view>
-}
-
-impl Drop for Splash {
-    fn drop(&mut self) {
-	println!("drop splash");
-    }
-}
-
-fn croscomp_splash_interface() -> *const ffi::wl_interface {
-    <protocol::croscomp_splash::CroscompSplash as wayland_server::Interface>
-	::c_interface() as *const ffi::wl_interface
-}
-
 extern "C"
 fn splash_committed(psurface: *mut ffi::weston_surface, _sx: i32, _sy: i32) {
     let surface = unsafe { &mut *psurface };
@@ -45,29 +29,11 @@ fn splash_committed(psurface: *mut ffi::weston_surface, _sx: i32, _sy: i32) {
     }
 }
 
-extern "C" fn dispatcher(
-    _data: *const ::std::os::raw::c_void,
-    object: *mut ::std::os::raw::c_void,
-    opcode: u32,
-    _message: *const ffi::wl_message,
-    args: *mut ffi::wl_argument) -> ::std::os::raw::c_int {
-    println!("dispatch!");
-
-    use protocol::croscomp_splash::Request as Request;
-
-    let resource = object as *mut ffi::wl_resource;
-    let client = unsafe { ffi::wl_resource_get_client(resource) };
-    let splash = unsafe {
-	&mut *(ffi::wl_resource_get_user_data(resource) as *mut Splash)
-    };
-    println!("client {:?}", client);
-
-    let request = unsafe {
-	<Request as wayland_server::MessageGroup>
-	    ::from_raw_c(object, opcode, args as *const wayland_sys::common::wl_argument)
-    };
+fn handle_request(_resource: &mut super::Resource<protocol::croscomp_splash::CroscompSplash>,
+		  request: &protocol::croscomp_splash::Request) {
+    use protocol::croscomp_splash::Request;
     match request {
-	Ok(Request::Set { output: output_resource, surface: surface_resource }) => {
+	Request::Set { output: output_resource, surface: surface_resource } => {
 	    let surface = unsafe {
 		&mut *(ffi::wl_resource_get_user_data(
 		    surface_resource.as_ref().c_ptr() as *mut ffi::wl_resource)
@@ -82,7 +48,7 @@ extern "C" fn dispatcher(
 
 	    if surface.committed.is_some() {
 		println!("surface already committed");
-		return 0;
+		return;
 	    }
 
 	    surface.committed = Some(splash_committed);
@@ -91,83 +57,34 @@ extern "C" fn dispatcher(
 	    let view = unsafe { &mut *surface.create_view() };
 	    view.set_output(head.output);
 
-	    splash.views.push(view);
-	    surface.ref_count += 1;
+	    //surface.ref_count += 1;
 	},
-	_ => { println!("invalid request") }
-    };
-
-    0
-}
-
-extern "C" fn unbind_splash(resource: *mut ffi::wl_resource) {
-    let splash = unsafe {
-	Box::from_raw(ffi::wl_resource_get_user_data(resource) as *mut Splash)
-    };
-    println!("unbind_splash");
-
-    for &view in splash.views.iter() {
-	unsafe { ffi::weston_surface_destroy((*view).surface) }
-    }
-
-    let mut shell = splash.shell.borrow_mut();
-    shell.finish_init()
-}
-
-extern "C" fn bind_splash(
-    client: *mut ffi::wl_client,
-    data: *mut ::std::os::raw::c_void,
-    _version: u32,
-    id: u32) {
-
-    let r = unsafe {
-	ffi::wl_resource_create(client, croscomp_splash_interface(), 1, id)
-    };
-
-    unsafe {
-	ffi::wl_resource_set_dispatcher(r,
-					Some(dispatcher), std::ptr::null(),
-					data, Some(unbind_splash))
     };
 }
 
-extern "C"
-fn launch_splash_process(data: *mut ::std::os::raw::c_void) {
-    
-    let compositor = unsafe { &mut *(data as *mut ffi::weston_compositor) };
-    let path = "/usr/bin/weston-simple-splash\0";
+pub fn init(rc: &Rc<RefCell<crate::Shell>>) {
+    let shell = &rc.borrow();
+    let mut compositor = shell.compositor.borrow_mut();
+    let d = unsafe { &mut (*compositor.native.wl_display) };
 
-    unsafe {
-	ffi::weston_client_start(compositor, path.as_ptr() as *const i8)
-    };
-}
+    let version = 1;
+    let rc = Rc::clone(rc);
 
-pub fn init(shell: &Rc<RefCell<crate::Shell>>) {
-    let s = Box::new(Splash {
-	shell: Rc::clone(shell),
-	views: Vec::new()
+    println!("from splash, allocating global");
+    let global = d.create_global::<protocol::croscomp_splash::CroscompSplash>(version)
+	.on_bind(|_| println!("splash: handle bind") )
+	.on_request(|resource, request| { handle_request(resource, request) })
+	.on_destroy(move |_resource| {
+	    let mut shell = rc.borrow_mut();
+	    shell.finish_init()
+	});
+
+    Box::into_raw(Box::new(global));
+
+    let rc = Rc::clone(&shell.compositor);
+    compositor.when_idle(move || {
+	let path = "/usr/bin/weston-simple-splash\0";
+	let mut compositor = rc.borrow_mut();
+	compositor.start_client(path);
     });
-
-    let p = Box::into_raw(s);
-
-    let compositor = &shell.borrow().compositor;
-
-    unsafe {
-	ffi::wl_global_create(
-	    compositor.borrow().native.wl_display,
-	    croscomp_splash_interface(), 1,
-	    p as *mut _, Some(bind_splash));
-    }
-
-    let event_loop = unsafe {
-	&mut *ffi::wl_display_get_event_loop(compositor.borrow().native.wl_display)
-    };
-
-    unsafe {
-	ffi::wl_event_loop_add_idle(event_loop,
-				    Some(launch_splash_process),
-				    &mut compositor.borrow_mut().native
-				    as *mut ffi::weston_compositor
-				    as *mut _);
-    }
 }

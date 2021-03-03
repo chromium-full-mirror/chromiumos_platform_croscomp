@@ -1,0 +1,119 @@
+<protocol name="croscomp">
+
+  <interface name="croscomp_splash" version="1">
+    <request name="set">
+      <arg name="output" type="object" interface="wl_output"/>
+      <arg name="surface" type="object" interface="wl_surface"/>
+    </request>
+  </interface>
+
+  <interface name="croscomp_display" version="1">
+    <request name="destroy" type="destructor"/>
+
+    <event name="output">
+      <arg name="id" type="new_id" interface="croscomp_output"/>
+    </event>
+  </interface>
+
+  <interface name="croscomp_output" version="1">
+    <enum name="subpixel">
+      <description summary="subpixel geometry information">
+	This enumeration describes how the physical
+	pixels on an output are laid out.
+      </description>
+      <entry name="unknown" value="0" summary="unknown geometry"/>
+      <entry name="none" value="1" summary="no geometry"/>
+      <entry name="horizontal_rgb" value="2" summary="horizontal RGB"/>
+      <entry name="horizontal_bgr" value="3" summary="horizontal BGR"/>
+      <entry name="vertical_rgb" value="4" summary="vertical RGB"/>
+      <entry name="vertical_bgr" value="5" summary="vertical BGR"/>
+    </enum>
+
+    <enum name="transform">
+      <description summary="transform from framebuffer to output">
+	This describes the transform that a compositor will apply to a
+	surface to compensate for the rotation or mirroring of an
+	output device.
+
+	The flipped values correspond to an initial flip around a
+	vertical axis followed by rotation.
+
+	The purpose is mainly to allow clients to render accordingly and
+	tell the compositor, so that for fullscreen surfaces, the
+	compositor will still be able to scan out directly from client
+	surfaces.
+      </description>
+      <entry name="normal" value="0" summary="no transform"/>
+      <entry name="90" value="1" summary="90 degrees counter-clockwise"/>
+      <entry name="180" value="2" summary="180 degrees counter-clockwise"/>
+      <entry name="270" value="3" summary="270 degrees counter-clockwise"/>
+      <entry name="flipped" value="4" summary="180 degree flip around a vertical axis"/>
+      <entry name="flipped_90" value="5" summary="flip and rotate 90 degrees counter-clockwise"/>
+      <entry name="flipped_180" value="6" summary="flip and rotate 180 degrees counter-clockwise"/>
+      <entry name="flipped_270" value="7" summary="flip and rotate 270 degrees counter-clockwise"/>
+    </enum>
+
+    <event name="geometry">
+      <arg name="physical_width" type="int"
+	   summary="width in millimeters of the output"/>
+      <arg name="physical_height" type="int"
+	   summary="height in millimeters of the output"/>
+      <arg name="subpixel" type="int" enum="subpixel"
+	   summary="subpixel orientation of the output"/>
+      <arg name="make" type="string"
+	   summary="textual description of the manufacturer"/>
+      <arg name="model" type="string"
+	   summary="textual description of the model"/>
+      <arg name="transform" type="int" enum="transform"
+	   summary="transform that maps framebuffer to output"/>
+
+      <!-- 
+  DisplaySnapshot(int64_t display_id,
+                  const gfx::Point& origin,
+                  const gfx::Size& physical_size,
+                  DisplayConnectionType type,
+                  uint64_t base_connector_id,
+                  const std::vector<uint64_t>& path_topology,
+                  bool is_aspect_preserving_scaling,
+                  bool has_overscan,
+                  PrivacyScreenState privacy_screen_state,
+                  bool has_color_correction_matrix,
+                  bool color_correction_in_linear_space,
+                  const gfx::ColorSpace& color_space,
+                  uint32_t bits_per_channel,
+                  std::string display_name,
+                  const base::FilePath& sys_path,
+                  DisplayModeList modes,
+                  PanelOrientation panel_orientation,
+                  const std::vector<uint8_t>& edid,
+                  const DisplayMode* current_mode,
+                  const DisplayMode* native_mode,
+                  int64_t product_code,
+                  int32_t year_of_manufacture,
+                  const gfx::Size& maximum_cursor_size);
+      -->
+    </event>
+
+    <enum name="mode" bitfield="true">
+      <description summary="mode information">
+	These flags describe properties of an output mode.
+	They are used in the flags bitfield of the mode event.
+      </description>
+      <entry name="current" value="0x1"
+	     summary="indicates this is the current mode"/>
+      <entry name="preferred" value="0x2"
+	     summary="indicates this is the preferred mode"/>
+    </enum>
+
+    <event name="mode">
+      <arg name="flags" type="uint" enum="mode" summary="bitfield of mode flags"/>
+      <arg name="width" type="int" summary="width of the mode in hardware units"/>
+      <arg name="height" type="int" summary="height of the mode in hardware units"/>
+      <arg name="refresh" type="int" summary="vertical refresh rate in mHz"/>
+    </event>
+
+    <event name="done"/>
+
+  </interface>
+
+</protocol>

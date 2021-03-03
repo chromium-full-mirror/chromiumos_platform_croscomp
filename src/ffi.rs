@@ -136,6 +136,129 @@ impl wl_listener {
     }
 }
 
+impl wl_client {
+    pub fn create_resource(&mut self,
+			   interface: &wl_interface,
+			   version: u32,
+			   id: u32) -> *mut wl_resource {
+	unsafe { wl_resource_create(self, interface, version as i32, id) }
+    }
+}
+
+impl wl_display {
+    pub fn create_global<I>(&mut self, version: u32) -> super::Global<I>
+    where I: wayland_server::Interface {
+	unsafe extern "C" fn call_dispatcher<I>(
+	    data: *const ::std::ffi::c_void,
+	    object: *mut ::std::ffi::c_void,
+	    opcode: u32,
+	    _message: *const wl_message,
+	    args: *mut wl_argument) -> ::std::os::raw::c_int
+	where I: wayland_server::Interface {
+	    let request = <I::Request as wayland_server::MessageGroup>
+		::from_raw_c(object, opcode,
+			     args as *const wayland_sys::common::wl_argument);
+
+	    let mut resource = super::Resource::<I> {
+		native: object as *mut wl_resource,
+		phantom: PhantomData
+	    };
+
+	    let handlers = &mut *(data as *mut super::GlobalHandlers<I>);
+
+	    if let (Ok(request), Some(dispatcher)) = (request, handlers.dispatcher.as_ref()) {
+		(*dispatcher)(&mut resource, &request)
+	    }
+	    0
+	}
+
+	unsafe extern "C" fn call_destroy_closure<I>(native: *mut wl_resource) {
+	    let b = &*(wl_resource_get_user_data(native)
+		       as *mut Box<dyn Fn(&mut super::Resource<I>)>);
+
+	    let mut resource = super::Resource::<I> {
+		native,
+		phantom: PhantomData
+	    };
+
+	    b(&mut resource)
+	}
+
+	unsafe extern "C" fn call_bind_closure<I>(
+            client: *mut wl_client,
+            data: *mut ::std::os::raw::c_void,
+            version: u32,
+            id: u32) 
+	where I: wayland_server::Interface {
+	    let client = &mut *client;
+
+	    let native = client.create_resource(
+		&mut *(I::c_interface() as *mut _), version, id);
+
+	    let mut resource = super::Resource::<I> {
+		native,
+		phantom: PhantomData
+	    };
+
+	    let handlers = &mut *(data as *mut super::GlobalHandlers<I>);
+
+	    println!("handlers: {:?}", handlers as *const _);
+
+	    if let Some(ref handle_bind) = handlers.handle_bind {
+		println!("calling handle_bind for {}: {:?}",
+			 I::NAME, &(*handle_bind) as *const _);
+		(*handle_bind)(&mut resource);
+		// xxx return value from handle_bind should indicate whether
+		// or not bind was successful
+	    }
+
+	    if let Some(ref dispatcher) = handlers.dispatcher {
+		println!("setting dispatcher for {}: {:?}",
+			 I::NAME, &(*dispatcher) as *const _);
+
+		wl_resource_set_dispatcher(
+		    resource.native,
+		    Some(call_dispatcher::<I>),
+		    handlers as *mut _ as *mut std::ffi::c_void,
+		    std::ptr::null_mut(),
+		    None)
+	    }
+
+	    if let Some(ref mut handle_destroy) = handlers.handle_destroy {
+		wl_resource_set_user_data(resource.native,
+					  handle_destroy as *mut _
+					  as *mut std::ffi::c_void);
+		wl_resource_set_destructor(resource.native,
+					   Some(call_destroy_closure::<I>));
+	    }
+	}
+
+	let mut global = super::Global {
+	    native: std::ptr::null_mut(),
+	    handlers: Box::new(super::GlobalHandlers {
+		handle_bind: None,
+		dispatcher: None,
+		handle_destroy: None,
+	    })
+	};
+
+	println!("in create_global:");
+	println!("  global: {:?}", &global as *const _);
+	println!("  allocated handlers: {:?}", &(*global.handlers) as *const _);
+
+	global.native = unsafe {
+	    wl_global_create(self,
+			     I::c_interface() as *const _,
+			     version as i32,
+			     &mut *global.handlers as *mut _
+			     as *mut std::ffi::c_void,
+			     Some(call_bind_closure::<I>))
+	};
+
+	global
+    }
+}
+
 impl weston_keyboard_modifier {
     pub fn is_set(&self, bit: weston_keyboard_modifier) -> bool {
 	(*self & bit) == bit
