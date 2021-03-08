@@ -84,6 +84,8 @@ pub(crate) fn generate_protocol_server(protocol: Protocol) -> TokenStream {
     // Force the fallback to work around https://github.com/alexcrichton/proc-macro2/issues/218
     proc_macro2::fallback::force();
 
+    let c_prefix = super::c_interface_gen::generate_interfaces_prefix(&protocol);
+
     let modules = protocol
         .interfaces
         .iter()
@@ -140,13 +142,14 @@ pub(crate) fn generate_protocol_server(protocol: Protocol) -> TokenStream {
             quote! {
                 #doc_attr
                 pub mod #mod_name {
-                    use std::os::raw::c_char;
                     use super::{
                         Resource, AnonymousObject, Interface, MessageGroup, MessageDesc, Main, smallvec,
-                        ArgumentType, Object, Message, Argument, ObjectMetadata, types_null, NULLPTR
+                        ArgumentType, Object, Message, Argument, ObjectMetadata
                     };
                     use super::sys::common::{wl_argument, wl_interface, wl_array, wl_message};
                     use super::sys::server::*;
+
+		    #c_prefix
 
                     #(#enums)*
                     #requests
@@ -159,10 +162,7 @@ pub(crate) fn generate_protocol_server(protocol: Protocol) -> TokenStream {
             }
         });
 
-    let c_prefix = super::c_interface_gen::generate_interfaces_prefix(&protocol);
-
     quote! {
-        #c_prefix
         #(#modules)*
     }
 }

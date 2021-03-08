@@ -28,13 +28,12 @@ pub(crate) fn generate_interfaces_prefix(protocol: &Protocol) -> TokenStream {
 
     let types_null_len = Literal::usize_unsuffixed(longest_nulls);
 
-    let nulls = repeat(quote!(NULLPTR as *const sys::common::wl_interface)).take(longest_nulls);
+    let nulls = repeat(quote!(0 as *const wl_interface)).take(longest_nulls);
 
     quote! {
         use std::os::raw::{c_char, c_void};
 
-        const NULLPTR: *const c_void = 0 as *const c_void;
-        static mut types_null: [*const sys::common::wl_interface; #types_null_len] = [
+        static mut types_null: [*const wl_interface; #types_null_len] = [
             #(#nulls,)*
         ];
     }
@@ -49,14 +48,14 @@ pub(crate) fn generate_interface(interface: &Interface) -> TokenStream {
     let version_value = Literal::i32_unsuffixed(interface.version as i32);
     let request_count_value = Literal::i32_unsuffixed(interface.requests.len() as i32);
     let requests_value = if interface.requests.is_empty() {
-        quote!(NULLPTR as *const wl_message)
+        quote!(0 as *const wl_message)
     } else {
         let requests_ident = Ident::new(&format!("{}_requests", interface.name), Span::call_site());
         quote!(unsafe { &#requests_ident as *const _ })
     };
     let event_count_value = Literal::i32_unsuffixed(interface.events.len() as i32);
     let events_value = if interface.events.is_empty() {
-        quote!(NULLPTR as *const wl_message)
+        quote!(0 as *const wl_message)
     } else {
         let events_ident = Ident::new(&format!("{}_events", interface.name), Span::call_site());
         quote!(unsafe { &#events_ident as *const _ })
@@ -99,7 +98,7 @@ fn gen_messages(interface: &Interface, messages: &[Message], which: &str) -> Tok
                         Ident::new(&format!("{}_interface", inter), Span::call_site());
                     quote!(unsafe { &super::#module::#interface_ident as *const wl_interface })
                 }
-                _ => quote!(NULLPTR as *const wl_interface),
+                _ => quote!(0 as *const wl_interface),
             });
 
             Some(quote! {
