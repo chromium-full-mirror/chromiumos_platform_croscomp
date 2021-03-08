@@ -172,7 +172,8 @@ impl wl_display {
 	    0
 	}
 
-	unsafe extern "C" fn call_destroy_closure<I>(native: *mut wl_resource) {
+	unsafe extern "C" fn call_destroy_closure<I>(native: *mut wl_resource)
+	where I: wayland_server::Interface {
 	    let b = &*(wl_resource_get_user_data(native)
 		       as *mut Box<dyn Fn(&mut super::Resource<I>)>);
 

@@ -10,6 +10,7 @@ use std::fs::metadata;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::marker::PhantomData;
+use wayland_server::MessageGroup;
 
 #[macro_use]
 mod ffi;
@@ -80,9 +81,40 @@ fn head_notify(_listener: *mut ffi::wl_listener, data: *mut ::std::os::raw::c_vo
     }
 }
 
-pub struct Resource<I> {
+pub struct Resource<I>
+where I: wayland_server::Interface {
     native: *mut ffi::wl_resource,
     phantom: PhantomData<I>
+}
+
+impl<I> Resource<I>
+where I: wayland_server::Interface {
+    pub fn new(client: *mut ffi::wl_client, version: u32) -> Self {
+	let native = unsafe {
+	    ffi::wl_resource_create(
+		client,
+		I::c_interface() as *mut ffi::wl_interface, version as i32, 0)
+	};
+
+	Resource::<I> {
+	    native,
+	    phantom: PhantomData
+	}
+    }
+
+    pub fn client(&mut self) -> *mut ffi::wl_client {
+	unsafe { ffi::wl_resource_get_client(self.native) }
+    }
+
+    pub fn send(&mut self, message: I::Event) {
+	message.as_raw_c_in(
+	    |opcode, args|
+	    unsafe {
+		ffi::wl_resource_post_event_array(
+		    self.native, opcode,
+		    args.as_mut_ptr() as *mut ffi::wl_argument);
+	    })
+    }
 }
 
 struct GlobalHandlers<I>
