@@ -6,26 +6,39 @@ use std::path::Path;
 use std::path::PathBuf;
 use wayland_scanner::*;
 
-fn generate_protocol(f: &str, out: &str) {
+fn main() {
+    let protocols = [
+	"wayland",
+	"linux-dmabuf-unstable-v1",
+	"croscomp",
+	"alpha-compositing-unstable-v1",
+	"aura-shell",
+	"cursor-shapes-unstable-v1",
+	"gaming-input-unstable-v2",
+	"keyboard-configuration-unstable-v1",
+	"keyboard-extension-unstable-v1",
+	"pointer-gestures-unstable-v1",
+	"remote-shell-unstable-v1",
+	"secure-output-unstable-v1",
+	"stylus-tools-unstable-v1",
+	"stylus-unstable-v2",
+	"vsync-feedback-unstable-v1",
+    ];
+
     let out_dir_str = env::var("OUT_DIR").unwrap();
     let out_dir = Path::new(&out_dir_str);
-
-    println!("cargo:rerun-if-changed={}", f);
-    generate_code_with_destructor_events(
-        f,
-        out_dir.join(out),
-        Side::Server,
-        &[("wl_callback", "done")],
-    );
-}
-
-fn main() {
-    generate_protocol("./protocol/wayland.xml", "wayland_api.rs");
-    generate_protocol("./protocol/linux-dmabuf-unstable-v1.xml",
-		      "linux_dmabuf_unstable_v1_api.rs");
-    generate_protocol("./protocol/croscomp.xml", "croscomp_api.rs");
-    generate_protocol("./protocol/alpha-compositing-unstable-v1.xml",
-		      "alpha-compositing-unstable-v1.rs");
+    for e in &protocols {
+	let spec = Path::new("protocol").join(e).with_extension("xml");
+	let out = out_dir.join(e).with_extension("rs");
+	println!("cargo:rerun-if-changed={}", spec.to_str().unwrap());
+	println!("// out: {}", out.to_str().unwrap());
+	generate_code_with_destructor_events(
+	    spec,
+            out,
+            Side::Server,
+            &[("wl_callback", "done")],
+	);
+    }
 
     let bindings = bindgen::Builder::default()
 	.clang_arg("-I/usr/include/pixman-1")

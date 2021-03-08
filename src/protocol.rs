@@ -12,9 +12,21 @@ pub(crate) use wayland_commons::*;
 pub(crate) use wayland_commons::wire::*;
 pub(crate) use wayland_commons::map::*;
 
-use wayland_server::{
-    protocol::{wl_compositor, wl_shell, wl_output, wl_surface},
-    Display,
-};
+use wayland_server::Display;
 
-include!(concat!(env!("OUT_DIR"), "/croscomp_api.rs"));
+include!(concat!(env!("OUT_DIR"), "/wayland.rs"));
+include!(concat!(env!("OUT_DIR"), "/croscomp.rs"));
+include!(concat!(env!("OUT_DIR"), "/aura-shell.rs"));
+include!(concat!(env!("OUT_DIR"), "/alpha-compositing-unstable-v1.rs"));
+include!(concat!(env!("OUT_DIR"), "/cursor-shapes-unstable-v1.rs"));
+include!(concat!(env!("OUT_DIR"), "/pointer-gestures-unstable-v1.rs"));
+include!(concat!(env!("OUT_DIR"), "/gaming-input-unstable-v2.rs"));
+include!(concat!(env!("OUT_DIR"), "/input.rs"));
+include!(concat!(env!("OUT_DIR"), "/keyboard-configuration-unstable-v1.rs"));
+include!(concat!(env!("OUT_DIR"), "/keyboard-extension-unstable-v1.rs"));
+include!(concat!(env!("OUT_DIR"), "/linux-dmabuf-unstable-v1.rs"));
+include!(concat!(env!("OUT_DIR"), "/remote-shell-unstable-v1.rs"));
+include!(concat!(env!("OUT_DIR"), "/secure-output-unstable-v1.rs"));
+include!(concat!(env!("OUT_DIR"), "/stylus-tools-unstable-v1.rs"));
+include!(concat!(env!("OUT_DIR"), "/stylus-unstable-v2.rs"));
+include!(concat!(env!("OUT_DIR"), "/vsync-feedback-unstable-v1.rs"));
