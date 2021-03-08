@@ -75,8 +75,7 @@ pub fn init(rc: &Rc<RefCell<crate::Shell>>) {
 	.on_bind(|_| println!("splash: handle bind") )
 	.on_request(|resource, request| { handle_request(resource, request) })
 	.on_destroy(move |_resource| {
-	    let mut shell = rc.borrow_mut();
-	    shell.finish_init()
+	    super::Shell::finish_init(&rc)
 	});
 
     Box::into_raw(Box::new(global));

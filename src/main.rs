@@ -349,11 +349,12 @@ impl Shell {
 	self.create_background_surface();
     }
 
-    fn finish_init(&mut self) {
+    fn finish_init(rc: &Rc<RefCell<crate::Shell>>) {
 	unsafe {
-	    ffi::weston_compositor_init_input(&mut self.compositor.borrow_mut().native);
-	    ffi::exo_extensions_init(&mut self.native);
+	    let shell = &rc.borrow();
+	    ffi::weston_compositor_init_input(&mut shell.compositor.borrow_mut().native);
 	}
+	exo::init(rc);
     }
 
     fn create_background_surface(&mut self) {
@@ -457,8 +458,6 @@ fn main() {
     switcher::init(&shell);
 
     move_resize::init(&shell);
-
-    exo::init(&shell);
 
     rotate::init(&shell);
 

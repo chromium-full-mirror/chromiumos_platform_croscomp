@@ -2962,17 +2962,6 @@ handle_seat_created(struct wl_listener *listener, void *data)
 	create_shell_seat(seat);
 }
 
-void
-shell_finish_init(struct desktop_shell *shell)
-{
-	assert(!shell->initialized_inputs);
-
-	weston_compositor_init_input(shell->compositor);
-	shell->initialized_inputs = true;
-
-	exo_extensions_init(shell);
-}
-
 int
 desktop_shell_init(struct desktop_shell *shell,
 		   struct weston_compositor *ec)
