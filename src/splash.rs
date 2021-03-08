@@ -65,13 +65,12 @@ fn handle_request(_resource: &mut super::Resource<protocol::croscomp_splash::Cro
 pub fn init(rc: &Rc<RefCell<crate::Shell>>) {
     let shell = &rc.borrow();
     let mut compositor = shell.compositor.borrow_mut();
-    let d = unsafe { &mut (*compositor.native.wl_display) };
 
     let version = 1;
     let rc = Rc::clone(rc);
 
     println!("from splash, allocating global");
-    let global = d.create_global::<protocol::croscomp_splash::CroscompSplash>(version)
+    let global = compositor.create_global::<protocol::croscomp_splash::CroscompSplash>(version)
 	.on_bind(|_| println!("splash: handle bind") )
 	.on_request(|resource, request| { handle_request(resource, request) })
 	.on_destroy(move |_resource| {

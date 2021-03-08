@@ -348,6 +348,115 @@ impl Compositor {
 	unsafe { ffi::weston_surface_create(&self.native
 					    as *const _ as *mut _) }
     }
+
+    fn create_global<I>(&mut self, version: u32) -> Global<I>
+    where I: wayland_server::Interface {
+	unsafe extern "C" fn call_dispatcher<I>(
+	    data: *const ::std::ffi::c_void,
+	    object: *mut ::std::ffi::c_void,
+	    opcode: u32,
+	    _message: *const ffi::wl_message,
+	    args: *mut ffi::wl_argument) -> ::std::os::raw::c_int
+	where I: wayland_server::Interface {
+	    let request = <I::Request as wayland_server::MessageGroup>
+		::from_raw_c(object, opcode,
+			     args as *const wayland_sys::common::wl_argument);
+
+	    let mut resource = Resource::<I> {
+		native: object as *mut ffi::wl_resource,
+		phantom: PhantomData
+	    };
+
+	    let handlers = &mut *(data as *mut GlobalHandlers<I>);
+
+	    if let (Ok(request), Some(dispatcher)) = (request, handlers.dispatcher.as_ref()) {
+		(*dispatcher)(&mut resource, &request)
+	    }
+	    0
+	}
+
+	unsafe extern "C" fn call_destroy_closure<I>(native: *mut ffi::wl_resource)
+	where I: wayland_server::Interface {
+	    let b = &*(ffi::wl_resource_get_user_data(native)
+		       as *mut Box<dyn Fn(&mut Resource<I>)>);
+
+	    let mut resource = Resource::<I> {
+		native,
+		phantom: PhantomData
+	    };
+
+	    b(&mut resource)
+	}
+
+	unsafe extern "C" fn call_bind_closure<I>(
+            client: *mut ffi::wl_client,
+            data: *mut ::std::os::raw::c_void,
+            version: u32,
+            id: u32) 
+	where I: wayland_server::Interface {
+	    let client = &mut *client;
+
+	    let native = client.create_resource(
+		&mut *(I::c_interface() as *mut _), version, id);
+
+	    let mut resource = Resource::<I> {
+		native,
+		phantom: PhantomData
+	    };
+
+	    let handlers = &mut *(data as *mut GlobalHandlers<I>);
+
+	    println!("handlers: {:?}", handlers as *const _);
+
+	    if let Some(ref handle_bind) = handlers.handle_bind {
+		println!("calling handle_bind for {}: {:?}",
+			 I::NAME, &(*handle_bind) as *const _);
+		(*handle_bind)(&mut resource);
+		// xxx return value from handle_bind should indicate whether
+		// or not bind was successful
+	    }
+
+	    if let Some(ref dispatcher) = handlers.dispatcher {
+		println!("setting dispatcher for {}: {:?}",
+			 I::NAME, &(*dispatcher) as *const _);
+
+		ffi::wl_resource_set_dispatcher(
+		    resource.native,
+		    Some(call_dispatcher::<I>),
+		    handlers as *mut _ as *mut std::ffi::c_void,
+		    std::ptr::null_mut(),
+		    None)
+	    }
+
+	    if let Some(ref mut handle_destroy) = handlers.handle_destroy {
+		ffi::wl_resource_set_user_data(resource.native,
+					       handle_destroy as *mut _
+					       as *mut std::ffi::c_void);
+		ffi::wl_resource_set_destructor(resource.native,
+						Some(call_destroy_closure::<I>));
+	    }
+	}
+
+	let mut global = Global {
+	    native: std::ptr::null_mut(),
+	    handlers: Box::new(GlobalHandlers {
+		handle_bind: None,
+		dispatcher: None,
+		handle_destroy: None,
+	    })
+	};
+
+	global.native = unsafe {
+	    ffi::wl_global_create(self.native.wl_display,
+				  I::c_interface() as *const _,
+				  version as i32,
+				  &mut *global.handlers as *mut _
+				  as *mut std::ffi::c_void,
+				  Some(call_bind_closure::<I>))
+	};
+
+	global
+    }
 }
 
 impl Drop for Compositor {
