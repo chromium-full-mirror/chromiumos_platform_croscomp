@@ -6,13 +6,10 @@
 #![allow(non_upper_case_globals, non_snake_case, unused_imports)]
 #![allow(missing_docs, clippy::all)]
 
-pub(crate) use wayland_sys as sys;
 pub(crate) use wayland_server::*;
 pub(crate) use wayland_commons::*;
 pub(crate) use wayland_commons::wire::*;
 pub(crate) use wayland_commons::map::*;
-
-use wayland_server::Display;
 
 include!(concat!(env!("OUT_DIR"), "/wayland.rs"));
 include!(concat!(env!("OUT_DIR"), "/croscomp.rs"));
