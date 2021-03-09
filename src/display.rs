@@ -10,8 +10,8 @@ use crate::protocol;
 use super::protocol::croscomp_display::CroscompDisplay;
 use super::protocol::croscomp_output::CroscompOutput;
 
-extern "C" fn handle_bind(resource: &mut super::Resource<CroscompDisplay>,
-			  compositor: &mut super::Compositor) {
+fn handle_bind(resource: &mut super::Resource<CroscompDisplay>,
+	       compositor: &mut super::Compositor) {
     for head in compositor.head_iter().filter(|h| h.is_enabled()) {
 	println!("head {:?}", head);
 
