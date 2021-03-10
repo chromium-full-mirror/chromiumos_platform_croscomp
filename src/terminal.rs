@@ -110,8 +110,11 @@ pub fn init(shell: &Rc<RefCell<Shell>>) {
     let mut compositor = s.compositor.borrow_mut();
 
     // signal add
-    compositor.native.create_surface_signal.add(
-	&mut t.borrow_mut().surface_create_listener);
+    unsafe {
+	ffi::wl_list_insert(
+	    &mut compositor.native.create_surface_signal.listener_list,
+	    &mut t.borrow_mut().surface_create_listener.link);
+    }
 
     let rc = Rc::clone(&t);
     compositor.bind_key(KEY_F1,

@@ -86,6 +86,10 @@ impl wl_list {
 	self.prev = self as *mut _;
     }
 
+    pub fn remove(&mut self) {
+	unsafe { wl_list_remove(self) }
+    }
+
     pub fn iter<'a, T>(&self, offset: usize) -> WlListIter<'a, T> {
 	WlListIter {
 	    offset: offset,
@@ -134,6 +138,11 @@ impl wl_listener {
 	    notify: Some(notify)
 	}
     }
+
+    pub fn zeroed() -> Self {
+	unsafe { std::mem::zeroed() }
+    }
+
 }
 
 impl wl_client {
@@ -145,9 +154,6 @@ impl wl_client {
     }
 }
 
-impl wl_display {
-}
-
 impl weston_keyboard_modifier {
     pub fn is_set(&self, bit: weston_keyboard_modifier) -> bool {
 	(*self & bit) == bit
@@ -155,10 +161,48 @@ impl weston_keyboard_modifier {
 }
 
 impl wl_signal {
-    pub fn add(&mut self, listener: &mut wl_listener) {
+    extern "C" fn destroy_notify<T>(listener: *mut wl_listener,
+				    _data: *mut ::std::os::raw::c_void)
+    where
+	T: From<*mut wl_listener>
+    {
+	println!("destroy notify");
+	unsafe { (*listener).link.remove() };
+	let _ = T::from(listener);
+    }
+
+    pub fn add<'a, T>(&mut self, item: &'a mut T)
+    where
+	T: From<*mut wl_listener>,
+	&'a mut T: Into<&'a mut wl_listener>
+    {
+	let listener: &'a mut wl_listener = item.into();
+	listener.notify = Some(Self::destroy_notify::<T>);
 	unsafe {
-	    wl_list_insert(self.listener_list.prev, &mut listener.link);
+	    wl_list_insert(self.listener_list.prev,
+			   &mut listener.link as *mut _);
 	}
+    }
+
+    pub fn get<T>(&mut self) -> Option<T>
+    where
+	T: From<*mut wl_listener>,
+    {
+	wl_list_iter_mut!(&mut self.listener_list, wl_listener, link)
+	    .find(|listener| listener.notify == Some(Self::destroy_notify::<T>))
+	    .map(|listener| T::from(listener))
+    }
+
+    pub fn remove<T>(&mut self) -> Option<T>
+    where
+	T: From<*mut wl_listener>,
+    {
+	wl_list_iter_mut!(&mut self.listener_list, wl_listener, link)
+	    .find(|listener| listener.notify == Some(Self::destroy_notify::<T>))
+	    .map(|listener| {
+		listener.link.remove();
+		T::from(listener)
+	    })
     }
 }
 

@@ -6,37 +6,79 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::Shell;
-//use crate::input;
 use crate::ffi;
-use crate::ffi::evdev::{BTN_LEFT, KEY_F3};
+use crate::ffi::evdev::{BTN_LEFT, KEY_F3, KEY_ESC};
 
 // TODO:
 //
 //  - Rotate on Ctrl-Alt-Shift-REFRESH
 //
 
-extern "C" fn view_destroy_notify(_listener: *mut ffi::wl_listener,
-				  _data: *mut ::std::os::raw::c_void) {
-    println!("view_destroy_notify");
-}
-    
+
+// #[derive(Listener)]
 
 struct Rotation {
-    rotation: ffi::weston_matrix,
     transform: ffi::weston_transform,
     view_destroy_listener: ffi::wl_listener
 }
 
-fn key_rotate(surface: &mut ffi::weston_surface) {
-    let mut rotation = Box::new(Rotation {
-	rotation: ffi::weston_matrix::new(),
-	transform: unsafe { std::mem::zeroed() },
-	view_destroy_listener: ffi::wl_listener::new(view_destroy_notify)
-    });
-			    
-    let view = unsafe { &mut *ffi::get_default_view(surface as *mut _) };
+impl From<*mut ffi::wl_listener> for Box<Rotation> {
+    fn from(listener: *mut ffi::wl_listener) -> Box<Rotation> {
+	unsafe { Box::from_raw(container_of_mut!(listener, Rotation,
+						 view_destroy_listener)) }
+    }
+}
 
-    view.destroy_signal.add(&mut rotation.view_destroy_listener);
+impl<'a> From<&'a mut Box<Rotation>> for &'a mut ffi::wl_listener {
+    fn from(rotation: &'a mut Box<Rotation>) -> &'a mut ffi::wl_listener {
+	&mut rotation.view_destroy_listener
+    }
+}
+
+impl Drop for Rotation {
+    fn drop(&mut self) {
+	println!("rotation dropped");
+	self.transform.link.remove();
+    }
+}
+
+fn key_rotate(surface: &mut ffi::weston_surface) {
+    let view = unsafe { &mut *ffi::get_default_view(surface as *mut _) };
+    let compositor = unsafe { &mut *(*view.surface).compositor };
+
+    let cx = surface.width as f32 * 0.5;
+    let cy = surface.height as f32 * 0.5;
+    let (s, c) = f32::sin_cos(0.1);
+
+    let mut rotation =
+	view.destroy_signal.get().unwrap_or_else(|| {
+	    println!("create rotation");
+	    let mut rotation = Box::new(Rotation {
+		transform: ffi::weston_transform {
+		    matrix: ffi::weston_matrix::new(),
+		    link: ffi::wl_list::zeroed()
+		},
+		view_destroy_listener: ffi::wl_listener::zeroed()
+	    });
+
+	    view.destroy_signal.add(&mut rotation);
+
+	    unsafe {
+		ffi::wl_list_insert(&mut view.geometry.transformation_list,
+				    &mut rotation.transform.link);
+	    }
+
+	    rotation
+	});
+
+    rotation.transform.matrix = rotation.transform.matrix
+	.translate(-cx, -cy, 0.0)
+	.rotate(c, s)
+	.translate(cx, cy, 0.0);
+
+    view.geometry_dirty();
+
+    compositor.schedule_repaint();
 
     println!("rotate {:?}", surface as *mut _)
 }
@@ -57,6 +99,16 @@ pub fn init(shell: &Rc<RefCell<Shell>>) {
         let focus = unsafe { &mut *keyboard.focus };
 
         key_rotate(focus)
+    });
+
+    compositor.bind_key(KEY_ESC, mods, move |keyboard, _, _| {
+	let view = unsafe { &mut *ffi::get_default_view(keyboard.focus as *mut _) };
+	let compositor = unsafe { &mut *(*view.surface).compositor };
+
+	let _ = view.destroy_signal.remove::<Box<Rotation>>();
+
+	view.geometry_dirty();
+	compositor.schedule_repaint();
     });
 
     compositor.bind_button(BTN_LEFT, mods, |pointer: &mut ffi::weston_pointer, _, _| {
