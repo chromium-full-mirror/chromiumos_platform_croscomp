@@ -297,13 +297,41 @@ impl weston_matrix {
 	unsafe { weston_matrix_multiply(self, other) }
     }
 
-    pub fn scale(&mut self, x: f32, y: f32, z: f32) -> &mut Self{
+    pub fn scale(mut self, x: f32, y: f32, z: f32) -> Self {
 	let m = weston_matrix {
 	    d: [ x,   0.0, 0.0, 0.0,
 		 0.0, y,   0.0, 0.0,
 		 0.0, 0.0, z,   0.0,
 		 0.0, 0.0, 0.0, 1.0 ],
 	    type_: weston_matrix_transform_type::WESTON_MATRIX_TRANSFORM_SCALE as u32
+	};
+
+	self.multiply(&m);
+
+	self
+    }
+
+    pub fn rotate(mut self, cos: f32, sin: f32) -> Self {
+	let m = weston_matrix {
+	    d: [  cos, sin, 0.0, 0.0,
+		 -sin, cos, 0.0, 0.0,
+		  0.0, 0.0, 1.0, 0.0,
+		  0.0, 0.0, 0.0, 1.0 ],
+	    type_: weston_matrix_transform_type::WESTON_MATRIX_TRANSFORM_ROTATE as u32
+	};
+
+	self.multiply(&m);
+
+	self
+    }
+
+    pub fn translate(mut self, x: f32, y: f32, z: f32) -> Self {
+	let m = weston_matrix {
+	    d: [  1.0, 0.0, 0.0, 0.0,
+		  0.0, 1.0, 0.0, 0.0,
+		  0.0, 0.0, 1.0, 0.0,
+		  x,   y,   z,   1.0 ],
+	    type_: weston_matrix_transform_type::WESTON_MATRIX_TRANSFORM_TRANSLATE as u32
 	};
 
 	self.multiply(&m);

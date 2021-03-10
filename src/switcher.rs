@@ -106,12 +106,11 @@ impl Switcher {
 
 		    x = x + (surface.width as f32 * scale) as i32 + margin;
 
-		    let mut matrix = ffi::weston_matrix::new();
-		    matrix.scale(scale, scale, 1.0);
 		    Thumbnail {
 			view: icon as *mut ffi::weston_view,
 			transform: ffi::weston_transform {
-			    matrix: matrix,
+			    matrix: ffi::weston_matrix::new()
+				.scale(scale, scale, 1.0),
 			    link: ffi::wl_list::zeroed(),
 			}
 		    }
