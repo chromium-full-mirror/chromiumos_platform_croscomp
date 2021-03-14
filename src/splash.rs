@@ -7,6 +7,8 @@ use std::rc::Rc;
 use crate::ffi;
 use crate::protocol;
 
+use protocol::croscomp_splash::{CroscompSplash, Request};
+
 extern "C"
 fn splash_committed(psurface: *mut ffi::weston_surface, _sx: i32, _sy: i32) {
     let surface = unsafe { &mut *psurface };
@@ -29,22 +31,11 @@ fn splash_committed(psurface: *mut ffi::weston_surface, _sx: i32, _sy: i32) {
     }
 }
 
-fn handle_request(_resource: &mut super::Resource<protocol::croscomp_splash::CroscompSplash>,
-		  request: &protocol::croscomp_splash::Request) {
-    use protocol::croscomp_splash::Request;
+fn handle_request(_resource: &mut super::Resource<CroscompSplash>, request: &Request) {
     match request {
 	Request::Set { output: output_resource, surface: surface_resource } => {
-	    let surface = unsafe {
-		&mut *(ffi::wl_resource_get_user_data(
-		    surface_resource.as_ref().c_ptr() as *mut ffi::wl_resource)
-		   as *mut ffi::weston_surface)
-	    };
-
-	    let head = unsafe {
-		&*(ffi::wl_resource_get_user_data(
-		    output_resource.as_ref().c_ptr() as *mut ffi::wl_resource)
-		    as *mut ffi::weston_head)
-	    };
+	    let surface = surface_resource.as_ref().user_data::<ffi::weston_surface>();
+	    let head = output_resource.as_ref().user_data::<ffi::weston_head>();
 
 	    if surface.committed.is_some() {
 		println!("surface already committed");
@@ -70,7 +61,7 @@ pub fn init(rc: &Rc<RefCell<crate::Shell>>) {
     let rc = Rc::clone(rc);
 
     println!("from splash, allocating global");
-    let global = compositor.create_global::<protocol::croscomp_splash::CroscompSplash>(version)
+    let global = compositor.create_global::<CroscompSplash>(version)
 	.on_bind(|_| println!("splash: handle bind") )
 	.on_request(|resource, request| { handle_request(resource, request) })
 	.on_destroy(move |_resource| {

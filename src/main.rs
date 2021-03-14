@@ -81,6 +81,7 @@ fn head_notify(_listener: *mut ffi::wl_listener, data: *mut ::std::os::raw::c_vo
     }
 }
 
+#[derive(Clone,Eq, PartialEq, Debug)]
 pub struct Resource<I>
 where I: wayland_server::Interface {
     native: *mut ffi::wl_resource,
@@ -89,24 +90,50 @@ where I: wayland_server::Interface {
 
 impl<I> Resource<I>
 where I: wayland_server::Interface {
-    pub fn new(client: *mut ffi::wl_client, version: u32) -> Self {
-	let native = unsafe {
-	    ffi::wl_resource_create(
-		client,
-		I::c_interface() as *mut ffi::wl_interface, version as i32, 0)
-	};
+    pub fn new<J>(&self, id: u32) -> Resource<J>
+    where J: wayland_server::Interface + From<Resource<J>> + AsRef<Resource<J>> {
+	unsafe {
+	    let client = ffi::wl_resource_get_client(self.native);
+	    let version = ffi::wl_resource_get_version(self.native);
 
+	    Resource::from_c_ptr(
+		ffi::wl_resource_create(
+		    client,
+		    J::c_interface() as *mut ffi::wl_interface,
+		    version, id)
+	    )
+	}
+    }
+
+    pub fn from_c_ptr(native: *mut ffi::wl_resource) -> Self {
 	Resource::<I> {
 	    native,
 	    phantom: PhantomData
 	}
     }
 
-    pub fn client(&mut self) -> *mut ffi::wl_client {
+    pub unsafe fn make_child_for<J>(&self, id: u32) -> Option<Main<J>>
+    where J: wayland_server::Interface + From<Resource<J>> + AsRef<Resource<J>> {
+	Some(Main::<J> { resource: self.new(id) })
+    }
+
+    pub fn c_ptr(&self) -> *mut ffi::wl_resource {
+	self.native
+    }
+
+    pub fn client(&self) -> *mut ffi::wl_client {
 	unsafe { ffi::wl_resource_get_client(self.native) }
     }
 
-    pub fn send(&mut self, message: I::Event) {
+    pub fn id(&self) -> u32 {
+	unsafe { ffi::wl_resource_get_id(self.native) }
+    }
+
+    pub fn user_data<J>(&self) -> &mut J {
+	unsafe { &mut *(ffi::wl_resource_get_user_data(self.native) as *mut J) }
+    }
+
+    pub fn send(&self, message: I::Event) {
 	message.as_raw_c_in(
 	    |opcode, args|
 	    unsafe {
@@ -114,6 +141,76 @@ where I: wayland_server::Interface {
 		    self.native, opcode,
 		    args.as_mut_ptr() as *mut ffi::wl_argument);
 	    })
+    }
+
+    pub fn on_request<F>(&self, f: F) -> &Self
+    where F: 'static + Fn(&mut Resource<I>, &I::Request) {
+	unsafe extern "C" fn call_dispatcher<I, F>(
+	    data: *const ::std::ffi::c_void,
+	    object: *mut ::std::ffi::c_void,
+	    opcode: u32,
+	    _message: *const ffi::wl_message,
+	    args: *mut ffi::wl_argument) -> ::std::os::raw::c_int
+	where
+	    I: wayland_server::Interface,
+	    F: 'static + Fn(&mut Resource<I>, &I::Request)
+	{
+	    let request = <I::Request as wayland_server::MessageGroup>
+		::from_raw_c(object, opcode,
+			     args as *const wayland_sys::common::wl_argument);
+
+	    let mut resource = Resource::<I>::from_c_ptr(object as *mut _);
+	    let f = &mut *(data as *mut F);
+
+	    if let Ok(request) = request {
+		(*f)(&mut resource, &request)
+	    }
+	    0
+	}
+
+	println!("set dispatcher for {}: {:?}", I::NAME, &f as *const _);
+
+	let dispatcher = Box::new(f);
+	unsafe {
+	    ffi::wl_resource_set_dispatcher(
+		self.native,
+		Some(call_dispatcher::<I, F>),
+		Box::into_raw(dispatcher) as *mut _,
+		std::ptr::null_mut(),
+		None)
+	}
+
+	self
+    }
+}
+
+#[derive(Clone,Eq, PartialEq, Debug)]
+pub struct Main<I>
+where I: wayland_server::Interface {
+    resource: Resource<I>
+}
+
+impl<I> Main<I>
+where I: wayland_server::Interface
+{
+    pub fn on_request<F>(&self, f: F) -> &Self
+    where F: 'static + Fn(&mut Resource<I>, &I::Request) {
+	self.resource.on_request(f);
+	self
+    }
+}
+
+pub struct ResourceMap {
+}
+
+impl ResourceMap {
+    pub fn get_new<I>(&mut self, _id: u32) -> Option<Main<I>>
+    where I: wayland_server::Interface {
+	panic!("ResourceMap::get_new called");
+    }
+
+    pub fn get<I: wayland_server::Interface>(&mut self, _id: u32) -> Option<Resource<I>> {
+	panic!("ResourceMap::get called");
     }
 }
 
@@ -149,49 +246,6 @@ impl<I: wayland_server::Interface> Global<I> {
     where F: 'static + Fn(&mut Resource<I>) {
 	self.handlers.handle_destroy = Some(Box::new(f));
 	self
-    }
-}
-
-impl<I: wayland_server::Interface> Resource<I> {
-    pub fn set_dispatcher<F>(&mut self,
-			     f: F)
-    where F: 'static + Fn(&mut Resource<I>, &I::Request) {
-	extern "C" fn dispatcher<I, F>(
-	    data: *const ::std::ffi::c_void,
-	    object: *mut ::std::ffi::c_void,
-	    opcode: u32,
-	    _message: *const ffi::wl_message,
-	    args: *mut ffi::wl_argument) -> ::std::os::raw::c_int
-	where I: wayland_server::Interface,
-	      F: 'static + Fn(&mut Resource<I>, &I::Request) {
-	    let request = unsafe {
-		<I::Request as wayland_server::MessageGroup>
-		    ::from_raw_c(object, opcode, args as *const wayland_sys::common::wl_argument)
-	    };
-
-	    let mut resource = Resource::<I> {
-		native: object as *mut ffi::wl_resource,
-		phantom: PhantomData
-	    };
-	    let handler = unsafe { &*(data as *mut Box<F>) };
-	    if let Ok(request) = request {
-		(*handler)(&mut resource, &request);
-	    } else {
-		panic!("illegal request");
-	    };
-
-	    0
-	}
-
-	let b = Box::new(f);
-	unsafe {
-	    ffi::wl_resource_set_dispatcher(
-		self.native,
-		Some(dispatcher::<I, F>),
-		Box::into_raw(b) as *mut _,
-		std::ptr::null_mut(),
-		None)
-	}
     }
 }
 

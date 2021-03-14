@@ -5,8 +5,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-pub fn init(shell: &Rc<RefCell<crate::Shell>>) {
-    let shell = &shell.borrow();
+pub fn init(rc: &Rc<RefCell<crate::Shell>>) {
+    let shell = &rc.borrow();
     let mut compositor = shell.compositor.borrow_mut();
 
     use super::protocol::zcr_alpha_compositing_v1::ZcrAlphaCompositingV1;
@@ -23,15 +23,12 @@ pub fn init(shell: &Rc<RefCell<crate::Shell>>) {
 	.on_request(|_resource, request| {
 	    use super::protocol::zaura_shell::Request;
 	    match request {
-		Request::GetAuraSurface { .. } => {
-		    // xxx resource.create().on_request(|request| { ... });
-		    //
-		    // returns (), but maybe have:
-		    //  .with(|resource| ... _)
-		    // if we want to do something with the resource...
+		Request::GetAuraSurface { id, surface: _ } => {
 		    println!("get aura surface");
+		    id.on_request(|_, request| {
+			println!("request for aura surface: {:?}", request)
+		    });
 		},
-
 		Request::GetAuraOutput { .. } => {
 		    println!("get aura output");
 		},
@@ -78,19 +75,64 @@ pub fn init(shell: &Rc<RefCell<crate::Shell>>) {
     Box::into_raw(Box::new(global));
 
     use super::protocol::zcr_remote_shell_v1::ZcrRemoteShellV1;
+    let rc = Rc::clone(rc);
     let global = compositor.create_global::<ZcrRemoteShellV1>(2)
-	.on_bind(|_resource| {
-	    // xxx create desktop client, send workspace info
-	    println!("on_bind, send workspace info")
+	.on_bind(move |resource| {
+	    use super::protocol::zcr_remote_shell_v1::Event::*;
+	    use super::protocol::zcr_remote_shell_v1::LayoutMode;
+	    use super::protocol::zcr_remote_surface_v1::SystemuiVisibilityState;
+	    use super::protocol::wl_output;;
 
-	    //zcr_remote_shell_v1_send_default_device_scale_factor(shell, 1 << 24);
+	    let shell = &rc.borrow();
+	    let mut compositor = shell.compositor.borrow_mut();
 
-	    //zcr_remote_shell_v1_send_configure(shell, ZCR_REMOTE_SHELL_V1_LAYOUT_MODE_WINDOWED);
+	    println!("on_bind, send workspace info");
 
+	    for head in compositor.head_iter_mut()
+		.filter(|h| !h.output.is_null()) {
+		    let output = unsafe { &*head.output };
+		    resource.send(WorkspaceInfo {
+			display_id_hi: 0,
+			display_id_lo: 0,
+			x: output.x,
+			y: output.y,
+			width: output.width,
+			height: output.height,
+			inset_left: 0,
+			inset_top: 0,
+			inset_right: 0,
+			inset_bottom: 0,
+			stable_inset_left: 0,
+			stable_inset_top: 0,
+			stable_inset_right: 0,
+			stable_inset_bottom: 0,
+			systemui_visibility: SystemuiVisibilityState::Visible.to_raw() as i32,
+			transform: wl_output::Transform::Normal.to_raw() as i32,
+			is_internal: head.connection_internal as u32,
+			identification_data: Vec::new(),
+		    });
+		}
+
+	    // xxx create desktop client
+
+	    resource.send(DefaultDeviceScaleFactor { scale: 1 << 24 });
+	    resource.send(Configure { layout_mode: LayoutMode::Windowed.to_raw() });
 	})
 	.on_request(|_resource, request| {
-	    // xxx: handle get_remote_surface
-	    println!("{:?}", request)
+	    use super::protocol::zcr_remote_shell_v1::Request::*;
+	    match request {
+		Destroy => { },
+		GetRemoteSurface { id, surface: _, container: _ } => {
+		    id.on_request(|_resource, request| match request {
+			_ => { println!("request: {:?}", request) }
+		    });
+		},
+		GetNotificationSurface { id: _, surface: _, notification_key: _ } => { },
+		GetInputMethodSurface { id: _, surface: _ } =>  { },
+		GetToastSurface { id: _, surface: _ } => { },
+		GetRemoteOutput { id: _, output: _ } => { },
+		SetUseDefaultDeviceScaleCancellation { use_default_device_scale_factor: _ } => { },
+	    }
 	});
     Box::into_raw(Box::new(global));
 

@@ -6,7 +6,11 @@
 #![allow(non_upper_case_globals, non_snake_case, unused_imports)]
 #![allow(missing_docs, clippy::all)]
 
-pub(crate) use wayland_server::*;
+// Use our own version of these
+use super::{Resource, Main, ResourceMap};
+
+pub(crate) use wayland_server::sys;
+pub(crate) use wayland_server::AnonymousObject;
 pub(crate) use wayland_commons::*;
 pub(crate) use wayland_commons::wire::*;
 pub(crate) use wayland_commons::map::*;

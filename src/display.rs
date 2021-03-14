@@ -15,57 +15,45 @@ fn handle_bind(resource: &mut super::Resource<CroscompDisplay>,
     for head in compositor.head_iter().filter(|h| h.is_enabled()) {
 	println!("head {:?}", head);
 
-	let mut output_resource =
-	    super::Resource::<CroscompOutput>::new(resource.client(), 1);
+	use super::protocol::croscomp_display::Event::Output;
+	use super::protocol::croscomp_output::Event::{Geometry, Mode, Done};
+	use super::protocol::croscomp_output::{Subpixel, Transform};
 
-	unsafe {
-	    //use protocol::croscomp_display::Event as Event;
+	let output_resource = resource.new::<CroscompOutput>(0);
+	resource.send(Output { id: output_resource.clone() });
 
-	    //raw_resource.send(Event::Output { id: output_resource })
+	let make = "panel".to_string();
+	let model = "foo".to_string();
 
-	    let mut args = [ffi::wl_argument {
-		o: output_resource.native as *mut ffi::wl_object
-	    }];
-	    ffi::wl_resource_post_event_array(resource.native, 0,
-					      args.as_mut_ptr());
-	};
+	output_resource.send(Geometry {
+	    physical_width: head.mm_width,
+	    physical_height: head.mm_height,
+	    subpixel: Subpixel::Unknown, // head.subpixel
+	    make: make,
+	    model: model,
+	    transform: Transform::Normal, // head.transform
+	});
 
-	{ 
-	    use super::protocol::croscomp_output::{Event, Subpixel, Transform};
+	if let Some(output) = unsafe { head.output.as_ref() } {
+	    println!("output {:?}", output);
 
-	    let make = "panel".to_string();
-	    let model = "foo".to_string();
+	    if output.enabled {
+		for mode in wl_list_iter!(output.mode_list,
+					  ffi::weston_mode, link) {
+		    println!(" - mode {:?}", mode);
 
-	    output_resource.send(Event::Geometry {
-		physical_width: head.mm_width,
-		physical_height: head.mm_height,
-		subpixel: Subpixel::Unknown, // head.subpixel
-		make: make,
-		model: model,
-		transform: Transform::Normal, // head.transform
-	    });
-
-	    if let Some(output) = unsafe { head.output.as_ref() } {
-		println!("output {:?}", output);
-
-		if output.enabled {
-		    for mode in wl_list_iter!(output.mode_list,
-					      ffi::weston_mode, link) {
-			println!(" - mode {:?}", mode);
-
-			output_resource.send(Event::Mode {
-			    flags: protocol::croscomp_output::Mode::Current |
-			    protocol::croscomp_output::Mode::Preferred, // xxx
-			    width: mode.width,
-			    height: mode.height,
-			    refresh: mode.refresh as i32
-			});
-		    }
+		    output_resource.send(Mode {
+			flags: protocol::croscomp_output::Mode::Current |
+			protocol::croscomp_output::Mode::Preferred, // xxx
+			width: mode.width,
+			height: mode.height,
+			refresh: mode.refresh as i32
+		    });
 		}
 	    }
-
-	    output_resource.send(Event::Done {});
 	}
+
+	output_resource.send(Done {});
     }
 }
 
