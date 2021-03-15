@@ -35,13 +35,9 @@ fn handle_bind(resource: &mut super::Resource<CroscompDisplay>,
 	});
 
 	if let Some(output) = unsafe { head.output.as_ref() } {
-	    println!("output {:?}", output);
-
 	    if output.enabled {
 		for mode in wl_list_iter!(output.mode_list,
 					  ffi::weston_mode, link) {
-		    println!(" - mode {:?}", mode);
-
 		    output_resource.send(Mode {
 			flags: protocol::croscomp_output::Mode::Current |
 			protocol::croscomp_output::Mode::Preferred, // xxx

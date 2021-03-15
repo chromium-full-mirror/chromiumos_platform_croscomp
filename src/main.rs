@@ -49,7 +49,6 @@ fn head_notify(_listener: *mut ffi::wl_listener, data: *mut ::std::os::raw::c_vo
     let compositor = unsafe {
 	&mut *container_of_mut!(native as *mut _, Compositor, native)
     };
-    println!("listener");
 
     for head in compositor.head_iter_mut()
 	.filter(|h| h.connected && !h.is_enabled()) {
