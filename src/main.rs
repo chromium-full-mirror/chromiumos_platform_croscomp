@@ -24,6 +24,7 @@ mod input;
 mod rotate;
 mod exo;
 mod aura_shell;
+mod remote_shell;
 
 const SCALE: i32 = 2;
 
@@ -551,6 +552,7 @@ impl Shell {
 	    ffi::weston_compositor_init_input(&mut shell.compositor.borrow_mut().native);
 	}
 	exo::init(rc);
+	remote_shell::init(rc);
     }
 
     fn create_background_surface(&mut self) {
