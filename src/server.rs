@@ -3,6 +3,9 @@
 // found in the LICENSE file.
 
 use std::marker::PhantomData;
+use std::os::unix::net::{UnixListener, SocketAddr};
+use std::os::unix::io::{RawFd, IntoRawFd, FromRawFd};
+
 use wayland_server::MessageGroup;
 
 use crate::ffi;
@@ -185,10 +188,6 @@ impl Server {
 	Server { native: unsafe { ffi::wl_display_create() } }
     }
 
-    pub fn add_socket_auto(&self) -> *const ::std::os::raw::c_char {
-	unsafe { ffi::wl_display_add_socket_auto(self.native) }
-    }
-
     pub fn when_idle<F>(&mut self, f: F)
     where F: FnOnce() {
 	let event_loop = unsafe {
@@ -207,6 +206,39 @@ impl Server {
 	unsafe {
 	    ffi::wl_event_loop_add_idle(event_loop,
 					Some(call_closure::<F>), p as *mut _);
+	}
+    }
+
+    pub fn on_connect<F>(&mut self, listener: UnixListener, f: F)
+    where F: Fn(RawFd, SocketAddr) {
+	let event_loop = unsafe {
+	    &mut *ffi::wl_display_get_event_loop(self.native)
+	};
+
+	extern "C" fn call_closure<F>(fd: i32, _: u32, data: *mut ::std::os::raw::c_void) -> i32
+	where F: Fn(RawFd, SocketAddr) {
+	    let listener = unsafe { UnixListener::from_raw_fd(fd) };
+	    let f = unsafe { &*(data as *mut F) };
+	    match listener.accept() {
+		Ok((socket, addr)) => f(socket.into_raw_fd(), addr),
+		Err(_) => ()
+	    }
+
+	    1
+	}
+
+	let p = Box::into_raw(Box::new(f));
+
+	unsafe {
+	    ffi::wl_event_loop_add_fd(event_loop, listener.into_raw_fd(),
+				      ffi::WL_EVENT_READABLE as u32,
+				      Some(call_closure::<F>), p as *mut _);
+	}
+    }
+
+    pub fn create_client(&self, fd: RawFd) -> *mut ffi::wl_client {
+	unsafe {
+	    ffi::wl_client_create(self.native, fd)
 	}
     }
 

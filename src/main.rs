@@ -6,9 +6,10 @@
 extern crate bitflags;
 
 use std::env;
-use std::fs::metadata;
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::os::unix::net::{UnixListener, UnixStream};
+use std::io::{ErrorKind};
 
 #[macro_use]
 mod ffi;
@@ -29,19 +30,33 @@ use server::Server;
 
 const SCALE: i32 = 2;
 
-fn verify_xdg_runtime_dir() {
+fn bind_socket() -> UnixListener {
     let path = env::var_os("XDG_RUNTIME_DIR")
 	.expect("environment variable XDG_RUNTIME_DIR is not set.")
 	.into_string()
 	.expect("invalid value");
 
-    let md = metadata(&path).unwrap();
-    if !md.is_dir() {
-	panic!("environment variable XDG_RUNTIME_DIR\nis set to \"{}\", \
-		which is not a directory.", path);
+    let socket_path = format!("{}/wayland-0", path);
+    if let Ok(sock) = UnixListener::bind(&socket_path) {
+	return sock
     }
 
-    // Verify permissions 0700 and owned by user?
+    match UnixStream::connect(&socket_path) {
+	Ok(_) => panic!("croscomp already running"),
+	Err(error) if error.kind() == ErrorKind::ConnectionRefused => {
+	    let _ = std::fs::remove_file(&socket_path);
+	},
+	_ => ()
+    }
+
+    match UnixListener::bind(&socket_path) {
+	Ok(sock) => sock,
+	Err(error) => if error.kind() == ErrorKind::AddrInUse {
+	    panic!("address in use")
+	} else {
+	    panic!("other error")
+	}
+    }
 }
 
 extern "C"
@@ -260,9 +275,7 @@ impl Shell {
 
 }
 
-fn main() {
-    verify_xdg_runtime_dir();
-
+fn main() -> std::io::Result<()> {
     let ctx = unsafe {
 	ffi::weston_log_ctx_create()
     };
@@ -317,11 +330,14 @@ fn main() {
 
     compositor.borrow_mut().flush_heads_changed();
 
-    let socket_name = compositor.borrow_mut().server.add_socket_auto();
+    let sock = bind_socket();
 
-    if socket_name == std::ptr::null() {
-	panic!("failed to create listening socket")
-    }
+    let rc = Rc::clone(&compositor);
+    compositor.borrow_mut().server.on_connect(
+	sock, move |fd, _| {
+	    let compositor = rc.borrow_mut();
+	    compositor.server.create_client(fd);
+	});
 
     let shell = Rc::new(RefCell::new(Shell::new(&compositor)));
     shell.borrow_mut().init();
@@ -346,4 +362,6 @@ fn main() {
 	let display = compositor.borrow_mut().server.native;
 	ffi::wl_display_run(display)
     }
+
+    Ok(())
 }
