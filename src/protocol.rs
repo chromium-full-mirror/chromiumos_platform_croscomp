@@ -7,7 +7,7 @@
 #![allow(missing_docs, clippy::all)]
 
 // Use our own version of these
-use super::{Resource, Main, ResourceMap};
+use crate::server::{Resource, Main, ResourceMap};
 
 pub(crate) use wayland_server::sys;
 pub(crate) use wayland_server::AnonymousObject;

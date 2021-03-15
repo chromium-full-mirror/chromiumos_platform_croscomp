@@ -7,6 +7,7 @@ use std::rc::Rc;
 use crate::ffi;
 use crate::protocol;
 
+use crate::server::Resource;
 use protocol::croscomp_splash::{CroscompSplash, Request};
 
 extern "C"
@@ -31,7 +32,7 @@ fn splash_committed(psurface: *mut ffi::weston_surface, _sx: i32, _sy: i32) {
     }
 }
 
-fn handle_request(_resource: &mut super::Resource<CroscompSplash>, request: &Request) {
+fn handle_request(_resource: &mut Resource<CroscompSplash>, request: &Request) {
     match request {
 	Request::Set { output: output_resource, surface: surface_resource } => {
 	    let surface = surface_resource.as_ref().user_data::<ffi::weston_surface>();
