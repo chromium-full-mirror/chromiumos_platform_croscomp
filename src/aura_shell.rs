@@ -10,7 +10,7 @@ pub fn init(rc: &Rc<RefCell<crate::Shell>>) {
     let mut compositor = shell.compositor.borrow_mut();
 
     use super::protocol::zaura_shell::ZauraShell;
-    let global = compositor.create_global::<ZauraShell>(12)
+    let global = compositor.server.create_global::<ZauraShell>(12)
 	.on_request(|_resource, request| {
 	    use super::protocol::zaura_shell::Request;
 	    match request {

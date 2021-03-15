@@ -58,7 +58,7 @@ pub fn init(shell: &Rc<RefCell<crate::Shell>>) {
     let shell = &shell.borrow();
     let mut compositor = shell.compositor.borrow_mut();
 
-    let global = compositor.create_global::<CroscompDisplay>(1)
+    let global = compositor.server.create_global::<CroscompDisplay>(1)
 	.on_bind(move |resource| {
 	    let shell = &rc.borrow();
 	    let mut compositor = shell.compositor.borrow_mut();

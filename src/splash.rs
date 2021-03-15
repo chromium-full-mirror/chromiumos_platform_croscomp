@@ -61,7 +61,7 @@ pub fn init(rc: &Rc<RefCell<crate::Shell>>) {
     let rc = Rc::clone(rc);
 
     println!("from splash, allocating global");
-    let global = compositor.create_global::<CroscompSplash>(version)
+    let global = compositor.server.create_global::<CroscompSplash>(version)
 	.on_bind(|_| println!("splash: handle bind") )
 	.on_request(|resource, request| { handle_request(resource, request) })
 	.on_destroy(move |_resource| {
@@ -71,7 +71,7 @@ pub fn init(rc: &Rc<RefCell<crate::Shell>>) {
     Box::into_raw(Box::new(global));
 
     let rc = Rc::clone(&shell.compositor);
-    compositor.when_idle(move || {
+    compositor.server.when_idle(move || {
 	let path = "/usr/bin/weston-simple-splash\0";
 	let mut compositor = rc.borrow_mut();
 	compositor.start_client(path);

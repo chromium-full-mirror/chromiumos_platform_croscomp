@@ -12,7 +12,7 @@ pub fn init(rc: &Rc<RefCell<crate::Shell>>) {
     let mut compositor = shell.compositor.borrow_mut();
 
     let rc = Rc::clone(rc);
-    let global = compositor.create_global::<ZcrRemoteShellV1>(30)
+    let global = compositor.server.create_global::<ZcrRemoteShellV1>(30)
 	.on_bind(move |resource| {
 	    use super::protocol::zcr_remote_shell_v1::Event::*;
 	    use super::protocol::zcr_remote_shell_v1::LayoutMode;

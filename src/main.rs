@@ -251,107 +251,23 @@ impl<I: wayland_server::Interface> Global<I> {
 }
 
 #[derive(Debug)]
-struct Display {
+struct Server {
     native: *mut ffi::wl_display
 }
 
-impl Display {
+impl Server {
     fn new() -> Self {
-	Display { native: unsafe { ffi::wl_display_create() } }
-    }
-
-    fn run(&self) {
-	unsafe { ffi::wl_display_run(self.native) }
+	Server { native: unsafe { ffi::wl_display_create() } }
     }
 
     fn add_socket_auto(&self) -> *const ::std::os::raw::c_char {
 	unsafe { ffi::wl_display_add_socket_auto(self.native) }
     }
-}
-
-impl Drop for Display {
-    fn drop(&mut self) {
-	println!("drop display");
-	unsafe { ffi::wl_display_destroy(self.native) }
-    }
-}
-
-#[derive(Debug)]
-pub struct Compositor {
-    native: ffi::weston_compositor,
-}
-
-impl Compositor {
-    fn new() -> Self {
-	Compositor { native: unsafe { std::mem::zeroed() }, }
-    }
-
-    fn init(&mut self, display: &Display, ctx: *mut ffi::weston_log_context) {
-	unsafe  {
-	    ffi::weston_compositor_init(&mut self.native,
-					display.native, ctx, std::ptr::null_mut())
-	};
-    }
-
-    fn add_heads_changed_listener(&mut self, listener: &mut ffi::wl_listener) {
-	unsafe {
-	    ffi::weston_compositor_add_heads_changed_listener(&mut self.native,
-							      listener)
-	}
-    }
-
-    fn bind_key<F>(&mut self, key: u32,
-		   modifier: ffi::weston_keyboard_modifier,
-		   f: F)
-    where F: Fn(&mut ffi::weston_keyboard, *const ffi::timespec, u32) {
-	extern "C"
-	fn call_key_closure<F>(keyboard: *mut ffi::weston_keyboard,
-			       time: *const ffi::timespec,
-			       key: u32,
-			       data: *mut std::ffi::c_void)
-	where F: Fn(&mut ffi::weston_keyboard, *const ffi::timespec, u32) {
-	    let keyboard = unsafe { &mut *keyboard };
-	    (unsafe { &mut *(data as *mut F) })(keyboard, time, key)
-	}
-
-	let handler = Box::new(f);
-
-	unsafe {
-	    ffi::weston_compositor_add_key_binding(
-		&mut self.native, key, modifier,
-		Some(call_key_closure::<F>),
-		Box::into_raw(handler) as *mut _)
-	};
-    }
-
-    fn bind_button<F>(&mut self, button: u32,
-		      modifier: ffi::weston_keyboard_modifier,
-		      f: F)
-    where F: Fn(&mut ffi::weston_pointer, *const ffi::timespec, u32) {
-	extern "C"
-	fn call_button_closure<F>(pointer: *mut ffi::weston_pointer,
-				  time: *const ffi::timespec,
-				  key: u32,
-				  data: *mut std::ffi::c_void)
-	where F: Fn(&mut ffi::weston_pointer, *const ffi::timespec, u32) {
-	    let pointer = unsafe { &mut *pointer };
-	    (unsafe { &mut *(data as *mut F) })(pointer, time, key)
-	}
-
-	let handler = Box::new(f);
-
-	unsafe {
-	    ffi::weston_compositor_add_button_binding(
-		&mut self.native, button, modifier,
-		Some(call_button_closure::<F>),
-		Box::into_raw(handler) as *mut _)
-	};
-    }
 
     fn when_idle<F>(&mut self, f: F)
     where F: FnOnce() {
 	let event_loop = unsafe {
-	    &mut *ffi::wl_display_get_event_loop(self.native.wl_display)
+	    &mut *ffi::wl_display_get_event_loop(self.native)
 	};
 
 	extern "C" fn call_closure<F>(data: *mut ::std::os::raw::c_void)
@@ -367,41 +283,6 @@ impl Compositor {
 	    ffi::wl_event_loop_add_idle(event_loop,
 					Some(call_closure::<F>), p as *mut _);
 	}
-    }
-
-    fn start_client(&mut self, path: &str) {
-	unsafe {
-	    ffi::weston_client_start(&mut self.native, path.as_ptr() as *const i8)
-	};
-    }
-
-    fn wake(&mut self) {
-	unsafe { ffi::weston_compositor_wake(&mut self.native) }
-    }
-
-    fn flush_heads_changed(&mut self) {
-	unsafe {
-	    ffi::weston_compositor_flush_heads_changed(&mut self.native)
-	}
-    }
-
-    fn set_xkb_rule_names(&mut self, names: &mut ffi::xkb_rule_names) {
-	unsafe {
-	    ffi::weston_compositor_set_xkb_rule_names(&mut self.native, names);
-	}
-    }
-
-    fn head_iter(&self) -> ffi::WlListIter<ffi::weston_head> {
-	wl_list_iter!(&self.native.head_list, ffi::weston_head, compositor_link)
-    }
-
-    fn head_iter_mut(&mut self) -> ffi::WlListIterMut<ffi::weston_head> {
-	wl_list_iter_mut!(&mut self.native.head_list, ffi::weston_head, compositor_link)
-    }
-
-    fn create_surface(&self) -> *mut ffi::weston_surface {
-	unsafe { ffi::weston_surface_create(&self.native
-					    as *const _ as *mut _) }
     }
 
     fn create_global<I>(&mut self, version: u32) -> Global<I>
@@ -502,7 +383,7 @@ impl Compositor {
 	};
 
 	global.native = unsafe {
-	    ffi::wl_global_create(self.native.wl_display,
+	    ffi::wl_global_create(self.native,
 				  I::c_interface() as *const _,
 				  version as i32,
 				  &mut *global.handlers as *mut _
@@ -511,6 +392,126 @@ impl Compositor {
 	};
 
 	global
+    }
+}
+
+impl Drop for Server {
+    fn drop(&mut self) {
+	println!("drop display");
+	unsafe { ffi::wl_display_destroy(self.native) }
+    }
+}
+
+#[derive(Debug)]
+pub struct Compositor {
+    server: Server,
+    native: ffi::weston_compositor,
+}
+
+impl Compositor {
+    fn new() -> Self {
+	Compositor {
+	    server: Server::new(),
+	    native: unsafe { std::mem::zeroed() },
+	}
+    }
+
+    fn init(&mut self, ctx: *mut ffi::weston_log_context) {
+	unsafe  {
+	    ffi::weston_compositor_init(&mut self.native,
+					self.server.native,
+					ctx, std::ptr::null_mut())
+	};
+    }
+
+    fn add_heads_changed_listener(&mut self, listener: &mut ffi::wl_listener) {
+	unsafe {
+	    ffi::weston_compositor_add_heads_changed_listener(&mut self.native,
+							      listener)
+	}
+    }
+
+    fn bind_key<F>(&mut self, key: u32,
+		   modifier: ffi::weston_keyboard_modifier,
+		   f: F)
+    where F: Fn(&mut ffi::weston_keyboard, *const ffi::timespec, u32) {
+	extern "C"
+	fn call_key_closure<F>(keyboard: *mut ffi::weston_keyboard,
+			       time: *const ffi::timespec,
+			       key: u32,
+			       data: *mut std::ffi::c_void)
+	where F: Fn(&mut ffi::weston_keyboard, *const ffi::timespec, u32) {
+	    let keyboard = unsafe { &mut *keyboard };
+	    (unsafe { &mut *(data as *mut F) })(keyboard, time, key)
+	}
+
+	let handler = Box::new(f);
+
+	unsafe {
+	    ffi::weston_compositor_add_key_binding(
+		&mut self.native, key, modifier,
+		Some(call_key_closure::<F>),
+		Box::into_raw(handler) as *mut _)
+	};
+    }
+
+    fn bind_button<F>(&mut self, button: u32,
+		      modifier: ffi::weston_keyboard_modifier,
+		      f: F)
+    where F: Fn(&mut ffi::weston_pointer, *const ffi::timespec, u32) {
+	extern "C"
+	fn call_button_closure<F>(pointer: *mut ffi::weston_pointer,
+				  time: *const ffi::timespec,
+				  key: u32,
+				  data: *mut std::ffi::c_void)
+	where F: Fn(&mut ffi::weston_pointer, *const ffi::timespec, u32) {
+	    let pointer = unsafe { &mut *pointer };
+	    (unsafe { &mut *(data as *mut F) })(pointer, time, key)
+	}
+
+	let handler = Box::new(f);
+
+	unsafe {
+	    ffi::weston_compositor_add_button_binding(
+		&mut self.native, button, modifier,
+		Some(call_button_closure::<F>),
+		Box::into_raw(handler) as *mut _)
+	};
+    }
+
+    fn start_client(&mut self, path: &str) {
+	unsafe {
+	    ffi::weston_client_start(&mut self.native, path.as_ptr() as *const i8)
+	};
+    }
+
+    fn wake(&mut self) {
+	unsafe { ffi::weston_compositor_wake(&mut self.native) }
+    }
+
+    fn flush_heads_changed(&mut self) {
+	unsafe {
+	    ffi::weston_compositor_flush_heads_changed(&mut self.native)
+	}
+    }
+
+    fn set_xkb_rule_names(&mut self, names: &mut ffi::xkb_rule_names) {
+	unsafe {
+	    ffi::weston_compositor_set_xkb_rule_names(&mut self.native, names);
+	}
+    }
+
+    fn head_iter(&self) -> ffi::WlListIter<ffi::weston_head> {
+	wl_list_iter!(&self.native.head_list, ffi::weston_head, compositor_link)
+    }
+
+    fn head_iter_mut(&mut self) -> ffi::WlListIterMut<ffi::weston_head> {
+	wl_list_iter_mut!(&mut self.native.head_list, ffi::weston_head, compositor_link)
+    }
+
+    fn create_surface(&self) -> *mut ffi::weston_surface {
+	unsafe { ffi::weston_surface_create(&self.native
+					    as *const _ as *mut _) }
     }
 }
 
@@ -585,11 +586,9 @@ fn main() {
 	ffi::weston_log_ctx_create()
     };
 
-    let display = Display::new();
-
     let compositor =
 	Rc::new(RefCell::new(Compositor::new()));
-    compositor.borrow_mut().init(&display, ctx);
+    compositor.borrow_mut().init(ctx);
 
     println!("set log handler");
     unsafe {
@@ -637,7 +636,7 @@ fn main() {
 
     compositor.borrow_mut().flush_heads_changed();
 
-    let socket_name = display.add_socket_auto();
+    let socket_name = compositor.borrow_mut().server.add_socket_auto();
 
     if socket_name == std::ptr::null() {
 	panic!("failed to create listening socket")
@@ -662,5 +661,8 @@ fn main() {
 
     compositor.borrow_mut().wake();
 
-    display.run();
+    unsafe {
+	let display = compositor.borrow_mut().server.native;
+	ffi::wl_display_run(display)
+    }
 }
