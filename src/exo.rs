@@ -40,7 +40,7 @@ pub fn init(rc: &Rc<RefCell<crate::Shell>>) {
     Box::into_raw(Box::new(global));
 
     use super::protocol::zcr_keyboard_extension_v1::ZcrKeyboardExtensionV1;
-    let global = compositor.create_global::<ZcrKeyboardExtensionV1>(2)
+    let global = compositor.create_global::<ZcrKeyboardExtensionV1>(1)
 	.on_request(|_resource, request| {
 	    // xxx: handle: get_extended_keyboard request
 	    println!("{:?}", request)
@@ -48,7 +48,7 @@ pub fn init(rc: &Rc<RefCell<crate::Shell>>) {
     Box::into_raw(Box::new(global));
 
     use super::protocol::zcr_cursor_shapes_v1::ZcrCursorShapesV1;
-    let global = compositor.create_global::<ZcrCursorShapesV1>(2)
+    let global = compositor.create_global::<ZcrCursorShapesV1>(1)
 	.on_request(|_resource, request| {
 	    println!("{:?}", request)
 	});
@@ -117,7 +117,7 @@ pub fn init(rc: &Rc<RefCell<crate::Shell>>) {
     Box::into_raw(Box::new(global));
 
     use super::protocol::zcr_secure_output_v1::ZcrSecureOutputV1;
-    let global = compositor.create_global::<ZcrSecureOutputV1>(2)
+    let global = compositor.create_global::<ZcrSecureOutputV1>(1)
 	.on_request(|_resource, request| {
 	    println!("{:?}", request)
 	});
@@ -131,14 +131,14 @@ pub fn init(rc: &Rc<RefCell<crate::Shell>>) {
     Box::into_raw(Box::new(global));
 
     use super::protocol::zcr_stylus_tools_v1::ZcrStylusToolsV1;
-    let global = compositor.create_global::<ZcrStylusToolsV1>(2)
+    let global = compositor.create_global::<ZcrStylusToolsV1>(1)
 	.on_request(|_resource, request| {
 	    println!("{:?}", request)
 	});
     Box::into_raw(Box::new(global));
 
     use super::protocol::zcr_vsync_feedback_v1::ZcrVsyncFeedbackV1;
-    let global = compositor.create_global::<ZcrVsyncFeedbackV1>(2)
+    let global = compositor.create_global::<ZcrVsyncFeedbackV1>(1)
 	.on_request(|_resource, request| {
 	    println!("{:?}", request)
 	});
