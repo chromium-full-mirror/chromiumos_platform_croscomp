@@ -17,26 +17,6 @@ pub fn init(rc: &Rc<RefCell<crate::Shell>>) {
 	});
     Box::into_raw(Box::new(global));
 
-
-    use super::protocol::zaura_shell::ZauraShell;
-    let global = compositor.create_global::<ZauraShell>(12)
-	.on_request(|_resource, request| {
-	    use super::protocol::zaura_shell::Request;
-	    match request {
-		Request::GetAuraSurface { id, surface: _ } => {
-		    println!("get aura surface");
-		    id.on_request(|_, request| {
-			println!("request for aura surface: {:?}", request)
-		    });
-		},
-		Request::GetAuraOutput { .. } => {
-		    println!("get aura output");
-		},
-	    }
-	});
-    Box::into_raw(Box::new(global));
-
-
     use super::protocol::zwp_pointer_gestures_v1::ZwpPointerGesturesV1;
     let global = compositor.create_global::<ZwpPointerGesturesV1>(2)
 	.on_request(|_resource, request| {

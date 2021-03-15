@@ -23,6 +23,7 @@ mod protocol;
 mod input;
 mod rotate;
 mod exo;
+mod aura_shell;
 
 const SCALE: i32 = 2;
 
@@ -655,6 +656,8 @@ fn main() {
     move_resize::init(&shell);
 
     rotate::init(&shell);
+
+    aura_shell::init(&shell);
 
     compositor.borrow_mut().wake();
 
