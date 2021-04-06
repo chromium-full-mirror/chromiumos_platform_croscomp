@@ -1,0 +1,3 @@
+#!/bin/sh
+
+exec weston-terminal --fullscreen --font-size=42

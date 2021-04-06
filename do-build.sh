@@ -89,11 +89,13 @@ cargo build --manifest-path $d/Cargo.toml --target="${CHOST}"
 # Take this from environment but default to hatch and my IP of the day
 DUT=${DUT:-192.168.86.226}
 
-d=~/trunk/src/platform/croscomp
-
 rsync -av --progress $out/croscomp $DUT:
 
 rsync -av --progress $out/meson/subprojects/weston/libweston/libweston-9.so{,*.0} \
       $DUT:/usr/lib64
 rsync -av --progress $out/meson/subprojects/weston/libweston/renderer-gl/gl-renderer.so \
       $DUT:/usr/lib64/libweston-9
+rsync -av --progress $out/meson/subprojects/weston/clients/weston-{simple-splash,terminal} \
+      $DUT:/usr/bin
+rsync -av --progress $d/croscomp-terminal $DUT:/usr/bin
+
