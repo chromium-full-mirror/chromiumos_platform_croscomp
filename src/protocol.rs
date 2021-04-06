@@ -7,24 +7,33 @@
 #![allow(missing_docs, clippy::all)]
 
 // Use our own version of these
-use crate::server::{Resource, Main, ResourceMap};
+use crate::server::{Main, Resource, ResourceMap};
 
+pub(crate) use wayland_commons::map::*;
+pub(crate) use wayland_commons::wire::*;
+pub(crate) use wayland_commons::*;
 pub(crate) use wayland_server::sys;
 pub(crate) use wayland_server::AnonymousObject;
-pub(crate) use wayland_commons::*;
-pub(crate) use wayland_commons::wire::*;
-pub(crate) use wayland_commons::map::*;
 
 include!(concat!(env!("OUT_DIR"), "/wayland.rs"));
 include!(concat!(env!("OUT_DIR"), "/croscomp.rs"));
 include!(concat!(env!("OUT_DIR"), "/aura-shell.rs"));
-include!(concat!(env!("OUT_DIR"), "/alpha-compositing-unstable-v1.rs"));
+include!(concat!(
+    env!("OUT_DIR"),
+    "/alpha-compositing-unstable-v1.rs"
+));
 include!(concat!(env!("OUT_DIR"), "/cursor-shapes-unstable-v1.rs"));
 include!(concat!(env!("OUT_DIR"), "/pointer-gestures-unstable-v1.rs"));
 include!(concat!(env!("OUT_DIR"), "/gaming-input-unstable-v2.rs"));
 include!(concat!(env!("OUT_DIR"), "/input.rs"));
-include!(concat!(env!("OUT_DIR"), "/keyboard-configuration-unstable-v1.rs"));
-include!(concat!(env!("OUT_DIR"), "/keyboard-extension-unstable-v1.rs"));
+include!(concat!(
+    env!("OUT_DIR"),
+    "/keyboard-configuration-unstable-v1.rs"
+));
+include!(concat!(
+    env!("OUT_DIR"),
+    "/keyboard-extension-unstable-v1.rs"
+));
 include!(concat!(env!("OUT_DIR"), "/linux-dmabuf-unstable-v1.rs"));
 include!(concat!(env!("OUT_DIR"), "/remote-shell-unstable-v1.rs"));
 include!(concat!(env!("OUT_DIR"), "/secure-output-unstable-v1.rs"));

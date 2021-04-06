@@ -10,20 +10,20 @@ pub fn init(rc: &Rc<RefCell<crate::Shell>>) {
     let mut compositor = shell.compositor.borrow_mut();
 
     use super::protocol::zaura_shell::ZauraShell;
-    let global = compositor.server.create_global::<ZauraShell>(12)
-	.on_request(|_resource, request| {
-	    use super::protocol::zaura_shell::Request;
-	    match request {
-		Request::GetAuraSurface { id, surface: _ } => {
-		    println!("get aura surface");
-		    id.on_request(|_, request| {
-			println!("request for aura surface: {:?}", request)
-		    });
-		},
-		Request::GetAuraOutput { .. } => {
-		    println!("get aura output");
-		},
-	    }
-	});
+    let global = compositor
+        .server
+        .create_global::<ZauraShell>(12)
+        .on_request(|_resource, request| {
+            use super::protocol::zaura_shell::Request;
+            match request {
+                Request::GetAuraSurface { id, surface: _ } => {
+                    println!("get aura surface");
+                    id.on_request(|_, request| println!("request for aura surface: {:?}", request));
+                }
+                Request::GetAuraOutput { .. } => {
+                    println!("get aura output");
+                }
+            }
+        });
     Box::into_raw(Box::new(global));
 }
