@@ -73,15 +73,23 @@ fn main() {
         .write_to_file(out_path.join("input.rs"))
         .expect("Couldn't write bindings!");
 
-    println!("cargo:rustc-flags=-Lx86_64/subprojects/weston/compositor");
+    let lib_paths = [ 
+	"weston/compositor",
+	"weston/desktop-shell",
+	"weston/libweston",
+	"libinput",
+	"libevdev"
+    ];
+
+    let chost = env::var("CHOST").unwrap();
+    for p in &lib_paths {
+	println!("cargo:rustc-flags=-Ltarget/{}/debug/meson/subprojects/{}", chost, p);
+    }
+    
     println!("cargo:rustc-link-lib=exec_weston");
-    println!("cargo:rustc-flags=-Lx86_64/subprojects/weston/desktop-shell");
     println!("cargo:rustc-link-lib=desktop-shell");
-    println!("cargo:rustc-flags=-Lx86_64/subprojects/weston/libweston");
     println!("cargo:rustc-link-lib=weston-9");
-    println!("cargo:rustc-flags=-Lx86_64/subprojects/libinput");
     println!("cargo:rustc-link-lib=input");
-    println!("cargo:rustc-flags=-Lx86_64/subprojects/libevdev");
     println!("cargo:rustc-link-lib=evdev-fdo");
     println!("cargo:rustc-link-lib=wayland-server");
     println!("cargo:rustc-link-lib=pixman-1");

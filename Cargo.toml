@@ -14,4 +14,4 @@ bitflags = "1.0"
 
 [build-dependencies]
 wayland-scanner = { version = "0.28.2", path = "third_party/wayland-scanner" }
-bindgen = ">=0.56"
+bindgen = "0.56"
