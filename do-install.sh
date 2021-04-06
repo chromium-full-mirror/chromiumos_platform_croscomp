@@ -1,15 +1,15 @@
 #!/bin/sh
 
-export SYSROOT=/build/hatch
+# Take this from environment but default to hatch and my IP of the day
+DUT=${DUT:-192.168.86.226}
 
 d=~/trunk/src/platform/croscomp
-dut=192.168.86.140
 
-rsync -av --progress $d/target/debug/croscomp $dut:
+rsync -av --progress $d/target/x86_64-cros-linux-gnu/debug/croscomp $DUT:
 
 rsync -av --progress $d/x86_64/subprojects/weston/libweston/libweston-9.so* \
-      $dut:/usr/lib64
+      $DUT:/usr/lib64
 rsync -av --progress $d/x86_64/subprojects/weston/libweston/renderer-gl/gl-renderer.so \
-      $dut:/usr/lib64/libweston-9
+      $DUT:/usr/lib64/libweston-9
 
 
