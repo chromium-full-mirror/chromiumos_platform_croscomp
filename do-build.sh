@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -xe
+set -e
 
 # Take board from environment but default to hatch
 export BOARD=${BOARD:-hatch}
@@ -61,8 +61,8 @@ out=$d/target/$CHOST/debug
 
 cross_file="${out}/meson.${CHOST}.${ABI}"
 if test ! -e "${cross_file}"; then
-    # Run this in a subshell to avoid all the eclass variable spilling
-    # into out namespace.
+    # Run this in a subshell to avoid all the eclass variables
+    # spilling into our namespace.
     (create_cross_file $out)
 fi
 
@@ -89,13 +89,12 @@ cargo build --manifest-path $d/Cargo.toml --target="${CHOST}"
 # Take this from environment but default to hatch and my IP of the day
 DUT=${DUT:-192.168.86.226}
 
-rsync -av --progress $out/croscomp $DUT:
-
 rsync -av --progress $out/meson/subprojects/weston/libweston/libweston-9.so{,*.0} \
-      $DUT:/usr/lib64
+      $DUT:/usr/$LIBDIR
 rsync -av --progress $out/meson/subprojects/weston/libweston/renderer-gl/gl-renderer.so \
-      $DUT:/usr/lib64/libweston-9
-rsync -av --progress $out/meson/subprojects/weston/clients/weston-{simple-splash,terminal} \
+      $DUT:/usr/$LIBDIR/libweston-9
+rsync -av --progress $out/croscomp \
+      $out/meson/subprojects/weston/clients/weston-{simple-splash,terminal} \
       $DUT:/usr/bin
 rsync -av --progress $d/croscomp-terminal $DUT:/usr/bin
 
