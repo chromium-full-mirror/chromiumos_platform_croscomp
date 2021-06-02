@@ -10,7 +10,7 @@ d=$(dirname $(readlink -f $0))
 shopt -s lastpipe
 emerge-$BOARD --info --verbose 2>/dev/null | while IFS=\= read var val; do
     case $var in
-	CHOST|CBUILD|ABI|SYSROOT|CFLAGS|LDFLAGS|CPPFLAGS|AR|AS|CC|CXX|STRIP|LIBDIR_*)
+	PKG_CONFIG|CHOST|CBUILD|ABI|SYSROOT|CFLAGS|LDFLAGS|CPPFLAGS|AR|AS|CC|CXX|STRIP|LIBDIR_*)
 	    eval export "$var=$val";;
     esac
 done
@@ -73,7 +73,7 @@ if test ! -d "${out}/meson"; then
 fi
 
 export PKG_CONFIG_ALLOW_CROSS=1
-export CARGO_HOME="$d/cargo_home"
+export CARGO_HOME="$d/cargo_home_${CHOST}"
 mkdir -p ${CARGO_HOME}
 
 create_cargo_config
@@ -84,17 +84,33 @@ ninja -j 80 -C $out/meson
 # source is
 echo "cargo: Entering directory '$d'"
 
+echo "PKG_CONFIG: ${PKG_CONFIG}"
+echo "SYSROOT: ${SYSROOT}"
+
 cargo build --manifest-path $d/Cargo.toml --target="${CHOST}"
 
-# Take this from environment but default to hatch and my IP of the day
+# Take this from environment but default to my IP of the day
 DUT=${DUT:-192.168.86.226}
 
-rsync -av --progress $out/meson/subprojects/weston/libweston/libweston-9.so{,*.0} \
+ssh $DUT mkdir -p /usr/$LIBDIR/libweston-9 /usr/share/weston
+rsync -lav --progress \
+      $out/meson/subprojects/weston/libweston/libweston-9.so{,*[0-9]} \
+      $out/meson/subprojects/libinput/libinput.so{,*[0-9]} \
+      $out/meson/subprojects/libevdev/libevdev-fdo.so{,*[0-9]} \
       $DUT:/usr/$LIBDIR
-rsync -av --progress $out/meson/subprojects/weston/libweston/renderer-gl/gl-renderer.so \
+
+rsync -lav --progress \
+      $d/subprojects/weston/data/*.png \
+      $DUT:/usr/share/weston
+
+rsync -lav --progress \
+      $out/meson/subprojects/weston/libweston/renderer-gl/gl-renderer.so \
+      $out/meson/subprojects/weston/libweston/backend-drm/drm-backend.so \
       $DUT:/usr/$LIBDIR/libweston-9
-rsync -av --progress $out/croscomp \
+
+rsync -lav --progress $out/croscomp \
       $out/meson/subprojects/weston/clients/weston-{simple-splash,terminal} \
       $DUT:/usr/bin
+
 rsync -av --progress $d/croscomp-terminal $DUT:/usr/bin
 
