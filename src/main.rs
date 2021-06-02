@@ -72,8 +72,8 @@ extern "C" fn head_notify(_listener: *mut ffi::wl_listener, data: *mut ::std::os
         unsafe {
             let api = ffi::weston_plugin_api_get(
                 native,
-                ffi::WESTON_DRM_OUTPUT_API_NAME.as_ptr() as *const i8,
-                std::mem::size_of::<ffi::weston_drm_output_api>() as u64,
+                ffi::WESTON_DRM_OUTPUT_API_NAME.as_ptr() as *const _,
+                std::mem::size_of::<ffi::weston_drm_output_api>() as ffi::size_t,
             ) as *mut ffi::weston_drm_output_api;
 
             let output = native.create_output("output\0");
@@ -94,7 +94,7 @@ extern "C" fn head_notify(_listener: *mut ffi::wl_listener, data: *mut ::std::os
             set_gbm_format(output, std::ptr::null());
 
             let set_seat = (*api).set_seat.unwrap();
-            set_seat(output, "\0".as_ptr() as *const i8);
+            set_seat(output, "\0".as_ptr() as *const _);
 
             if ffi::weston_output_enable(output) != 0 {
                 println!("weston_output_enable return non-0");
@@ -191,7 +191,7 @@ impl Compositor {
     }
 
     fn start_client(&mut self, path: &str) {
-        unsafe { ffi::weston_client_start(&mut self.native, path.as_ptr() as *const i8) };
+        unsafe { ffi::weston_client_start(&mut self.native, path.as_ptr() as *const _) };
     }
 
     fn wake(&mut self) {
@@ -294,10 +294,7 @@ fn main() -> std::io::Result<()> {
     let compositor = Rc::new(RefCell::new(Compositor::new()));
     compositor.borrow_mut().init(ctx);
 
-    println!("set log handler");
     unsafe { ffi::weston_log_set_handler(Some(ffi::vlog), Some(ffi::vlog_continue)) }
-
-    println!("done set log handler");
 
     let mut listener = ffi::wl_listener::new(head_notify);
 
@@ -318,7 +315,7 @@ fn main() -> std::io::Result<()> {
     let mut config = ffi::weston_drm_backend_config {
         base: ffi::weston_backend_config {
             struct_version: ffi::WESTON_DRM_BACKEND_CONFIG_VERSION,
-            struct_size: std::mem::size_of::<ffi::weston_drm_backend_config>() as u64,
+            struct_size: std::mem::size_of::<ffi::weston_drm_backend_config>() as ffi::size_t,
         },
         tty: -1,
         use_pixman: false,

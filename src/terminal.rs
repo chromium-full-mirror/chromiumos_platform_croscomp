@@ -75,7 +75,7 @@ impl Terminal {
                 let client = unsafe {
                     ffi::weston_client_start(
                         &mut shell.compositor.borrow_mut().native,
-                        terminal_client_path.as_ptr() as *const i8,
+                        terminal_client_path.as_ptr() as *const _,
                     )
                 };
                 unsafe {

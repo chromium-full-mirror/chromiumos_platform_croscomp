@@ -216,7 +216,7 @@ impl weston_compositor {
     }
 
     pub fn create_output(&mut self, name: &str) -> &mut weston_output {
-        unsafe { &mut *weston_compositor_create_output(self, name.as_ptr() as *const i8) }
+        unsafe { &mut *weston_compositor_create_output(self, name.as_ptr() as *const _) }
     }
 }
 
