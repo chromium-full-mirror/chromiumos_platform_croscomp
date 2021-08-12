@@ -350,7 +350,7 @@ protocol_log_fn(void *user_data,
 static struct wl_list child_process_list;
 static struct weston_compositor *segv_compositor;
 
-static int
+int
 sigchld_handler(int signal_number, void *data)
 {
 	struct weston_process *p;

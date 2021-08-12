@@ -217,8 +217,43 @@ pub struct Server {
 
 impl Server {
     pub fn new() -> Self {
-        Server {
+        let mut server = Server {
             native: unsafe { ffi::wl_display_create() },
+        };
+
+        pub use nix::sys::signal::SIGCHLD;
+        server.on_signal(SIGCHLD as i32,
+                         |sig| unsafe { ffi::sigchld_handler(sig, std::ptr::null_mut()); });
+
+        server
+    }
+
+    pub fn on_signal<F>(&mut self, signal: i32, f: F)
+    where
+        F: Fn(i32),
+    {
+        let event_loop = unsafe { &mut *ffi::wl_display_get_event_loop(self.native) };
+
+        extern "C" fn call_closure<F>(signal: i32, data: *mut ::std::os::raw::c_void) -> i32
+        where
+            F: Fn(i32),
+        {
+            let f = unsafe { Box::from_raw(data as *mut F) };
+
+            f(signal);
+
+            1
+	}
+
+        let p = Box::into_raw(Box::new(f));
+
+        unsafe {
+            ffi::wl_event_loop_add_signal(
+                event_loop,
+                signal,
+                Some(call_closure::<F>),
+                p as *mut _,
+            );
         }
     }
 

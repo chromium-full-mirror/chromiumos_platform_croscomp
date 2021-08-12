@@ -46,6 +46,8 @@ struct weston_process {
 	struct wl_list link;
 };
 
+int sigchld_handler(int signal_number, void *data);
+
 struct wl_client *
 weston_client_launch(struct weston_compositor *compositor,
 		     struct weston_process *proc,
