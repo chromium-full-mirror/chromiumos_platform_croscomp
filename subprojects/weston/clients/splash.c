@@ -204,6 +204,7 @@ static const struct wl_callback_listener frame_listener;
 #define CACHELINE_SIZE 64
 #define CACHELINE_MASK 63
 
+#ifdef __x86_64
 static inline void
 clflush_range(void *start, size_t size)
 {
@@ -217,6 +218,12 @@ clflush_range(void *start, size_t size)
       p += CACHELINE_SIZE;
    }
 }
+#else
+static inline void
+clflush_range(void *start, size_t size)
+{
+}
+#endif
 
 static void
 redraw(void *data, struct wl_callback *callback, uint32_t time)
