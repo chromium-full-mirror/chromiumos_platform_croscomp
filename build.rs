@@ -78,12 +78,9 @@ fn main() {
         "libevdev",
     ];
 
-    let chost = env::var("CHOST").unwrap();
+    let build_dir = env::var("MESON_BUILD_DIR").unwrap();
     for p in &lib_paths {
-        println!(
-            "cargo:rustc-flags=-Ltarget/{}/debug/meson/subprojects/{}",
-            chost, p
-        );
+        println!("cargo:rustc-flags=-L{}/subprojects/{}", build_dir, p);
     }
 
     println!("cargo:rustc-link-lib=exec_weston");

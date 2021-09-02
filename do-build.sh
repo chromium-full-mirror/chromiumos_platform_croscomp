@@ -79,6 +79,7 @@ mkdir -p ${CARGO_HOME}
 create_cargo_config
 
 ninja -j 80 -C $out/meson
+export MESON_BUILD_DIR=$out/meson
 
 # Print this message to help emacs compile mode figure out where the
 # source is
@@ -87,7 +88,7 @@ echo "cargo: Entering directory '$d'"
 echo "PKG_CONFIG: ${PKG_CONFIG}"
 echo "SYSROOT: ${SYSROOT}"
 
-cargo build --manifest-path $d/Cargo.toml --target="${CHOST}"
+cargo build -vv --manifest-path $d/Cargo.toml --target="${CHOST}"
 
 # Take this from environment but default to my IP of the day
 DUT=${DUT:-192.168.86.226}
