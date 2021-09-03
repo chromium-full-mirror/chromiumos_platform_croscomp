@@ -17,8 +17,6 @@ done
 eval export LIBDIR="\$LIBDIR_$ABI"
 
 create_cross_file() {
-    ECLASS_PATH=~/trunk/src/third_party/portage-stable/eclass
-
     inherit() { :; }
     EXPORT_FUNCTIONS() { :; }
     EAPI=7
@@ -27,8 +25,8 @@ create_cross_file() {
     # encounters EOF
     set +e
 
-    source ${ECLASS_PATH}/toolchain-funcs.eclass
-    source ${ECLASS_PATH}/meson.eclass
+    source ../../third_party/portage-stable/eclass/toolchain-funcs.eclass
+    source ../../third_party/eclass-overlay/eclass/meson.eclass
 
     T=$1
     mkdir -p $T
