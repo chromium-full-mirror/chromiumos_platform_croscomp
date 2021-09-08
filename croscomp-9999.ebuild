@@ -72,5 +72,11 @@ src_compile() {
 }
 
 src_install() {
+	# cargo doesn't know how to install cross-compiled binaries.  It will
+	# always install native binaries for the host system.  Manually install
+	# crosvm instead.
+	local build_dir="$(cros-rust_get_build_dir)"
+	dobin "${build_dir}/croscomp"
+
 	meson_src_install
 }
