@@ -21,12 +21,10 @@ COMMON_DEPEND="
 	x11-libs/cairo:=
 	sys-libs/mtdev:=
 	x11-libs/libxkbcommon:=
-	dev-libs/wayland-protocols:=
 	x11-libs/pixman:=
 	x11-libs/pango:=
 	dev-libs/wayland:=
 	dev-libs/expat:=
-	media-libs/jpeg:=
 	media-libs/lcms:=
 	>=x11-libs/libdrm-2.4.94:=
 "
@@ -35,6 +33,7 @@ RDEPEND="${COMMON_DEPEND}
 "
 
 DEPEND="${COMMON_DEPEND}
+	virtual/bindgen:=
 	>=dev-rust/libc-0.2.44:= <dev-rust/libc-0.3.0
 	=dev-rust/cfg-if-1.0.0:=
 	>=dev-rust/parking_lot-0.7.1:=
@@ -43,7 +42,7 @@ DEPEND="${COMMON_DEPEND}
 
 BDEPEND="
 	virtual/pkgconfig
-	=dev-rust/bindgen-0.56.0:=
+	dev-libs/wayland-protocols:=
 "
 
 src_unpack() {
