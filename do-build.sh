@@ -20,6 +20,7 @@ create_cross_file() {
     inherit() { :; }
     EXPORT_FUNCTIONS() { :; }
     EAPI=7
+    get_libdir() { echo ${LIBDIR}; }
 
     # meson.eclass has a read call that returns non-0 when it
     # encounters EOF
@@ -57,7 +58,7 @@ EOF
 
 out=$d/target/$CHOST/debug
 
-cross_file="${out}/meson.${CHOST}.${ABI}"
+cross_file="${out}/meson.${CHOST}.${ABI}.ini"
 if test ! -e "${cross_file}"; then
     # Run this in a subshell to avoid all the eclass variables
     # spilling into our namespace.
