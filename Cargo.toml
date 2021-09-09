@@ -15,4 +15,3 @@ nix = "*"
 
 [build-dependencies]
 wayland-scanner = { version = "0.28.2", path = "third_party/wayland-scanner" }
-bindgen = "0.56"

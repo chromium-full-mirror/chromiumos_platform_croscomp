@@ -1,10 +1,30 @@
-extern crate bindgen;
 extern crate wayland_scanner;
 
 use std::env;
 use std::path::Path;
 use std::path::PathBuf;
+use std::process::Command;
 use wayland_scanner::*;
+
+
+fn run_bindgen(header: &str, output: &str) {
+    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+
+    Command::new("bindgen")
+	.args(&["-o", out_path.join(output).to_str().unwrap()])
+	.arg("--no-doc-comments")
+	.arg("--no-layout-tests")
+	.args(&["--new-type-alias", "wl_fixed_t"])
+	.args(&["--default-enum-style", "rust_non_exhaustive"])
+	.args(&["--bitfield-enum", "weston_keyboard_modifier"])
+	.args(&["--bitfield-enum", "wl_shell_surface_resize"])
+	.arg(header)
+	.arg("--")
+	.arg("-I/usr/include/pixman-1")
+	.arg("-I./subprojects/weston/include")
+	.arg("-I./bindgen/block")
+	.status().unwrap();
+}
 
 fn main() {
     let protocols = [
@@ -35,40 +55,10 @@ fn main() {
         generate_code_with_destructor_events(spec, out, Side::Server, &[("wl_callback", "done")]);
     }
 
-    let bindings = bindgen::Builder::default()
-        .clang_arg("-I/usr/include/pixman-1")
-        .clang_arg("-I./subprojects/weston/include")
-        .clang_arg("-I./bindgen/block")
-        .header("./subprojects/weston/include/libweston/backend-drm.h")
-        .header("./subprojects/weston/desktop-shell/shell.h")
-        .header("./subprojects/weston/compositor/weston.h")
-        .generate_comments(false)
-        .new_type_alias("wl_fixed_t")
-        .default_enum_style(bindgen::EnumVariation::Rust {
-            non_exhaustive: true,
-        })
-        .bitfield_enum("weston_keyboard_modifier")
-        .bitfield_enum("wl_shell_surface_resize")
-        .layout_tests(false)
-        .parse_callbacks(Box::new(bindgen::CargoCallbacks))
-        .generate()
-        .expect("Unable to generate bindings");
+    Command::new("pwd").status().unwrap();
 
-    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
-    bindings
-        .write_to_file(out_path.join("bindings.rs"))
-        .expect("Couldn't write bindings!");
-
-    let bindings = bindgen::Builder::default()
-        .header("/usr/include/linux/input.h")
-        .generate_comments(false)
-        .generate()
-        .expect("Unable to generate input.h bindings");
-
-    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
-    bindings
-        .write_to_file(out_path.join("input.rs"))
-        .expect("Couldn't write bindings!");
+    run_bindgen("/usr/include/linux/input.h", "input.rs");
+    run_bindgen("./subprojects/weston/croscomp_weston.h", "croscomp_weston.rs");
 
     let lib_paths = [
         "weston/compositor",

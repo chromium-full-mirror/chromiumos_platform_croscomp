@@ -125,7 +125,7 @@ macro_rules! wl_list_iter_mut {
     })
 }
 
-include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+include!(concat!(env!("OUT_DIR"), "/croscomp_weston.rs"));
 
 type NotifyFunc =
     unsafe extern "C" fn(listener: *mut wl_listener, data: *mut ::std::os::raw::c_void);
