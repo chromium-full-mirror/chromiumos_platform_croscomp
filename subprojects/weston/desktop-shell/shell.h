@@ -632,6 +632,3 @@ weston_desktop_xdg_shell_v6_create(struct desktop_shell *shell,
 struct wl_global *
 weston_desktop_wl_shell_create(struct desktop_shell *shell,
 			       struct wl_display *display);
-
-int
-exo_extensions_init(struct desktop_shell *shell);
