@@ -63,7 +63,6 @@ fn main() {
     run_bindgen("./subprojects/weston/croscomp_weston.h", "croscomp_weston.rs");
 
     let lib_paths = [
-        "weston/compositor",
         "weston/desktop-shell",
         "weston/libweston",
         "libinput",
@@ -75,7 +74,6 @@ fn main() {
         println!("cargo:rustc-flags=-L{}/subprojects/{}", build_dir, p);
     }
 
-    println!("cargo:rustc-link-lib=exec_weston");
     println!("cargo:rustc-link-lib=desktop-shell");
     println!("cargo:rustc-link-lib=weston-9");
     println!("cargo:rustc-link-lib=input");

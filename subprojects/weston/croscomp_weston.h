@@ -6,4 +6,3 @@
 
 #include "include/libweston/backend-drm.h"
 #include "desktop-shell/shell.h"
-#include "compositor/weston.h"

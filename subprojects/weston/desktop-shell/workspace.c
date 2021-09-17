@@ -38,7 +38,6 @@
 #include <wayland-server.h>
 
 #include "shell.h"
-#include "compositor/weston.h"
 #include <libweston/config-parser.h>
 #include <libweston/libweston.h>
 #include <libweston/libweston.h>

@@ -1851,10 +1851,6 @@ typedef void (*weston_screenshooter_done_func_t)(void *data,
 int
 weston_screenshooter_shoot(struct weston_output *output, struct weston_buffer *buffer,
 			   weston_screenshooter_done_func_t done, void *data);
-struct weston_recorder *
-weston_recorder_start(struct weston_output *output, const char *filename);
-void
-weston_recorder_stop(struct weston_recorder *recorder);
 
 struct weston_view_animation;
 typedef	void (*weston_view_animation_done_func_t)(struct weston_view_animation *animation, void *data);

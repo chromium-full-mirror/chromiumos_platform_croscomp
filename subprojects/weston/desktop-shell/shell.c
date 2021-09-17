@@ -36,9 +36,11 @@
 #include <math.h>
 #include <sys/types.h>
 #include <wayland-server.h>
+#include <errno.h>
+#include <sys/socket.h>
+#include <sys/wait.h>
 
 #include "shell.h"
-#include "compositor/weston.h"
 #include <libweston/config-parser.h>
 #include <libweston/libweston.h>
 #include <libweston/libweston.h>
@@ -46,6 +48,7 @@
 #include "shared/zalloc.h"
 #include "shared/helpers.h"
 #include "shared/timespec-util.h"
+#include "shared/os-compatibility.h"
 
 #define DEFAULT_NUM_WORKSPACES 1
 
@@ -302,86 +305,18 @@ static void
 center_on_output(struct weston_view *view,
 		 struct weston_output *output);
 
-static enum weston_keyboard_modifier
-get_modifier(char *modifier)
-{
-	if (!modifier)
-		return MODIFIER_SUPER;
-
-	if (!strcmp("ctrl", modifier))
-		return MODIFIER_CTRL;
-	else if (!strcmp("alt", modifier))
-		return MODIFIER_ALT;
-	else if (!strcmp("super", modifier))
-		return MODIFIER_SUPER;
-	else if (!strcmp("none", modifier))
-		return 0;
-	else
-		return MODIFIER_SUPER;
-}
-
-static enum animation_type
-get_animation_type(char *animation)
-{
-	if (!animation)
-		return ANIMATION_NONE;
-
-	if (!strcmp("zoom", animation))
-		return ANIMATION_ZOOM;
-	else if (!strcmp("fade", animation))
-		return ANIMATION_FADE;
-	else if (!strcmp("dim-layer", animation))
-		return ANIMATION_DIM_LAYER;
-	else
-		return ANIMATION_NONE;
-}
-
 static void
 shell_configuration(struct desktop_shell *shell)
 {
-	struct weston_config_section *section;
-	char *s, *client;
-	bool allow_zap;
-
-	section = weston_config_get_section(wet_get_config(shell->compositor),
-					    "shell", NULL, NULL);
-	client = wet_get_libexec_path(WESTON_SHELL_CLIENT);
-	weston_config_section_get_string(section, "client", &s, client);
-	free(client);
-	shell->client = s;
-
-	weston_config_section_get_bool(section,
-				       "allow-zap", &allow_zap, true);
-	shell->allow_zap = allow_zap;
-
-	weston_config_section_get_string(section,
-					 "binding-modifier", &s, "super");
-	shell->binding_modifier = get_modifier(s);
-	free(s);
-
-	weston_config_section_get_string(section,
-					 "exposay-modifier", &s, "none");
-	shell->exposay_modifier = get_modifier(s);
-	free(s);
-
-	weston_config_section_get_string(section, "animation", &s, "none");
-	shell->win_animation_type = get_animation_type(s);
-	free(s);
-	weston_config_section_get_string(section, "close-animation", &s, "fade");
-	shell->win_close_animation_type = get_animation_type(s);
-	free(s);
-	weston_config_section_get_string(section,
-					 "startup-animation", &s, "fade");
-	shell->startup_animation_type = get_animation_type(s);
-	free(s);
-	if (shell->startup_animation_type == ANIMATION_ZOOM)
-		shell->startup_animation_type = ANIMATION_NONE;
-	weston_config_section_get_string(section, "focus-animation", &s, "none");
-	shell->focus_animation_type = get_animation_type(s);
-	free(s);
-	weston_config_section_get_uint(section, "num-workspaces",
-				       &shell->workspaces.num,
-				       DEFAULT_NUM_WORKSPACES);
+	shell->client = strdup(LIBEXECDIR "/weston-desktop-shell");
+	shell->allow_zap = true;
+	shell->binding_modifier = MODIFIER_SUPER;
+	shell->exposay_modifier = 0;
+	shell->win_animation_type = ANIMATION_NONE;
+	shell->win_close_animation_type = ANIMATION_FADE;
+	shell->startup_animation_type = ANIMATION_ZOOM;
+	shell->focus_animation_type = ANIMATION_NONE;
+	shell->workspaces.num = 2;
 }
 
 struct weston_output *
@@ -2864,9 +2799,6 @@ shell_destroy(struct wl_listener *listener, void *data)
 	wl_list_remove(&shell->idle_listener.link);
 	wl_list_remove(&shell->wake_listener.link);
 
-	text_backend_destroy(shell->text_backend);
-	input_panel_destroy(shell);
-
 	wl_list_for_each_safe(shell_output, tmp, &shell->output_list, link) {
 		wl_list_remove(&shell_output->destroy_listener.link);
 		wl_list_remove(&shell_output->link);
@@ -2996,13 +2928,6 @@ desktop_shell_init(struct desktop_shell *shell,
 	wl_array_init(&shell->workspaces.array);
 	wl_list_init(&shell->workspaces.client_list);
 
-	if (input_panel_setup(shell) < 0)
-		return -1;
-
-	shell->text_backend = text_backend_init(ec);
-	if (!shell->text_backend)
-		return -1;
-
 	shell_configuration(shell);
 
 	shell->exposay.state_cur = EXPOSAY_LAYOUT_INACTIVE;
@@ -3028,29 +2953,11 @@ desktop_shell_init(struct desktop_shell *shell,
 	shell->resized_listener.notify = handle_output_resized;
 	wl_signal_add(&ec->output_resized_signal, &shell->resized_listener);
 
-	screenshooter_create(ec);
-
 	shell_add_bindings(ec, shell);
 
 	clock_gettime(CLOCK_MONOTONIC, &shell->startup_time);
 
 	return 0;
-}
-
-WL_EXPORT int
-wet_shell_init(struct weston_compositor *ec,
-	       int *argc, char *argv[])
-{
-	int ret;
-	struct desktop_shell *shell = zalloc(sizeof *shell);
-	if (shell == NULL)
-		return -1;
-
-	ret = desktop_shell_init(shell, ec);
-	if (ret == -1)
-		free(shell);
-
-	return ret;
 }
 
 /* croscomp rs glue code */
@@ -3066,3 +2973,189 @@ vlog_continue(const char *fmt, va_list argp)
 {
 	return vlog(fmt, argp);
 }
+
+static struct wl_list child_process_list;
+
+int
+sigchld_handler(int signal_number, void *data)
+{
+	struct weston_process *p;
+	int status;
+	pid_t pid;
+
+	while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+		wl_list_for_each(p, &child_process_list, link) {
+			if (p->pid == pid)
+				break;
+		}
+
+		if (&p->link == &child_process_list) {
+			weston_log("unknown child process exited\n");
+			continue;
+		}
+
+		wl_list_remove(&p->link);
+		p->cleanup(p, status);
+	}
+
+	if (pid < 0 && errno != ECHILD)
+		weston_log("waitpid error %s\n", strerror(errno));
+
+	return 1;
+}
+
+static void
+child_client_exec(int sockfd, const char *path)
+{
+	int clientfd;
+	char s[32];
+	sigset_t allsigs;
+
+	/* do not give our signal mask to the new process */
+	sigfillset(&allsigs);
+	sigprocmask(SIG_UNBLOCK, &allsigs, NULL);
+
+	/* Launch clients as the user. Do not launch clients with wrong euid. */
+	if (seteuid(getuid()) == -1) {
+		weston_log("compositor: failed seteuid\n");
+		return;
+	}
+
+	/* SOCK_CLOEXEC closes both ends, so we dup the fd to get a
+	 * non-CLOEXEC fd to pass through exec. */
+	clientfd = dup(sockfd);
+	if (clientfd == -1) {
+		weston_log("compositor: dup failed: %s\n", strerror(errno));
+		return;
+	}
+
+	snprintf(s, sizeof s, "%d", clientfd);
+	setenv("WAYLAND_SOCKET", s, 1);
+
+	if (execl(path, path, NULL) < 0)
+		weston_log("compositor: executing '%s' failed: %s\n",
+			   path, strerror(errno));
+}
+
+WL_EXPORT struct wl_client *
+weston_client_launch(struct weston_compositor *compositor,
+		     struct weston_process *proc,
+		     const char *path,
+		     weston_process_cleanup_func_t cleanup)
+{
+	int sv[2];
+	pid_t pid;
+	struct wl_client *client;
+
+	weston_log("launching '%s'\n", path);
+
+	if (os_socketpair_cloexec(AF_UNIX, SOCK_STREAM, 0, sv) < 0) {
+		weston_log("weston_client_launch: "
+			   "socketpair failed while launching '%s': %s\n",
+			   path, strerror(errno));
+		return NULL;
+	}
+
+	pid = fork();
+	if (pid == -1) {
+		close(sv[0]);
+		close(sv[1]);
+		weston_log("weston_client_launch: "
+			   "fork failed while launching '%s': %s\n", path,
+			   strerror(errno));
+		return NULL;
+	}
+
+	if (pid == 0) {
+		child_client_exec(sv[1], path);
+		_exit(-1);
+	}
+
+	close(sv[1]);
+
+	client = wl_client_create(compositor->wl_display, sv[0]);
+	if (!client) {
+		close(sv[0]);
+		weston_log("weston_client_launch: "
+			"wl_client_create failed while launching '%s'.\n",
+			path);
+		return NULL;
+	}
+
+	proc->pid = pid;
+	proc->cleanup = cleanup;
+	weston_watch_process(proc);
+
+	return client;
+}
+
+WL_EXPORT void
+weston_watch_process(struct weston_process *process)
+{
+	if (child_process_list.next == NULL)
+		wl_list_init(&child_process_list);
+
+	wl_list_insert(&child_process_list, &process->link);
+}
+
+struct process_info {
+	struct weston_process proc;
+	char *path;
+};
+
+static void
+process_handle_sigchld(struct weston_process *process, int status)
+{
+	struct process_info *pinfo =
+		container_of(process, struct process_info, proc);
+
+	/*
+	 * There are no guarantees whether this runs before or after
+	 * the wl_client destructor.
+	 */
+
+	if (WIFEXITED(status)) {
+		weston_log("%s exited with status %d\n", pinfo->path,
+			   WEXITSTATUS(status));
+	} else if (WIFSIGNALED(status)) {
+		weston_log("%s died on signal %d\n", pinfo->path,
+			   WTERMSIG(status));
+	} else {
+		weston_log("%s disappeared\n", pinfo->path);
+	}
+
+	free(pinfo->path);
+	free(pinfo);
+}
+
+WL_EXPORT struct wl_client *
+weston_client_start(struct weston_compositor *compositor, const char *path)
+{
+	struct process_info *pinfo;
+	struct wl_client *client;
+
+	pinfo = zalloc(sizeof *pinfo);
+	if (!pinfo)
+		return NULL;
+
+	pinfo->path = strdup(path);
+	if (!pinfo->path)
+		goto out_free;
+
+	client = weston_client_launch(compositor, &pinfo->proc, path,
+				      process_handle_sigchld);
+	if (!client)
+		goto out_str;
+
+	return client;
+
+out_str:
+	free(pinfo->path);
+
+out_free:
+	free(pinfo);
+
+	return NULL;
+}
+
+ 
