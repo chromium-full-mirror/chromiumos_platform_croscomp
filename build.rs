@@ -10,7 +10,9 @@ use wayland_scanner::*;
 fn run_bindgen(header: &str, output: &str) {
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
 
-    Command::new("bindgen")
+    let sysroot = env::var("SYSROOT").unwrap_or("/".to_string());
+
+    let status = Command::new("bindgen")
 	.args(&["-o", out_path.join(output).to_str().unwrap()])
 	.arg("--no-doc-comments")
 	.arg("--no-layout-tests")
@@ -20,10 +22,13 @@ fn run_bindgen(header: &str, output: &str) {
 	.args(&["--bitfield-enum", "wl_shell_surface_resize"])
 	.arg(header)
 	.arg("--")
+	.arg(format!("--sysroot={}", sysroot))
 	.arg("-I/usr/include/pixman-1")
 	.arg("-I./subprojects/weston/include")
 	.arg("-I./bindgen/block")
 	.status().unwrap();
+
+    assert!(status.success())
 }
 
 fn main() {
@@ -51,11 +56,8 @@ fn main() {
         let spec = Path::new("protocol").join(e).with_extension("xml");
         let out = out_dir.join(e).with_extension("rs");
         println!("cargo:rerun-if-changed={}", spec.to_str().unwrap());
-        println!("// out: {}", out.to_str().unwrap());
         generate_code_with_destructor_events(spec, out, Side::Server, &[("wl_callback", "done")]);
     }
-
-    Command::new("pwd").status().unwrap();
 
     run_bindgen("/usr/include/linux/input.h", "input.rs");
     run_bindgen("./subprojects/weston/croscomp_weston.h", "croscomp_weston.rs");
