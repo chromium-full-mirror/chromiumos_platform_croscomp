@@ -32,14 +32,6 @@ dep_libexec_weston = declare_dependency(
 	include_directories: [ include_directories('.'), public_inc ],
 	dependencies: dep_libweston_public
 )
-exe_weston = executable(
-	'weston',
-	'executable.c',
-	include_directories: common_inc,
-	dependencies: dep_libexec_weston,
-	install_rpath: dir_module_weston,
-	install: true
-)
 install_headers('weston.h', subdir: 'weston')
 
 pkgconfig.generate(
