@@ -73,9 +73,9 @@ pub fn init(rc: &Rc<RefCell<crate::Shell>>) {
     Box::into_raw(Box::new(global));
 
     let rc = Rc::clone(&shell.compositor);
-    compositor.server.when_idle(move || {
-        let path = "/usr/bin/weston-simple-splash\0";
+    compositor.server.event_loop.when_idle(move || {
+        let path = "/usr/bin/weston-simple-splash";
         let mut compositor = rc.borrow_mut();
-        compositor.start_client(path);
+        compositor.launch_client(path).unwrap();
     });
 }

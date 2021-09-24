@@ -72,12 +72,8 @@ impl Terminal {
             (None, None) => {
                 let terminal_client_path = "/usr/bin/croscomp-terminal\0";
 
-                let client = unsafe {
-                    ffi::weston_client_start(
-                        &mut shell.compositor.borrow_mut().native,
-                        terminal_client_path.as_ptr() as *const _,
-                    )
-                };
+                let mut compositor = shell.compositor.borrow_mut();
+		let client = compositor.launch_client(terminal_client_path).unwrap();
                 unsafe {
                     ffi::wl_client_add_destroy_listener(
                         client,

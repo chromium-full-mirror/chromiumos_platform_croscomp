@@ -3,10 +3,8 @@
 // found in the LICENSE file.
 
 use std::marker::PhantomData;
-use std::os::unix::io::{FromRawFd, IntoRawFd, RawFd};
-use std::os::unix::net::{SocketAddr, UnixListener};
-
 use wayland_server::MessageGroup;
+use crate::event_loop::EventLoop;
 
 use crate::ffi;
 
@@ -213,107 +211,20 @@ impl<I: wayland_server::Interface> Global<I> {
 #[derive(Debug)]
 pub struct Server {
     pub native: *mut ffi::wl_display,
+    pub event_loop: EventLoop,
 }
 
 impl Server {
     pub fn new() -> Self {
-        let mut server = Server {
-            native: unsafe { ffi::wl_display_create() },
-        };
+	let native_display = unsafe { ffi::wl_display_create() };
+        let native_event_loop = unsafe {
+	    &mut *ffi::wl_display_get_event_loop(native_display)
+	};
 
-        pub use nix::sys::signal::SIGCHLD;
-        server.on_signal(SIGCHLD as i32,
-                         |sig| unsafe { ffi::sigchld_handler(sig, std::ptr::null_mut()); });
-
-        server
-    }
-
-    pub fn on_signal<F>(&mut self, signal: i32, f: F)
-    where
-        F: Fn(i32),
-    {
-        let event_loop = unsafe { &mut *ffi::wl_display_get_event_loop(self.native) };
-
-        extern "C" fn call_closure<F>(signal: i32, data: *mut ::std::os::raw::c_void) -> i32
-        where
-            F: Fn(i32),
-        {
-            let f = unsafe { Box::from_raw(data as *mut F) };
-
-            f(signal);
-
-            1
-	}
-
-        let p = Box::into_raw(Box::new(f));
-
-        unsafe {
-            ffi::wl_event_loop_add_signal(
-                event_loop,
-                signal,
-                Some(call_closure::<F>),
-                p as *mut _,
-            );
+        Server {
+            native: native_display,
+	    event_loop: EventLoop::new(native_event_loop),
         }
-    }
-
-    pub fn when_idle<F>(&mut self, f: F)
-    where
-        F: FnOnce(),
-    {
-        let event_loop = unsafe { &mut *ffi::wl_display_get_event_loop(self.native) };
-
-        extern "C" fn call_closure<F>(data: *mut ::std::os::raw::c_void)
-        where
-            F: FnOnce(),
-        {
-            let f = unsafe { Box::from_raw(data as *mut F) };
-
-            f()
-        }
-
-        let p = Box::into_raw(Box::new(f));
-
-        unsafe {
-            ffi::wl_event_loop_add_idle(event_loop, Some(call_closure::<F>), p as *mut _);
-        }
-    }
-
-    pub fn on_connect<F>(&mut self, listener: UnixListener, f: F)
-    where
-        F: Fn(RawFd, SocketAddr),
-    {
-        let event_loop = unsafe { &mut *ffi::wl_display_get_event_loop(self.native) };
-
-        extern "C" fn call_closure<F>(fd: i32, _: u32, data: *mut ::std::os::raw::c_void) -> i32
-        where
-            F: Fn(RawFd, SocketAddr),
-        {
-            let listener = unsafe { UnixListener::from_raw_fd(fd) };
-            let f = unsafe { &*(data as *mut F) };
-            match listener.accept() {
-                Ok((socket, addr)) => f(socket.into_raw_fd(), addr),
-                Err(_) => (),
-            }
-
-            1
-        }
-
-        let p = Box::into_raw(Box::new(f));
-
-        unsafe {
-            ffi::wl_event_loop_add_fd(
-                event_loop,
-                listener.into_raw_fd(),
-                ffi::WL_EVENT_READABLE as u32,
-                Some(call_closure::<F>),
-                p as *mut _,
-            );
-        }
-    }
-
-    pub fn create_client(&self, fd: RawFd) -> *mut ffi::wl_client {
-        unsafe { ffi::wl_client_create(self.native, fd) }
     }
 
     pub fn create_global<I>(&mut self, version: u32) -> Global<I>

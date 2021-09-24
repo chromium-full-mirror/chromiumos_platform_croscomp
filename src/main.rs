@@ -5,11 +5,20 @@
 #[macro_use]
 extern crate bitflags;
 
+use nix::sys::wait::{waitpid, WaitPidFlag};
+use nix::sys::signal::{SigSet, SigmaskHow, sigprocmask};
+use nix::unistd::dup;
+
+use std::env::set_var;
+
+use std::os::unix::io::{AsRawFd, IntoRawFd, RawFd};
 use std::cell::RefCell;
 use std::env;
 use std::io::ErrorKind;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::rc::Rc;
+use std::process::Command;
+use std::os::unix::process::CommandExt;
 
 #[macro_use]
 mod ffi;
@@ -25,6 +34,7 @@ mod server;
 mod splash;
 mod switcher;
 mod terminal;
+mod event_loop;
 
 use server::Server;
 
@@ -190,8 +200,27 @@ impl Compositor {
         };
     }
 
-    fn start_client(&mut self, path: &str) {
-        unsafe { ffi::weston_client_start(&mut self.native, path.as_ptr() as *const _) };
+    pub fn create_client(&self, fd: RawFd) -> *mut ffi::wl_client {
+        unsafe { ffi::wl_client_create(self.server.native, fd) }
+    }
+
+    pub fn launch_client(&mut self, path: &str) -> std::io::Result<*mut ffi::wl_client>{
+	let (client_stream, server_stream) = UnixStream::pair()?;
+	let fd = client_stream.as_raw_fd();
+
+	unsafe {
+	    Command::new(path)
+		.pre_exec(move || {
+		    sigprocmask(SigmaskHow::SIG_UNBLOCK,
+				Some(&SigSet::all()), None).expect("sigprocmask failed");
+		    let fd = dup(fd).expect("dup failed");
+		    set_var("WAYLAND_SOCKET", fd.to_string());
+		    Ok(())
+		})
+		.spawn()?;
+	}
+
+	Ok(self.create_client(server_stream.into_raw_fd()))
     }
 
     fn wake(&mut self) {
@@ -338,15 +367,25 @@ fn main() -> std::io::Result<()> {
 
     compositor.borrow_mut().flush_heads_changed();
 
+    compositor
+	.borrow_mut()
+	.server
+	.event_loop
+	.on_signal(nix::sys::signal::SIGCHLD as i32,
+                   move |_sig| {
+		       let _ = waitpid(None, Some(WaitPidFlag::WNOHANG));
+		   });
+
     let sock = bind_socket();
 
     let rc = Rc::clone(&compositor);
     compositor
         .borrow_mut()
         .server
+	.event_loop
         .on_connect(sock, move |fd, _| {
             let compositor = rc.borrow_mut();
-            compositor.server.create_client(fd);
+            compositor.create_client(fd);
         });
 
     let shell = Rc::new(RefCell::new(Shell::new(&compositor)));
