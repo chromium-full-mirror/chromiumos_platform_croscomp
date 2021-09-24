@@ -75,7 +75,10 @@ export PKG_CONFIG_ALLOW_CROSS=1
 export CARGO_HOME="$d/cargo_home_${CHOST}"
 mkdir -p ${CARGO_HOME}
 
-create_cargo_config
+if test ! -e "${CARGO_HOME}/config"; then
+    echo create cargo config
+    create_cargo_config
+fi
 
 ninja -j 80 -C $out/meson
 export MESON_BUILD_DIR=$out/meson
