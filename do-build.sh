@@ -90,7 +90,7 @@ echo "cargo: Entering directory '$d'"
 echo "PKG_CONFIG: ${PKG_CONFIG}"
 echo "SYSROOT: ${SYSROOT}"
 
-cargo build -vv --manifest-path $d/Cargo.toml --target="${CHOST}"
+cargo build -v --manifest-path $d/Cargo.toml --target="${CHOST}"
 
 # Take this from environment but default to my IP of the day
 DUT=${DUT:-192.168.86.226}
