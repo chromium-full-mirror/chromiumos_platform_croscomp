@@ -249,6 +249,14 @@ impl Compositor {
         )
     }
 
+    fn output_iter_mut(&mut self) -> ffi::WlListIterMut<ffi::weston_output> {
+        wl_list_iter_mut!(&mut self.native.output_list, ffi::weston_output, link)
+    }
+
+    fn default_output(&mut self) -> Option<&mut ffi::weston_output> {
+        self.output_iter_mut().next()
+    }
+
     fn create_surface(&self) -> *mut ffi::weston_surface {
         unsafe { ffi::weston_surface_create(&self.native as *const _ as *mut _) }
     }
@@ -309,6 +317,35 @@ impl Shell {
                     kill(nix::unistd::Pid::from_raw(pid), nix::sys::signal::SIGTERM).unwrap();
                 }
             });
+
+            let rc = Rc::clone(&self.compositor);
+            let backlight_binding =
+                move |_: &mut ffi::weston_keyboard, _: *const ffi::timespec, key: u32| {
+                    let mut compositor = rc.borrow_mut();
+                    let mut output = match compositor.default_output() {
+                        Some(o) => o,
+                        _ => return,
+                    };
+                    let backlight = (output.backlight_current
+                        + match key {
+                            KEY_F9 | KEY_BRIGHTNESSDOWN => -25,
+                            KEY_F10 | KEY_BRIGHTNESSUP => 25,
+                            _ => return,
+                        })
+                    .min(255)
+                    .max(5);
+
+                    output.backlight_current = backlight;
+
+                    if let Some(set_backlight) = output.set_backlight {
+                        unsafe { set_backlight(output, backlight as u32) }
+                    }
+                };
+
+            compositor.bind_key(KEY_BRIGHTNESSDOWN, no_mods, backlight_binding.clone());
+            compositor.bind_key(KEY_BRIGHTNESSUP, no_mods, backlight_binding.clone());
+            compositor.bind_key(KEY_F9, mods, backlight_binding.clone());
+            compositor.bind_key(KEY_F10, mods, backlight_binding.clone());
         }
 
         self.create_background_surface();

@@ -2537,39 +2537,6 @@ weston_view_set_initial_position(struct weston_view *view,
 }
 
 static void
-backlight_binding(struct weston_keyboard *keyboard, const struct timespec *time,
-		  uint32_t key, void *data)
-{
-	struct weston_compositor *compositor = data;
-	struct weston_output *output;
-	long backlight_new = 0;
-
-	/* TODO: we're limiting to simple use cases, where we assume just
-	 * control on the primary display. We'd have to extend later if we
-	 * ever get support for setting backlights on random desktop LCD
-	 * panels though */
-	output = get_default_output(compositor);
-	if (!output)
-		return;
-
-	if (!output->set_backlight)
-		return;
-
-	if (key == KEY_F9 || key == KEY_BRIGHTNESSDOWN)
-		backlight_new = output->backlight_current - 25;
-	else if (key == KEY_F10 || key == KEY_BRIGHTNESSUP)
-		backlight_new = output->backlight_current + 25;
-
-	if (backlight_new < 5)
-		backlight_new = 5;
-	if (backlight_new > 255)
-		backlight_new = 255;
-
-	output->backlight_current = backlight_new;
-	output->set_backlight(output, output->backlight_current);
-}
-
-static void
 shell_reposition_view_on_output_change(struct weston_view *view)
 {
 	struct weston_output *output, *first_output;
@@ -2797,10 +2764,6 @@ shell_add_bindings(struct weston_compositor *ec, struct desktop_shell *shell)
 	weston_compositor_add_touch_binding(ec, 0,
 					    touch_to_activate_binding,
 					    shell);
-	weston_compositor_add_key_binding(ec, KEY_BRIGHTNESSDOWN, 0,
-				          backlight_binding, ec);
-	weston_compositor_add_key_binding(ec, KEY_BRIGHTNESSUP, 0,
-				          backlight_binding, ec);
 
 	/* configurable bindings */
 	if (shell->exposay_modifier)
@@ -2834,11 +2797,6 @@ shell_add_bindings(struct weston_compositor *ec, struct desktop_shell *shell)
 	if (ec->capabilities & WESTON_CAP_ROTATION_ANY)
 		weston_compositor_add_button_binding(ec, BTN_MIDDLE, mod,
 						     rotate_binding, NULL);
-
-	weston_compositor_add_key_binding(ec, KEY_F9, mod, backlight_binding,
-					  ec);
-	weston_compositor_add_key_binding(ec, KEY_F10, mod, backlight_binding,
-					  ec);
 
 	weston_install_debug_key_binding(ec, mod);
 }
