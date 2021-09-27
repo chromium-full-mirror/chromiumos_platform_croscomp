@@ -7,9 +7,6 @@ extern crate bitflags;
 
 use nix::sys::signal::{kill, sigprocmask, SigSet, SigmaskHow};
 use nix::sys::wait::{waitpid, WaitPidFlag};
-use nix::unistd::dup;
-
-use std::env::set_var;
 
 use std::cell::RefCell;
 use std::env;
@@ -209,12 +206,16 @@ impl Compositor {
         let fd = client_stream.as_raw_fd();
 
         unsafe {
+            use nix::fcntl::{fcntl, FdFlag, F_GETFD, F_SETFD};
+
             Command::new(path)
+                .env("WAYLAND_SOCKET", fd.to_string())
                 .pre_exec(move || {
                     sigprocmask(SigmaskHow::SIG_UNBLOCK, Some(&SigSet::all()), None)
                         .expect("sigprocmask failed");
-                    let fd = dup(fd).expect("dup failed");
-                    set_var("WAYLAND_SOCKET", fd.to_string());
+                    let mut flags = FdFlag::from_bits_truncate(fcntl(fd, F_GETFD).unwrap());
+                    flags.remove(FdFlag::FD_CLOEXEC);
+                    fcntl(fd, F_SETFD(flags)).unwrap();
                     Ok(())
                 })
                 .spawn()?;
