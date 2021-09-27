@@ -1915,15 +1915,6 @@ zoom_key_binding(struct weston_keyboard *keyboard, const struct timespec *time,
 }
 
 static void
-terminate_binding(struct weston_keyboard *keyboard, const struct timespec *time,
-		  uint32_t key, void *data)
-{
-	struct weston_compositor *compositor = data;
-
-	weston_compositor_exit(compositor);
-}
-
-static void
 rotate_grab_motion(struct weston_pointer_grab *grab,
 		   const struct timespec *time,
 		   struct weston_pointer_motion_event *event)
@@ -2795,11 +2786,6 @@ static void
 shell_add_bindings(struct weston_compositor *ec, struct desktop_shell *shell)
 {
 	uint32_t mod;
-
-	if (shell->allow_zap)
-		weston_compositor_add_key_binding(ec, KEY_BACKSPACE,
-					          MODIFIER_CTRL | MODIFIER_ALT,
-					          terminate_binding, ec);
 
 	/* fixed bindings */
 	weston_compositor_add_button_binding(ec, BTN_LEFT, 0,

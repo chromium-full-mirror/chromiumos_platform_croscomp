@@ -282,10 +282,23 @@ impl Shell {
         };
 
         {
-            use crate::ffi::evdev::KEY_K;
+            use crate::ffi::evdev::*;
 
-            let mods = ffi::weston_keyboard_modifier(self.native.binding_modifier);
             let mut compositor = self.compositor.borrow_mut();
+            let rc = Rc::clone(&self.compositor);
+            compositor.bind_key(
+                KEY_BACKSPACE,
+                ffi::weston_keyboard_modifier::MODIFIER_CTRL
+                    | ffi::weston_keyboard_modifier::MODIFIER_ALT,
+                move |_, _, key| {
+                    println!("key: {:?}", key);
+                    let mut compositor = rc.borrow_mut();
+                    compositor.server.terminate();
+                },
+            );
+
+            let no_mods = ffi::weston_keyboard_modifier(0);
+            let mods = ffi::weston_keyboard_modifier(self.native.binding_modifier);
             compositor.bind_key(KEY_K, mods, move |keyboard, _, _| {
                 if let Some(surface) = unsafe { keyboard.focus.as_ref() } {
                     let resource = server::Resource::<protocol::wl_surface::WlSurface>::from_c_ptr(
