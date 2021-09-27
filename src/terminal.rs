@@ -73,7 +73,7 @@ impl Terminal {
                 let terminal_client_path = "/usr/bin/croscomp-terminal\0";
 
                 let mut compositor = shell.compositor.borrow_mut();
-		let client = compositor.launch_client(terminal_client_path).unwrap();
+                let client = compositor.launch_client(terminal_client_path).unwrap();
                 unsafe {
                     ffi::wl_client_add_destroy_listener(
                         client,

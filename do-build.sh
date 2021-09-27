@@ -90,6 +90,7 @@ echo "cargo: Entering directory '$d'"
 echo "PKG_CONFIG: ${PKG_CONFIG}"
 echo "SYSROOT: ${SYSROOT}"
 
+cargo fmt
 cargo build -v --manifest-path $d/Cargo.toml --target="${CHOST}"
 
 # Take this from environment but default to my IP of the day

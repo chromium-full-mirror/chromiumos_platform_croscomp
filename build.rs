@@ -6,27 +6,27 @@ use std::path::PathBuf;
 use std::process::Command;
 use wayland_scanner::*;
 
-
 fn run_bindgen(header: &str, output: &str) {
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
 
     let sysroot = env::var("SYSROOT").unwrap_or("/".to_string());
 
     let status = Command::new("bindgen")
-	.args(&["-o", out_path.join(output).to_str().unwrap()])
-	.arg("--no-doc-comments")
-	.arg("--no-layout-tests")
-	.args(&["--new-type-alias", "wl_fixed_t"])
-	.args(&["--default-enum-style", "rust_non_exhaustive"])
-	.args(&["--bitfield-enum", "weston_keyboard_modifier"])
-	.args(&["--bitfield-enum", "wl_shell_surface_resize"])
-	.arg(header)
-	.arg("--")
-	.arg(format!("--sysroot={}", sysroot))
-	.arg("-I/usr/include/pixman-1")
-	.arg("-I./subprojects/weston/include")
-	.arg("-I./bindgen/block")
-	.status().unwrap();
+        .args(&["-o", out_path.join(output).to_str().unwrap()])
+        .arg("--no-doc-comments")
+        .arg("--no-layout-tests")
+        .args(&["--new-type-alias", "wl_fixed_t"])
+        .args(&["--default-enum-style", "rust_non_exhaustive"])
+        .args(&["--bitfield-enum", "weston_keyboard_modifier"])
+        .args(&["--bitfield-enum", "wl_shell_surface_resize"])
+        .arg(header)
+        .arg("--")
+        .arg(format!("--sysroot={}", sysroot))
+        .arg("-I/usr/include/pixman-1")
+        .arg("-I./subprojects/weston/include")
+        .arg("-I./bindgen/block")
+        .status()
+        .unwrap();
 
     assert!(status.success())
 }
@@ -60,7 +60,10 @@ fn main() {
     }
 
     run_bindgen("/usr/include/linux/input.h", "input.rs");
-    run_bindgen("./subprojects/weston/croscomp_weston.h", "croscomp_weston.rs");
+    run_bindgen(
+        "./subprojects/weston/croscomp_weston.h",
+        "croscomp_weston.rs",
+    );
 
     let lib_paths = [
         "weston/desktop-shell",

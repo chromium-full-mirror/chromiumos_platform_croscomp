@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::event_loop::EventLoop;
 use std::marker::PhantomData;
 use wayland_server::MessageGroup;
-use crate::event_loop::EventLoop;
 
 use crate::ffi;
 
@@ -216,14 +216,12 @@ pub struct Server {
 
 impl Server {
     pub fn new() -> Self {
-	let native_display = unsafe { ffi::wl_display_create() };
-        let native_event_loop = unsafe {
-	    &mut *ffi::wl_display_get_event_loop(native_display)
-	};
+        let native_display = unsafe { ffi::wl_display_create() };
+        let native_event_loop = unsafe { &mut *ffi::wl_display_get_event_loop(native_display) };
 
         Server {
             native: native_display,
-	    event_loop: EventLoop::new(native_event_loop),
+            event_loop: EventLoop::new(native_event_loop),
         }
     }
 

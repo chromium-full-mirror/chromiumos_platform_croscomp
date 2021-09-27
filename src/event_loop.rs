@@ -9,12 +9,12 @@ use crate::ffi;
 
 #[derive(Debug)]
 pub struct EventLoop {
-    native: *mut ffi::wl_event_loop
+    native: *mut ffi::wl_event_loop,
 }
 
 impl EventLoop {
     pub fn new(native: *mut ffi::wl_event_loop) -> Self {
-	Self { native }	       
+        Self { native }
     }
 
     pub fn on_signal<F>(&mut self, signal: i32, f: F)
@@ -30,7 +30,7 @@ impl EventLoop {
             f(signal);
 
             1
-	}
+        }
 
         let p = Box::into_raw(Box::new(f));
 
@@ -79,7 +79,7 @@ impl EventLoop {
                 Err(_) => (),
             }
 
-	    listener.into_raw_fd();
+            listener.into_raw_fd();
 
             1
         }
@@ -96,6 +96,4 @@ impl EventLoop {
             );
         }
     }
-
-
 }
