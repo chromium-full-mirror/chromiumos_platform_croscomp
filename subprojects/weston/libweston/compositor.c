@@ -7316,78 +7316,10 @@ debug_scene_graph_cb(struct weston_log_subscription *sub, void *data)
 	weston_log_subscription_complete(sub);
 }
 
-/** Create the compositor.
- *
- * This functions creates and initializes a compositor instance.
- *
- * \param display The Wayland display to be used.
- * \param user_data A pointer to an object that can later be retrieved
- * \param log_ctx A pointer to weston_debug_compositor
- * using the \ref weston_compositor_get_user_data function.
- * \return The compositor instance on success or NULL on failure.
- *
- * \ingroup compositor
- */
-WL_EXPORT struct weston_compositor *
-weston_compositor_create(struct wl_display *display,
-			 struct weston_log_context *log_ctx,
-			 void *user_data)
-{
-	struct weston_compositor *ec;
-
-	ec = zalloc(sizeof *ec);
-	if (!ec)
-		return NULL;
-
-	if (weston_compositor_init(ec, display, log_ctx, user_data) == -1) {
-		free(ec);
-		return NULL;
-	}
-
-	return ec;
-}
-
 WL_EXPORT int
-weston_compositor_init(struct weston_compositor *ec,
-		       struct wl_display *display,
-		       struct weston_log_context *log_ctx,
-		       void *user_data)
+weston_compositor_init(struct weston_compositor *ec)
 {
 	struct wl_event_loop *loop;
-
-	if (!log_ctx)
-		return -1;
-
-	ec->weston_log_ctx = log_ctx;
-	ec->wl_display = display;
-	ec->user_data = user_data;
-	wl_signal_init(&ec->destroy_signal);
-	wl_signal_init(&ec->create_surface_signal);
-	wl_signal_init(&ec->activate_signal);
-	wl_signal_init(&ec->transform_signal);
-	wl_signal_init(&ec->idle_signal);
-	wl_signal_init(&ec->wake_signal);
-	wl_signal_init(&ec->show_input_panel_signal);
-	wl_signal_init(&ec->hide_input_panel_signal);
-	wl_signal_init(&ec->update_input_panel_signal);
-	wl_signal_init(&ec->seat_created_signal);
-	wl_signal_init(&ec->output_created_signal);
-	wl_signal_init(&ec->output_destroyed_signal);
-	wl_signal_init(&ec->output_moved_signal);
-	wl_signal_init(&ec->output_resized_signal);
-	wl_signal_init(&ec->heads_changed_signal);
-	wl_signal_init(&ec->output_heads_changed_signal);
-	wl_signal_init(&ec->session_signal);
-	ec->session_active = true;
-
-	ec->output_id_pool = 0;
-	ec->repaint_msec = DEFAULT_REPAINT_WINDOW;
-
-	ec->activate_serial = 1;
-
-	ec->touch_mode = WESTON_TOUCH_MODE_NORMAL;
-
-	ec->content_protection = NULL;
 
 	if (!wl_global_create(ec->wl_display, &wl_compositor_interface, 4,
 			      ec, compositor_bind))
@@ -7412,22 +7344,6 @@ weston_compositor_init(struct weston_compositor *ec,
 	if (weston_input_init(ec) != 0)
 		return 1;
 
-	wl_list_init(&ec->view_list);
-	wl_list_init(&ec->plane_list);
-	wl_list_init(&ec->layer_list);
-	wl_list_init(&ec->seat_list);
-	wl_list_init(&ec->pending_output_list);
-	wl_list_init(&ec->output_list);
-	wl_list_init(&ec->head_list);
-	wl_list_init(&ec->key_binding_list);
-	wl_list_init(&ec->modifier_binding_list);
-	wl_list_init(&ec->button_binding_list);
-	wl_list_init(&ec->touch_binding_list);
-	wl_list_init(&ec->axis_binding_list);
-	wl_list_init(&ec->debug_binding_list);
-
-	wl_list_init(&ec->plugin_api_list);
-
 	weston_plane_init(&ec->primary_plane, ec, 0, 0);
 	weston_compositor_stack_plane(ec, &ec->primary_plane, NULL);
 
@@ -7440,13 +7356,6 @@ weston_compositor_init(struct weston_compositor *ec,
 	ec->repaint_timer =
 		wl_event_loop_add_timer(loop, output_repaint_timer_handler,
 					ec);
-
-	weston_layer_init(&ec->fade_layer, ec);
-	weston_layer_init(&ec->cursor_layer, ec);
-
-	weston_layer_set_position(&ec->fade_layer, WESTON_LAYER_POSITION_FADE);
-	weston_layer_set_position(&ec->cursor_layer,
-				  WESTON_LAYER_POSITION_CURSOR);
 
 	ec->debug_scene =
 		weston_compositor_add_log_scope(ec, "scene-graph",

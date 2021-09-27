@@ -177,7 +177,21 @@ impl weston_keyboard_modifier {
     }
 }
 
+impl weston_layer {
+    pub fn zeroed() -> Self {
+        unsafe { std::mem::zeroed() }
+    }
+}
+
 impl wl_signal {
+    pub fn init(&mut self) {
+        self.listener_list.init()
+    }
+
+    pub fn zeroed() -> Self {
+        unsafe { std::mem::zeroed() }
+    }
+
     extern "C" fn destroy_notify<T>(listener: *mut wl_listener, _data: *mut ::std::os::raw::c_void)
     where
         T: From<*mut wl_listener>,

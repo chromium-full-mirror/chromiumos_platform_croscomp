@@ -1776,10 +1776,7 @@ weston_compositor_create(struct wl_display *display,
 			 struct weston_log_context *log_ctx, void *user_data);
 
 int
-weston_compositor_init(struct weston_compositor *ec,
-		       struct wl_display *display,
-		       struct weston_log_context *log_ctx,
-		       void *user_data);
+weston_compositor_init(struct weston_compositor *ec);
 
 bool
 weston_compositor_add_destroy_listener_once(struct weston_compositor *compositor,

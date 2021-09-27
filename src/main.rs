@@ -117,21 +117,143 @@ pub struct Compositor {
 }
 
 impl Compositor {
-    fn new() -> Self {
+    fn new(ctx: *mut ffi::weston_log_context) -> Self {
+        let server = Server::new();
+        let display_native = server.native;
         Compositor {
-            server: Server::new(),
-            native: unsafe { std::mem::MaybeUninit::zeroed().assume_init() },
+            server: server,
+            native: ffi::weston_compositor {
+                destroy_signal: ffi::wl_signal::zeroed(),
+                wl_display: display_native,
+                create_surface_signal: ffi::wl_signal::zeroed(),
+                activate_signal: ffi::wl_signal::zeroed(),
+                transform_signal: ffi::wl_signal::zeroed(),
+                idle_signal: ffi::wl_signal::zeroed(),
+                wake_signal: ffi::wl_signal::zeroed(),
+                show_input_panel_signal: ffi::wl_signal::zeroed(),
+                hide_input_panel_signal: ffi::wl_signal::zeroed(),
+                update_input_panel_signal: ffi::wl_signal::zeroed(),
+                seat_created_signal: ffi::wl_signal::zeroed(),
+                output_created_signal: ffi::wl_signal::zeroed(),
+                output_destroyed_signal: ffi::wl_signal::zeroed(),
+                output_moved_signal: ffi::wl_signal::zeroed(),
+                output_resized_signal: ffi::wl_signal::zeroed(),
+                output_heads_changed_signal: ffi::wl_signal::zeroed(),
+                session_signal: ffi::wl_signal::zeroed(),
+                session_active: true,
+                fade_layer: ffi::weston_layer::zeroed(),
+                cursor_layer: ffi::weston_layer::zeroed(),
+                pending_output_list: ffi::wl_list::zeroed(),
+                output_list: ffi::wl_list::zeroed(),
+                head_list: ffi::wl_list::zeroed(),
+                seat_list: ffi::wl_list::zeroed(),
+                layer_list: ffi::wl_list::zeroed(),
+                view_list: ffi::wl_list::zeroed(),
+                plane_list: ffi::wl_list::zeroed(),
+                key_binding_list: ffi::wl_list::zeroed(),
+                modifier_binding_list: ffi::wl_list::zeroed(),
+                button_binding_list: ffi::wl_list::zeroed(),
+                touch_binding_list: ffi::wl_list::zeroed(),
+                axis_binding_list: ffi::wl_list::zeroed(),
+                debug_binding_list: ffi::wl_list::zeroed(),
+                state: 0,
+                idle_source: std::ptr::null_mut(),
+                idle_inhibit: 0,
+                idle_time: 0,
+                repaint_timer: std::ptr::null_mut(),
+                default_pointer_grab: std::ptr::null_mut(),
+                primary_plane: unsafe { std::mem::zeroed() },
+                capabilities: 0,
+                renderer: std::ptr::null_mut(),
+                read_format: ffi::pixman_format_code_t::PIXMAN_r8g8b8a8,
+                backend: std::ptr::null_mut(),
+                launcher: std::ptr::null_mut(),
+                plugin_api_list: ffi::wl_list::zeroed(),
+                output_id_pool: 0,
+                xkb_names: ffi::xkb_rule_names {
+                    rules: std::ptr::null_mut(),
+                    model: std::ptr::null_mut(),
+                    layout: std::ptr::null_mut(),
+                    variant: std::ptr::null_mut(),
+                    options: std::ptr::null_mut(),
+                },
+                xkb_context: std::ptr::null_mut(),
+                xkb_info: std::ptr::null_mut(),
+                kb_repeat_rate: 0,
+                kb_repeat_delay: 0,
+                vt_switching: false,
+                presentation_clock: 0,
+                repaint_msec: 7,
+                activate_serial: 1,
+                pointer_constraints: std::ptr::null_mut(),
+                exit_code: 0,
+                user_data: std::ptr::null_mut(),
+                exit: None,
+                require_input: true,
+                heads_changed_signal: ffi::wl_signal::zeroed(),
+                heads_changed_source: std::ptr::null_mut(),
+                touch_mode: ffi::weston_touch_mode::WESTON_TOUCH_MODE_NORMAL,
+                touch_calibration: std::ptr::null_mut(),
+                touch_calibration_save: None,
+                calibrator_layer: ffi::weston_layer::zeroed(),
+                touch_calibrator: std::ptr::null_mut(),
+                weston_log_ctx: ctx,
+                debug_scene: std::ptr::null_mut(),
+                timeline: std::ptr::null_mut(),
+                content_protection: std::ptr::null_mut(),
+            },
         }
     }
 
-    fn init(&mut self, ctx: *mut ffi::weston_log_context) {
+    fn init(&mut self) {
+        self.native.destroy_signal.init();
+        self.native.create_surface_signal.init();
+        self.native.activate_signal.init();
+        self.native.transform_signal.init();
+        self.native.idle_signal.init();
+        self.native.wake_signal.init();
+        self.native.show_input_panel_signal.init();
+        self.native.hide_input_panel_signal.init();
+        self.native.update_input_panel_signal.init();
+        self.native.seat_created_signal.init();
+        self.native.output_created_signal.init();
+        self.native.output_destroyed_signal.init();
+        self.native.output_moved_signal.init();
+        self.native.output_resized_signal.init();
+        self.native.heads_changed_signal.init();
+        self.native.output_heads_changed_signal.init();
+        self.native.session_signal.init();
+
+        self.native.view_list.init();
+        self.native.plane_list.init();
+        self.native.layer_list.init();
+        self.native.seat_list.init();
+        self.native.pending_output_list.init();
+        self.native.output_list.init();
+        self.native.head_list.init();
+        self.native.key_binding_list.init();
+        self.native.modifier_binding_list.init();
+        self.native.button_binding_list.init();
+        self.native.touch_binding_list.init();
+        self.native.axis_binding_list.init();
+        self.native.debug_binding_list.init();
+        self.native.plugin_api_list.init();
+
         unsafe {
-            ffi::weston_compositor_init(
-                &mut self.native,
-                self.server.native,
-                ctx,
-                std::ptr::null_mut(),
-            )
+            ffi::weston_layer_init(&mut self.native.fade_layer, &mut self.native);
+            ffi::weston_layer_set_position(
+                &mut self.native.fade_layer,
+                ffi::weston_layer_position::WESTON_LAYER_POSITION_FADE,
+            );
+
+            ffi::weston_layer_init(&mut self.native.cursor_layer, &mut self.native);
+
+            ffi::weston_layer_set_position(
+                &mut self.native.cursor_layer,
+                ffi::weston_layer_position::WESTON_LAYER_POSITION_CURSOR,
+            );
+
+            ffi::weston_compositor_init(&mut self.native);
         };
     }
 
@@ -397,8 +519,8 @@ impl Shell {
 fn main() -> std::io::Result<()> {
     let ctx = unsafe { ffi::weston_log_ctx_create() };
 
-    let compositor = Rc::new(RefCell::new(Compositor::new()));
-    compositor.borrow_mut().init(ctx);
+    let compositor = Rc::new(RefCell::new(Compositor::new(ctx)));
+    compositor.borrow_mut().init();
 
     unsafe { ffi::weston_log_set_handler(Some(ffi::vlog), Some(ffi::vlog_continue)) }
 
