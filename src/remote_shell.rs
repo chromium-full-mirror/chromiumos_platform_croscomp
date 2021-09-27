@@ -19,7 +19,7 @@ pub fn init(rc: &Rc<RefCell<crate::Shell>>) {
             use super::protocol::wl_output;
             use super::protocol::zcr_remote_shell_v1::Event::*;
             use super::protocol::zcr_remote_shell_v1::LayoutMode;
-            use super::protocol::zcr_remote_surface_v1::SystemuiVisibilityState;;
+            use super::protocol::zcr_remote_surface_v1::SystemuiVisibilityState;
 
             let shell = &rc.borrow();
             let mut compositor = shell.compositor.borrow_mut();
