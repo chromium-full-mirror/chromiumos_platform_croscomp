@@ -1012,7 +1012,6 @@ struct weston_compositor {
 	struct wl_signal activate_signal;
 	struct wl_signal transform_signal;
 
-	struct wl_signal kill_signal;
 	struct wl_signal idle_signal;
 	struct wl_signal wake_signal;
 

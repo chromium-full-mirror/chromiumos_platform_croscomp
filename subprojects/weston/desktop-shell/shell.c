@@ -2579,33 +2579,6 @@ backlight_binding(struct weston_keyboard *keyboard, const struct timespec *time,
 }
 
 static void
-force_kill_binding(struct weston_keyboard *keyboard,
-		   const struct timespec *time, uint32_t key, void *data)
-{
-	struct weston_surface *focus_surface;
-	struct wl_client *client;
-	struct desktop_shell *shell = data;
-	struct weston_compositor *compositor = shell->compositor;
-	pid_t pid;
-
-	focus_surface = keyboard->focus;
-	if (!focus_surface)
-		return;
-
-	wl_signal_emit(&compositor->kill_signal, focus_surface);
-
-	client = wl_resource_get_client(focus_surface->resource);
-	wl_client_get_credentials(client, &pid, NULL, NULL);
-
-	/* Skip clients that we launched ourselves (the credentials of
-	 * the socketpair is ours) */
-	if (pid == getpid())
-		return;
-
-	kill(pid, SIGKILL);
-}
-
-static void
 shell_reposition_view_on_output_change(struct weston_view *view)
 {
 	struct weston_output *output, *first_output;
@@ -2880,8 +2853,6 @@ shell_add_bindings(struct weston_compositor *ec, struct desktop_shell *shell)
 					  ec);
 	weston_compositor_add_key_binding(ec, KEY_F10, mod, backlight_binding,
 					  ec);
-	weston_compositor_add_key_binding(ec, KEY_K, mod,
-				          force_kill_binding, shell);
 
 	weston_install_debug_key_binding(ec, mod);
 }

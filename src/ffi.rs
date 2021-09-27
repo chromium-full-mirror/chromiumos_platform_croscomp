@@ -152,6 +152,23 @@ impl wl_client {
     ) -> *mut wl_resource {
         unsafe { wl_resource_create(self, interface, version as i32, id) }
     }
+
+    pub fn get_credentials(&mut self) -> (pid_t, uid_t, gid_t) {
+        let mut pid = 0;
+        let mut uid = 0;
+        let mut gid = 0;
+
+        unsafe {
+            wl_client_get_credentials(
+                self,
+                &mut pid as *mut _,
+                &mut uid as *mut _,
+                &mut gid as *mut _,
+            )
+        };
+
+        (pid, uid, gid)
+    }
 }
 
 impl weston_keyboard_modifier {

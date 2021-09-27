@@ -7365,7 +7365,6 @@ weston_compositor_init(struct weston_compositor *ec,
 	wl_signal_init(&ec->create_surface_signal);
 	wl_signal_init(&ec->activate_signal);
 	wl_signal_init(&ec->transform_signal);
-	wl_signal_init(&ec->kill_signal);
 	wl_signal_init(&ec->idle_signal);
 	wl_signal_init(&ec->wake_signal);
 	wl_signal_init(&ec->show_input_panel_signal);

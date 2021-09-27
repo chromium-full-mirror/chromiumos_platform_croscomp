@@ -281,6 +281,23 @@ impl Shell {
             ffi::desktop_shell_init(&mut self.native, native)
         };
 
+        {
+            use crate::ffi::evdev::KEY_K;
+
+            let mods = ffi::weston_keyboard_modifier(self.native.binding_modifier);
+            let mut compositor = self.compositor.borrow_mut();
+            compositor.bind_key(KEY_K, mods, move |keyboard, _, _| {
+                if let Some(surface) = unsafe { keyboard.focus.as_ref() } {
+                    let resource = server::Resource::<protocol::wl_surface::WlSurface>::from_c_ptr(
+                        surface.resource,
+                    );
+                    let client = unsafe { &mut *resource.client() };
+                    let (pid, _, _) = client.get_credentials();
+                    kill(nix::unistd::Pid::from_raw(pid), nix::sys::signal::SIGTERM).unwrap();
+                }
+            });
+        }
+
         self.create_background_surface();
     }
 
