@@ -120,7 +120,7 @@ impl Compositor {
     fn new() -> Self {
         Compositor {
             server: Server::new(),
-            native: unsafe { std::mem::zeroed() },
+            native: unsafe { std::mem::MaybeUninit::zeroed().assume_init() },
         }
     }
 
