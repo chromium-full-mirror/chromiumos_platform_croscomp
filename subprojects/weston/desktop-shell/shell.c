@@ -305,20 +305,6 @@ static void
 center_on_output(struct weston_view *view,
 		 struct weston_output *output);
 
-static void
-shell_configuration(struct desktop_shell *shell)
-{
-	shell->client = strdup(LIBEXECDIR "/weston-desktop-shell");
-	shell->allow_zap = true;
-	shell->binding_modifier = MODIFIER_SUPER;
-	shell->exposay_modifier = 0;
-	shell->win_animation_type = ANIMATION_NONE;
-	shell->win_close_animation_type = ANIMATION_FADE;
-	shell->startup_animation_type = ANIMATION_ZOOM;
-	shell->focus_animation_type = ANIMATION_NONE;
-	shell->workspaces.num = 2;
-}
-
 struct weston_output *
 get_default_output(struct weston_compositor *compositor)
 {
@@ -2842,8 +2828,6 @@ desktop_shell_init(struct desktop_shell *shell,
 
 	wl_array_init(&shell->workspaces.array);
 	wl_list_init(&shell->workspaces.client_list);
-
-	shell_configuration(shell);
 
 	shell->exposay.state_cur = EXPOSAY_LAYOUT_INACTIVE;
 	shell->exposay.state_target = EXPOSAY_TARGET_CANCEL;

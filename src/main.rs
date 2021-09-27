@@ -284,6 +284,15 @@ impl Shell {
     }
 
     fn init(&mut self) {
+        self.native.allow_zap = true;
+        self.native.binding_modifier = ffi::weston_keyboard_modifier::MODIFIER_SUPER.0;
+        self.native.exposay_modifier = 0;
+        self.native.win_animation_type = ffi::animation_type::ANIMATION_NONE;
+        self.native.win_close_animation_type = ffi::animation_type::ANIMATION_FADE;
+        self.native.startup_animation_type = ffi::animation_type::ANIMATION_ZOOM;
+        self.native.focus_animation_type = ffi::animation_type::ANIMATION_NONE;
+        self.native.workspaces.num = 2;
+
         unsafe {
             let native = &mut self.compositor.borrow_mut().native;
             ffi::desktop_shell_init(&mut self.native, native)
