@@ -6,7 +6,6 @@ edition = "2018"
 build = "build.rs"
 
 [dependencies]
-wayland-scanner = { path = "third_party/wayland-scanner" }
 wayland-commons = { path = "third_party/wayland-commons" }
 wayland-sys = { path = "third_party/wayland-sys" }
 wayland-server = { path = "third_party/wayland-server", features = ["use_system_lib"] }
