@@ -15,9 +15,12 @@ use std::ops;
 // Put these uglies here
 
 macro_rules! offset_of {
-    ($container:ty, $( $field:ident ).+) => {
-        &(*(0usize as *const $container)).$( $field ).+ as *const _ as usize
-    }
+    ($container:ty, $( $field:ident ).+) => ({
+        let base = std::mem::MaybeUninit::<$container>::uninit();
+        let base_ptr = base.as_ptr();
+        let field_ptr = std::ptr::addr_of!((*base_ptr).$( $field ).+);
+        (field_ptr as usize) - (base_ptr as usize)
+    })
 }
 
 macro_rules! container_of {
