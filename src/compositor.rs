@@ -140,22 +140,17 @@ impl Compositor {
         self.native.debug_binding_list.init();
         self.native.plugin_api_list.init();
 
-        unsafe {
-            ffi::weston_layer_init(&mut self.native.fade_layer, &mut self.native);
-            ffi::weston_layer_set_position(
-                &mut self.native.fade_layer,
-                ffi::weston_layer_position::WESTON_LAYER_POSITION_FADE,
-            );
+        let compositor = &mut self.native as *mut _;
+        self.native.fade_layer.init(compositor);
+        self.native
+            .fade_layer
+            .set_position(ffi::weston_layer_position::WESTON_LAYER_POSITION_FADE);
+        self.native.cursor_layer.init(compositor);
+        self.native
+            .cursor_layer
+            .set_position(ffi::weston_layer_position::WESTON_LAYER_POSITION_CURSOR);
 
-            ffi::weston_layer_init(&mut self.native.cursor_layer, &mut self.native);
-
-            ffi::weston_layer_set_position(
-                &mut self.native.cursor_layer,
-                ffi::weston_layer_position::WESTON_LAYER_POSITION_CURSOR,
-            );
-
-            ffi::weston_compositor_init(&mut self.native);
-        };
+        unsafe { ffi::weston_compositor_init(&mut self.native) };
     }
 
     pub fn add_heads_changed_listener(&mut self, listener: &mut ffi::wl_listener) {

@@ -178,6 +178,28 @@ impl weston_keyboard_modifier {
 }
 
 impl weston_layer {
+    pub fn init(&mut self, compositor: *mut weston_compositor) {
+        self.compositor = compositor;
+        self.link.init();
+        self.view_list.link.init();
+        self.set_mask_infinite();
+    }
+
+    pub fn set_position(&mut self, position: weston_layer_position) {
+        unsafe { weston_layer_set_position(self, position) }
+    }
+
+    pub fn set_mask_infinite(&mut self) {
+        self.mask.x1 = i32::MIN;
+        self.mask.y1 = i32::MIN;
+        self.mask.x2 = i32::MAX;
+        self.mask.y2 = i32::MAX;
+
+        for view in wl_list_iter_mut!(&mut self.view_list.link, weston_view, layer_link.link) {
+            unsafe { weston_view_geometry_dirty(view as *mut _) }
+        }
+    }
+
     pub fn zeroed() -> Self {
         unsafe { std::mem::zeroed() }
     }
