@@ -2801,8 +2801,6 @@ desktop_shell_init(struct desktop_shell *shell,
 {
 	struct weston_seat *seat;
 
-	shell->compositor = ec;
-
 	if (!weston_compositor_add_destroy_listener_once(ec,
 							 &shell->destroy_listener,
 							 shell_destroy))
@@ -2813,31 +2811,10 @@ desktop_shell_init(struct desktop_shell *shell,
 	shell->wake_listener.notify = wake_handler;
 	wl_signal_add(&ec->wake_signal, &shell->wake_listener);
 
-	weston_layer_init(&shell->fullscreen_layer, ec);
-	weston_layer_init(&shell->panel_layer, ec);
-	weston_layer_init(&shell->background_layer, ec);
-	weston_layer_init(&shell->lock_layer, ec);
-	weston_layer_init(&shell->input_panel_layer, ec);
-
-	weston_layer_set_position(&shell->fullscreen_layer,
-				  WESTON_LAYER_POSITION_FULLSCREEN);
-	weston_layer_set_position(&shell->panel_layer,
-				  WESTON_LAYER_POSITION_UI);
-	weston_layer_set_position(&shell->background_layer,
-				  WESTON_LAYER_POSITION_BACKGROUND);
-
-	wl_array_init(&shell->workspaces.array);
-	wl_list_init(&shell->workspaces.client_list);
-
-	shell->exposay.state_cur = EXPOSAY_LAYOUT_INACTIVE;
-	shell->exposay.state_target = EXPOSAY_TARGET_CANCEL;
-
 	if (init_workspaces(shell) == -1) {
 		weston_log("init_workspaces failed\n");
 		return -1;
 	}
-
-	weston_layer_init(&shell->minimized_layer, ec);
 
 	if (weston_desktop_create(ec, shell) == -1)
 		return -1;

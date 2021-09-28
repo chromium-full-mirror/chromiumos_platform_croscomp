@@ -174,6 +174,68 @@ impl wl_client {
     }
 }
 
+impl pixman_box32 {
+    pub fn new() -> Self {
+        Self {
+            x1: 0,
+            y1: 0,
+            x2: 0,
+            y2: 0,
+        }
+    }
+}
+
+impl wl_array {
+    pub fn new() -> Self {
+        Self {
+            size: 0,
+            alloc: 0,
+            data: std::ptr::null_mut(),
+        }
+    }
+}
+
+impl weston_pointer_grab {
+    pub fn new() -> Self {
+        Self {
+            interface: std::ptr::null(),
+            pointer: std::ptr::null_mut(),
+        }
+    }
+}
+
+impl weston_keyboard_grab {
+    pub fn new() -> Self {
+        Self {
+            interface: std::ptr::null(),
+            keyboard: std::ptr::null_mut(),
+        }
+    }
+}
+
+impl exposay {
+    pub fn new() -> Self {
+        Self {
+            focus_prev: std::ptr::null_mut(),
+            focus_current: std::ptr::null_mut(),
+            clicked: std::ptr::null_mut(),
+            workspace: std::ptr::null_mut(),
+            seat: std::ptr::null_mut(),
+            surface_list: wl_list::zeroed(),
+            grab_kbd: weston_keyboard_grab::new(),
+            grab_ptr: weston_pointer_grab::new(),
+            state_target: exposay_target_state::EXPOSAY_TARGET_CANCEL,
+            state_cur: exposay_layout_state::EXPOSAY_LAYOUT_INACTIVE,
+            in_flight: 0,
+            row_current: 0,
+            column_current: 0,
+            cur_output: std::ptr::null_mut(),
+            mod_pressed: false,
+            mod_invalid: false,
+        }
+    }
+}
+
 impl weston_keyboard_modifier {
     pub fn is_set(&self, bit: weston_keyboard_modifier) -> bool {
         (*self & bit) == bit

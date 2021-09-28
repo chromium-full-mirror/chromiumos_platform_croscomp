@@ -23,25 +23,105 @@ pub struct Shell {
 impl Shell {
     pub fn new(compositor: &Rc<RefCell<Compositor>>) -> Self {
         Shell {
-            native: unsafe { std::mem::zeroed() },
+            native: ffi::desktop_shell {
+                compositor: &mut compositor.borrow_mut().native as *mut _,
+                idle_listener: ffi::wl_listener::zeroed(),
+                wake_listener: ffi::wl_listener::zeroed(),
+                resized_listener: ffi::wl_listener::zeroed(),
+                destroy_listener: ffi::wl_listener::zeroed(),
+                show_input_panel_listener: ffi::wl_listener::zeroed(),
+                hide_input_panel_listener: ffi::wl_listener::zeroed(),
+                update_input_panel_listener: ffi::wl_listener::zeroed(),
+                fullscreen_layer: ffi::weston_layer::zeroed(),
+                panel_layer: ffi::weston_layer::zeroed(),
+                background_layer: ffi::weston_layer::zeroed(),
+                lock_layer: ffi::weston_layer::zeroed(),
+                input_panel_layer: ffi::weston_layer::zeroed(),
+                pointer_focus_listener: ffi::wl_listener::zeroed(),
+                grab_surface: std::ptr::null_mut(),
+                xdg_wm_base: std::ptr::null_mut(),
+                locked: false,
+                showing_input_panels: false,
+                prepare_event_sent: false,
+                text_input: ffi::desktop_shell__bindgen_ty_1 {
+                    surface: std::ptr::null_mut(),
+                    cursor_rectangle: ffi::pixman_box32::new(),
+                },
+                lock_surface: std::ptr::null_mut(),
+                lock_surface_listener: ffi::wl_listener::zeroed(),
+                workspaces: ffi::desktop_shell__bindgen_ty_2 {
+                    array: ffi::wl_array::new(),
+                    current: 0,
+                    num: 2,
+                    client_list: ffi::wl_list::zeroed(),
+                    animation: ffi::weston_animation {
+                        frame: None,
+                        frame_counter: 0,
+                        link: ffi::wl_list::zeroed(),
+                    },
+                    anim_sticky_list: ffi::wl_list::zeroed(),
+                    anim_dir: 0,
+                    anim_timestamp: ffi::timespec {
+                        tv_sec: 0,
+                        tv_nsec: 0,
+                    },
+                    anim_current: 0.0,
+                    anim_from: std::ptr::null_mut(),
+                    anim_to: std::ptr::null_mut(),
+                },
+                input_panel: ffi::desktop_shell__bindgen_ty_3 {
+                    binding: std::ptr::null_mut(),
+                    surfaces: ffi::wl_list::zeroed(),
+                },
+                exposay: ffi::exposay::new(),
+                allow_zap: true,
+                binding_modifier: ffi::weston_keyboard_modifier::MODIFIER_SUPER.0,
+                exposay_modifier: 0,
+                win_animation_type: ffi::animation_type::ANIMATION_NONE,
+                win_close_animation_type: ffi::animation_type::ANIMATION_FADE,
+                startup_animation_type: ffi::animation_type::ANIMATION_ZOOM,
+                focus_animation_type: ffi::animation_type::ANIMATION_NONE,
+                minimized_layer: ffi::weston_layer::zeroed(),
+                seat_create_listener: ffi::wl_listener::zeroed(),
+                output_create_listener: ffi::wl_listener::zeroed(),
+                output_move_listener: ffi::wl_listener::zeroed(),
+                output_list: ffi::wl_list::zeroed(),
+                client: std::ptr::null_mut(),
+                startup_time: ffi::timespec {
+                    tv_sec: 0,
+                    tv_nsec: 0,
+                },
+                initialized_inputs: false,
+            },
             compositor: Rc::clone(compositor),
         }
     }
 
     pub fn init(&mut self) {
-        self.native.allow_zap = true;
-        self.native.binding_modifier = ffi::weston_keyboard_modifier::MODIFIER_SUPER.0;
-        self.native.exposay_modifier = 0;
-        self.native.win_animation_type = ffi::animation_type::ANIMATION_NONE;
-        self.native.win_close_animation_type = ffi::animation_type::ANIMATION_FADE;
-        self.native.startup_animation_type = ffi::animation_type::ANIMATION_ZOOM;
-        self.native.focus_animation_type = ffi::animation_type::ANIMATION_NONE;
-        self.native.workspaces.num = 2;
+        self.native.workspaces.client_list.init();
 
-        unsafe {
-            let native = &mut self.compositor.borrow_mut().native;
-            ffi::desktop_shell_init(&mut self.native, native)
-        };
+        {
+            let compositor = &mut self.compositor.borrow_mut().native as *mut _;
+
+            self.native.fullscreen_layer.init(compositor);
+            self.native
+                .fullscreen_layer
+                .set_position(ffi::weston_layer_position::WESTON_LAYER_POSITION_FULLSCREEN);
+            self.native.panel_layer.init(compositor);
+            self.native
+                .panel_layer
+                .set_position(ffi::weston_layer_position::WESTON_LAYER_POSITION_UI);
+            self.native.background_layer.init(compositor);
+            self.native
+                .background_layer
+                .set_position(ffi::weston_layer_position::WESTON_LAYER_POSITION_BACKGROUND);
+
+            self.native.lock_layer.init(compositor);
+            self.native.input_panel_layer.init(compositor);
+            self.native.minimized_layer.init(compositor);
+
+            unsafe { ffi::desktop_shell_init(&mut self.native, compositor) };
+        }
 
         {
             use crate::ffi::evdev::*;
