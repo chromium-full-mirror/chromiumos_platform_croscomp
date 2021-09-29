@@ -72,7 +72,7 @@ if test ! -d "${out}/meson"; then
 fi
 
 export PKG_CONFIG_ALLOW_CROSS=1
-export CARGO_HOME="$d/cargo_home_${CHOST}"
+export CARGO_HOME="$d/target/${CHOST}/cargo_home"
 mkdir -p ${CARGO_HOME}
 
 if test ! -e "${CARGO_HOME}/config"; then
