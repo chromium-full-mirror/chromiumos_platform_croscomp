@@ -180,6 +180,15 @@ where
     handlers: Box<GlobalHandlers<I>>,
 }
 
+impl<I> Drop for Global<I>
+where
+    I: wayland_server::Interface,
+{
+    fn drop(&mut self) {
+        println!("drop global");
+    }
+}
+
 impl<I: wayland_server::Interface> Global<I> {
     pub fn on_bind<F>(mut self, f: F) -> Self
     where

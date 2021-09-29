@@ -57,7 +57,7 @@ impl Compositor {
                 touch_binding_list: ffi::wl_list::zeroed(),
                 axis_binding_list: ffi::wl_list::zeroed(),
                 debug_binding_list: ffi::wl_list::zeroed(),
-                state: 0,
+                state: ffi::WESTON_COMPOSITOR_IDLE as u32,
                 idle_source: std::ptr::null_mut(),
                 idle_inhibit: 0,
                 idle_time: 0,

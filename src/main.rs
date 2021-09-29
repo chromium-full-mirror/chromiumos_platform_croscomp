@@ -203,5 +203,10 @@ fn main() -> std::io::Result<()> {
         ffi::wl_display_run(display)
     }
 
+    println!(
+        "# exit from main: shell strong count {}",
+        Rc::strong_count(&shell)
+    );
+
     Ok(())
 }

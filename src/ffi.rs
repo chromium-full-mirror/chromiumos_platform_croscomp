@@ -322,6 +322,48 @@ impl wl_signal {
     }
 }
 
+pub struct WlListener<F> {
+    listener: wl_listener,
+    f: F,
+}
+
+impl<F> Drop for WlListener<F> {
+    fn drop(&mut self) {
+        unsafe { wl_list_remove(&mut self.listener.link) };
+        println!("fbox dropped");
+    }
+}
+
+impl<F> WlListener<F>
+where
+    F: Fn(),
+{
+    pub fn new(signal: &wl_signal, f: F) -> Box<Self> {
+        extern "C" fn call_closure<F>(
+            listener: *mut wl_listener,
+            _data: *mut ::std::os::raw::c_void,
+        ) where
+            F: Fn(),
+        {
+            let fbox = unsafe { &mut *container_of_mut!(listener, WlListener<F>, listener) };
+
+            (fbox.f)();
+        }
+
+        let mut fbox = Box::new(Self {
+            listener: wl_listener::zeroed(),
+            f: f,
+        });
+
+        fbox.listener.notify = Some(call_closure::<F>);
+        unsafe {
+            wl_list_insert(signal.listener_list.prev, &mut fbox.listener.link as *mut _);
+        }
+
+        fbox
+    }
+}
+
 impl weston_head {
     pub fn is_enabled(&self) -> bool {
         unsafe { self.output.as_ref().map_or(false, |output| output.enabled) }

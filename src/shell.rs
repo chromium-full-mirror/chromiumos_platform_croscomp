@@ -14,17 +14,20 @@ use crate::Compositor;
 
 use nix::sys::signal;
 
-#[derive(Debug)]
 pub struct Shell {
     pub native: ffi::desktop_shell,
     pub compositor: Rc<RefCell<Compositor>>,
+    idle_listener: Box<dyn Drop>,
+    wake_listener: Box<dyn Drop>,
 }
 
 impl Shell {
     pub fn new(compositor: &Rc<RefCell<Compositor>>) -> Self {
+        let rc = Rc::clone(compositor);
+        let compositor = &mut compositor.borrow_mut();
         Shell {
             native: ffi::desktop_shell {
-                compositor: &mut compositor.borrow_mut().native as *mut _,
+                compositor: &mut compositor.native as *mut _,
                 idle_listener: ffi::wl_listener::zeroed(),
                 wake_listener: ffi::wl_listener::zeroed(),
                 resized_listener: ffi::wl_listener::zeroed(),
@@ -93,7 +96,14 @@ impl Shell {
                 },
                 initialized_inputs: false,
             },
-            compositor: Rc::clone(compositor),
+            compositor: rc,
+
+            idle_listener: ffi::WlListener::new(&mut compositor.native.idle_signal, || {
+                println!("-------------------- idle signal fired")
+            }),
+            wake_listener: ffi::WlListener::new(&mut compositor.native.wake_signal, || {
+                println!("-------------------- wake signal fired")
+            }),
         }
     }
 
@@ -215,5 +225,11 @@ impl Shell {
                 &mut view.layer_link,
             );
         }
+    }
+}
+
+impl Drop for Shell {
+    fn drop(&mut self) {
+        println!("-------------------- drop Shell")
     }
 }
