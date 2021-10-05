@@ -902,6 +902,9 @@ drm_output_propose_state(struct weston_output *output_base,
 			continue;
 		}
 
+		if (ev->radius > 0.0f)
+			force_renderer = true;
+
 		/* We only assign planes to views which are exclusively present
 		 * on our output. */
 		if (ev->output_mask != (1u << output->base.id)) {
