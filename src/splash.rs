@@ -49,6 +49,7 @@ fn handle_request(_resource: &mut Resource<CroscompSplash>, request: &Request) {
 
             let view = unsafe { &mut *surface.create_view() };
             view.set_output(head.output);
+            view.radius = 50.0;
 
             //surface.ref_count += 1;
         }
