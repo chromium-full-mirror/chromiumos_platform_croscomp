@@ -37,7 +37,7 @@ extern "C" {
 #include "zalloc.h"
 
 void *
-fail_on_null(void *p, size_t size, char *file, int32_t line);
+fail_on_null(void *p, size_t size, const char *file, int32_t line);
 
 #define xmalloc(s) (fail_on_null(malloc(s), (s), __FILE__, __LINE__))
 #define xzalloc(s) (fail_on_null(zalloc(s), (s), __FILE__, __LINE__))

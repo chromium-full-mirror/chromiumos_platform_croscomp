@@ -33,7 +33,7 @@
 #include "xalloc.h"
 
 void *
-fail_on_null(void *p, size_t size, char *file, int32_t line)
+fail_on_null(void *p, size_t size, const char *file, int32_t line)
 {
 	if (p == NULL) {
 		fprintf(stderr, "[%s] ", program_invocation_short_name);

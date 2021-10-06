@@ -80,9 +80,9 @@ enum key_type {
 struct key {
 	enum key_type key_type;
 
-	char *label;
-	char *uppercase;
-	char *symbol;
+	const char *label;
+	const char *uppercase;
+	const char *symbol;
 
 	unsigned int width;
 };
