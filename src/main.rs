@@ -5,6 +5,7 @@
 #[macro_use]
 extern crate bitflags;
 
+use nix::sys::stat::{umask, Mode};
 use nix::sys::wait::{waitpid, WaitPidFlag};
 
 use std::cell::RefCell;
@@ -37,11 +38,31 @@ use shell::Shell;
 
 const SCALE: i32 = 2;
 
+struct Umask {
+    old_mode: Mode,
+}
+
+impl Umask {
+    fn with_mode(mode: Mode) -> Umask {
+        Umask {
+            old_mode: umask(mode),
+        }
+    }
+}
+
+impl Drop for Umask {
+    fn drop(&mut self) {
+        umask(self.old_mode);
+    }
+}
+
 fn bind_socket() -> UnixListener {
     let path = env::var_os("XDG_RUNTIME_DIR")
         .expect("environment variable XDG_RUNTIME_DIR is not set.")
         .into_string()
         .expect("invalid value");
+
+    let _guard = Umask::with_mode(Mode::empty());
 
     let socket_path = format!("{}/wayland-0", path);
     if let Ok(sock) = UnixListener::bind(&socket_path) {
