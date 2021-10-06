@@ -38,7 +38,7 @@
 #include <errno.h>
 #include <linux/dma-buf.h>
 #include <linux/udmabuf.h>
-#include <drm/drm_fourcc.h>
+#include <libdrm/drm_fourcc.h>
 #include <fcntl.h>
 
 #include <wayland-client.h>
