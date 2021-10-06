@@ -65,10 +65,44 @@ if test ! -e "${cross_file}"; then
     (create_cross_file $out)
 fi
 
-if test ! -d "${out}/meson"; then
+if test ! -d "${out}/weston"; then
     meson --cross-file $cross_file \
-	   "${out}/meson" --buildtype debug -D debug=true --prefix=/usr --libdir=$LIBDIR
-
+	--buildtype debug \
+	-Ddebug=true \
+	--prefix=/usr \
+	--libdir=$LIBDIR \
+	-Dbackend-default=drm \
+	-Dbackend-drm=true \
+	-Dbackend-drm-screencast-vaapi=false \
+	-Dbackend-fbdev=false \
+	-Dbackend-headless=true \
+	-Dbackend-rdp=false \
+	-Dbackend-wayland=true \
+	-Dbackend-x11=false \
+	-Dcolor-management-colord=false \
+	-Dcolor-management-lcms=true \
+	-Ddemo-clients=true \
+	-Ddesktop-shell-client-default=weston-desktop-shell \
+	-Ddoc=false \
+	-Dimage-jpeg=false \
+	-Dimage-webp=false \
+	-Dimage-png=true \
+	-Dlauncher-logind=false \
+	-Dpipewire=false \
+	-Dremoting=false \
+	-Drenderer-gl=true \
+	-Dresize-pool=true \
+	-Dscreenshare=true \
+	-Dshell-desktop=true \
+	-Dshell-fullscreen=false \
+	-Dshell-ivi=false \
+	-Dshell-kiosk=false \
+	-Dsystemd=false \
+	-Dtest-gl-renderer=true \
+	-Dtest-junit-xml=false \
+	-Dwcap-decode=false \
+	-Dweston-launch=false \
+	"${out}/weston" "${d}/weston"
 fi
 
 export PKG_CONFIG_ALLOW_CROSS=1
@@ -80,8 +114,8 @@ if test ! -e "${CARGO_HOME}/config"; then
     create_cargo_config
 fi
 
-ninja -j 80 -C $out/meson
-export MESON_BUILD_DIR=$out/meson
+ninja -j 80 -C $out/weston
+export MESON_BUILD_DIR=$out/weston
 
 # Print this message to help emacs compile mode figure out where the
 # source is
@@ -98,22 +132,20 @@ DUT=${DUT:-192.168.86.226}
 
 ssh $DUT mkdir -p /usr/$LIBDIR/libweston-9 /usr/share/weston
 rsync -lav --progress \
-      $out/meson/subprojects/weston/libweston/libweston-9.so{,*[0-9]} \
-      $out/meson/subprojects/libinput/libinput.so{,*[0-9]} \
-      $out/meson/subprojects/libevdev/libevdev-fdo.so{,*[0-9]} \
+      $out/weston/libweston/libweston-9.so{,*[0-9]} \
       $DUT:/usr/$LIBDIR
 
 rsync -lav --progress \
-      $d/subprojects/weston/data/*.png \
+      $d/weston/data/*.png \
       $DUT:/usr/share/weston
 
 rsync -lav --progress \
-      $out/meson/subprojects/weston/libweston/renderer-gl/gl-renderer.so \
-      $out/meson/subprojects/weston/libweston/backend-drm/drm-backend.so \
+      $out/weston/libweston/renderer-gl/gl-renderer.so \
+      $out/weston/libweston/backend-drm/drm-backend.so \
       $DUT:/usr/$LIBDIR/libweston-9
 
 rsync -lav --progress $out/croscomp \
-      $out/meson/subprojects/weston/clients/weston-{simple-splash,terminal} \
+      $out/weston/clients/weston-{simple-splash,terminal} \
       $DUT:/usr/bin
 
 rsync -av --progress $d/croscomp-terminal $DUT:/usr/bin

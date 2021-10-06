@@ -23,7 +23,7 @@ fn run_bindgen(header: &str, output: &str) {
         .arg("--")
         .arg(format!("--sysroot={}", sysroot))
         .arg("-I/usr/include/pixman-1")
-        .arg("-I./subprojects/weston/include")
+        .arg("-I./weston/include")
         .arg("-I./bindgen/block")
         .status()
         .unwrap();
@@ -61,26 +61,24 @@ fn main() {
 
     run_bindgen("/usr/include/linux/input.h", "input.rs");
     run_bindgen(
-        "./subprojects/weston/croscomp_weston.h",
+        "./weston/croscomp_weston.h",
         "croscomp_weston.rs",
     );
 
     let lib_paths = [
-        "weston/desktop-shell",
-        "weston/libweston",
-        "libinput",
-        "libevdev",
+        "desktop-shell",
+        "libweston",
     ];
 
     let build_dir = env::var("MESON_BUILD_DIR").unwrap();
     for p in &lib_paths {
-        println!("cargo:rustc-flags=-L{}/subprojects/{}", build_dir, p);
+        println!("cargo:rustc-flags=-L{}/{}", build_dir, p);
     }
 
     println!("cargo:rustc-link-lib=desktop-shell");
     println!("cargo:rustc-link-lib=weston-9");
     println!("cargo:rustc-link-lib=input");
-    println!("cargo:rustc-link-lib=evdev-fdo");
+    println!("cargo:rustc-link-lib=evdev");
     println!("cargo:rustc-link-lib=wayland-server");
     println!("cargo:rustc-link-lib=pixman-1");
 }
