@@ -4,6 +4,7 @@ Compositor for ChromeOS
 
 
 Building
+--------
 
 Build using portage
 
@@ -33,3 +34,28 @@ Rust deps:
 	$ cros deploy $DUT mtdev
 
 
+Running chrome under croscomp
+-----------------------------
+
+Using the CLs from
+
+	https://chromium-review.googlesource.com/c/chromium/src/+/3211500,
+
+build and deploy chrome to the device.  You need
+
+	target_os = ["chromeos"]
+	ozone_platform_wayland = "true"
+	ozone_platform = "wayland"
+	use_wayland_egl = "false"'
+	use_wayland_gbm = "true"
+
+in the gn args and then
+
+	$ ninja -C out_$BOARD/Relase chrome
+
+followed by
+
+	$ deploy_chrome --build-dir=out_strongbad/Release --device=$DUT --nostartui
+
+Then start croscomp on the device and use scripts/start-chrome.sh to
+start the chrome login screen on croscomp.
