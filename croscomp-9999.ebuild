@@ -115,5 +115,10 @@ src_install() {
 	local build_dir="$(cros-rust_get_build_dir)"
 	dobin "${build_dir}/croscomp"
 
+	insinto /etc/init
+	doins croscomp.conf
+	insinto /usr/bin
+	doins croscomp-terminal
+
 	meson_src_install
 }
