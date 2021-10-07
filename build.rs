@@ -60,15 +60,9 @@ fn main() {
     }
 
     run_bindgen("/usr/include/linux/input.h", "input.rs");
-    run_bindgen(
-        "./weston/croscomp_weston.h",
-        "croscomp_weston.rs",
-    );
+    run_bindgen("./weston/croscomp_weston.h", "croscomp_weston.rs");
 
-    let lib_paths = [
-        "desktop-shell",
-        "libweston",
-    ];
+    let lib_paths = ["desktop-shell", "libweston"];
 
     let build_dir = env::var("MESON_BUILD_DIR").unwrap();
     for p in &lib_paths {
