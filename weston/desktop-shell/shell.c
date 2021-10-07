@@ -2751,11 +2751,6 @@ shell_add_bindings(struct weston_compositor *ec, struct desktop_shell *shell)
 					    touch_to_activate_binding,
 					    shell);
 
-	/* configurable bindings */
-	if (shell->exposay_modifier)
-		weston_compositor_add_modifier_binding(ec, shell->exposay_modifier,
-						       exposay_binding, shell);
-
 	mod = shell->binding_modifier;
 	if (!mod)
 		return;

@@ -3,7 +3,6 @@ if get_option('shell-desktop')
 
 	srcs_shell_desktop = [
 		'shell.c',
-		'exposay.c',
 		'client.c',
 		'seat.c',
 		'surface.c',

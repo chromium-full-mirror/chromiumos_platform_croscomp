@@ -213,29 +213,6 @@ impl weston_keyboard_grab {
     }
 }
 
-impl exposay {
-    pub fn new() -> Self {
-        Self {
-            focus_prev: std::ptr::null_mut(),
-            focus_current: std::ptr::null_mut(),
-            clicked: std::ptr::null_mut(),
-            workspace: std::ptr::null_mut(),
-            seat: std::ptr::null_mut(),
-            surface_list: wl_list::zeroed(),
-            grab_kbd: weston_keyboard_grab::new(),
-            grab_ptr: weston_pointer_grab::new(),
-            state_target: exposay_target_state::EXPOSAY_TARGET_CANCEL,
-            state_cur: exposay_layout_state::EXPOSAY_LAYOUT_INACTIVE,
-            in_flight: 0,
-            row_current: 0,
-            column_current: 0,
-            cur_output: std::ptr::null_mut(),
-            mod_pressed: false,
-            mod_invalid: false,
-        }
-    }
-}
-
 impl weston_keyboard_modifier {
     pub fn is_set(&self, bit: weston_keyboard_modifier) -> bool {
         (*self & bit) == bit
