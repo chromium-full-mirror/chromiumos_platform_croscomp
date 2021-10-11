@@ -67,7 +67,10 @@ pub fn init(rc: &Rc<RefCell<crate::Shell>>) {
     let global = compositor
         .server
         .create_global::<CroscompSplash>(version)
-        .on_bind(|_| println!("splash: handle bind"))
+        .on_bind(|_| {
+            println!("splash: handle bind");
+            true
+        })
         .on_request(|resource, request| handle_request(resource, request))
         .on_destroy(move |_resource| super::Shell::finish_init(&rc));
 

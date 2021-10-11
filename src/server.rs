@@ -45,6 +45,10 @@ where
         }
     }
 
+    pub fn drop_native(&mut self) {
+        unsafe { ffi::wl_resource_destroy(self.native) }
+    }
+
     pub unsafe fn make_child_for<J>(&self, id: u32) -> Option<Main<J>>
     where
         J: wayland_server::Interface + From<Resource<J>> + AsRef<Resource<J>>,
@@ -78,6 +82,18 @@ where
                 args.as_mut_ptr() as *mut ffi::wl_argument,
             );
         })
+    }
+
+    pub fn post_error(&self, err: u32, msg: &str) {
+        unsafe {
+            let msg = std::ffi::CString::new(msg).expect("invalid error message");
+
+            ffi::wl_resource_post_error(self.native, err, msg.as_ptr())
+        }
+    }
+
+    pub fn post_no_memory(&self) {
+        unsafe { ffi::wl_resource_post_no_memory(self.native) }
     }
 
     pub fn on_request<F>(&self, f: F) -> &Self
@@ -167,7 +183,7 @@ struct GlobalHandlers<I>
 where
     I: wayland_server::Interface,
 {
-    handle_bind: Option<Box<dyn Fn(&mut Resource<I>)>>,
+    handle_bind: Option<Box<dyn Fn(&mut Resource<I>) -> bool>>,
     dispatcher: Option<Box<dyn Fn(&mut Resource<I>, &I::Request)>>,
     handle_destroy: Option<Box<dyn Fn(&mut Resource<I>)>>,
 }
@@ -192,7 +208,7 @@ where
 impl<I: wayland_server::Interface> Global<I> {
     pub fn on_bind<F>(mut self, f: F) -> Self
     where
-        F: 'static + Fn(&mut Resource<I>),
+        F: 'static + Fn(&mut Resource<I>) -> bool,
     {
         // hook for handling bind time checks or allocations
         self.handlers.handle_bind = Some(Box::new(f));
@@ -307,15 +323,21 @@ impl Server {
 
             println!("handlers: {:?}", handlers as *const _);
 
-            if let Some(ref handle_bind) = handlers.handle_bind {
+            let success = if let Some(ref handle_bind) = handlers.handle_bind {
                 println!(
                     "calling handle_bind for {}: {:?}",
                     I::NAME,
                     &(*handle_bind) as *const _
                 );
-                (*handle_bind)(&mut resource);
-                // xxx return value from handle_bind should indicate whether
-                // or not bind was successful
+                (*handle_bind)(&mut resource)
+            } else {
+                false
+            };
+
+            if !success {
+                println!("on_bind returns failure");
+                resource.drop_native();
+                return;
             }
 
             if let Some(ref dispatcher) = handlers.dispatcher {

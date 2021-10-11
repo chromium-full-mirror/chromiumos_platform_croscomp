@@ -26,6 +26,7 @@ mod move_resize;
 mod protocol;
 mod remote_shell;
 mod rotate;
+mod screenshooter;
 mod server;
 mod shell;
 mod splash;
@@ -216,6 +217,8 @@ fn main() -> std::io::Result<()> {
     rotate::init(&shell);
 
     aura_shell::init(&shell);
+
+    screenshooter::init(&shell);
 
     compositor.borrow_mut().wake();
 

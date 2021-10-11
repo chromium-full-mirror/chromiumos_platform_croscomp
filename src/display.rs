@@ -11,7 +11,10 @@ use super::protocol::croscomp_display::CroscompDisplay;
 use super::protocol::croscomp_output::CroscompOutput;
 use crate::server::Resource;
 
-fn handle_bind(resource: &mut Resource<CroscompDisplay>, compositor: &mut super::Compositor) {
+fn handle_bind(
+    resource: &mut Resource<CroscompDisplay>,
+    compositor: &mut super::Compositor,
+) -> bool {
     for head in compositor.head_iter().filter(|h| h.is_enabled()) {
         println!("head {:?}", head);
 
@@ -52,6 +55,8 @@ fn handle_bind(resource: &mut Resource<CroscompDisplay>, compositor: &mut super:
 
         output_resource.send(Done {});
     }
+
+    true
 }
 
 pub fn init(shell: &Rc<RefCell<crate::Shell>>) {

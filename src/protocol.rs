@@ -16,6 +16,7 @@ pub(crate) use wayland_server::sys;
 pub(crate) use wayland_server::AnonymousObject;
 
 include!(concat!(env!("OUT_DIR"), "/wayland.rs"));
+include!(concat!(env!("OUT_DIR"), "/weston-screenshooter.rs"));
 include!(concat!(env!("OUT_DIR"), "/croscomp.rs"));
 include!(concat!(env!("OUT_DIR"), "/aura-shell.rs"));
 include!(concat!(

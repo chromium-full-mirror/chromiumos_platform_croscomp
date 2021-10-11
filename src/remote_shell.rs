@@ -56,6 +56,8 @@ pub fn init(rc: &Rc<RefCell<crate::Shell>>) {
             resource.send(Configure {
                 layout_mode: LayoutMode::Windowed.to_raw(),
             });
+
+            true
         })
         .on_request(|_resource, request| {
             use super::protocol::zcr_remote_shell_v1::Request::*;
