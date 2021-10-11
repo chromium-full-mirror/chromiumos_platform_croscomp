@@ -5,7 +5,7 @@
 #[macro_use]
 extern crate bitflags;
 
-use log::{debug, warn};
+use log::{debug, info, warn};
 
 use nix::sys::stat::{umask, Mode};
 use nix::sys::wait::{waitpid, WaitPidFlag};
@@ -134,15 +134,24 @@ extern "C" fn head_notify(_listener: *mut ffi::wl_listener, data: *mut ::std::os
     }
 }
 
-fn main() -> std::io::Result<()> {
-    env_logger::init();
+extern "C" fn weston_log_bridge(msg: *const ::std::os::raw::c_char) {
+    unsafe {
+        info!(
+            "{}",
+            std::ffi::CStr::from_ptr(msg)
+                .to_str()
+                .expect("invalid utf-8")
+        )
+    }
+}
 
+fn main() -> std::io::Result<()> {
+    unsafe { ffi::weston_set_log_handler(Some(weston_log_bridge)) };
+    env_logger::init();
     let ctx = unsafe { ffi::weston_log_ctx_create() };
 
     let compositor = Rc::new(RefCell::new(Compositor::new(ctx)));
     compositor.borrow_mut().init();
-
-    unsafe { ffi::weston_log_set_handler(Some(ffi::vlog), Some(ffi::vlog_continue)) }
 
     let mut listener = ffi::wl_listener::new(head_notify);
 

@@ -1771,10 +1771,6 @@ weston_compositor_destroy(struct weston_compositor *ec);
 void
 weston_compositor_deinit(struct weston_compositor *compositor);
 
-struct weston_compositor *
-weston_compositor_create(struct wl_display *display,
-			 struct weston_log_context *log_ctx, void *user_data);
-
 int
 weston_compositor_init(struct weston_compositor *ec);
 
@@ -2055,6 +2051,9 @@ weston_compositor_enable_content_protection(struct weston_compositor *compositor
 void
 weston_timeline_refresh_subscription_objects(struct weston_compositor *wc,
 					     void *object);
+
+void
+weston_set_log_handler(void (*handler)(const char *));
 
 #ifdef  __cplusplus
 }

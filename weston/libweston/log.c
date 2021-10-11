@@ -37,64 +37,12 @@
 #include <libweston/libweston.h>
 #include "weston-log-internal.h"
 
-/**
- * \defgroup wlog weston-logging
- */
+static void (*log_handler)(const char *);
 
-static int
-default_log_handler(const char *fmt, va_list ap);
-
-/** Needs to be set, defaults to default_log_handler
- *
- * \ingroup wlog
- */
-static log_func_t log_handler = default_log_handler;
-
-/** Needs to be set, defaults to default_log_handler
- *
- * \ingroup wlog
- */
-static log_func_t log_continue_handler = default_log_handler;
-
-/** Sentinel log message handler
- *
- * This function is used as the default handler for log messages. It
- * exists only to issue a noisy reminder to the user that a real handler
- * must be installed prior to issuing logging calls. The process is
- * immediately aborted after the reminder is printed.
- *
- * \param fmt The format string. Ignored.
- * \param ap The variadic argument list. Ignored.
- *
- * \ingroup wlog
- */
-static int
-default_log_handler(const char *fmt, va_list ap)
-{
-        fprintf(stderr, "weston_log_set_handler() must be called before using of weston_log().\n");
-        abort();
-}
-
-/** Install the log handler
- *
- * The given functions will be called to output text as passed to the
- * \a weston_log and \a weston_log_continue functions.
- *
- * \param log The log function. This function will be called when
- *            \a weston_log is called, and should begin a new line,
- *            with user defined line headers, if any.
- * \param cont The continue log function. This function will be called
- *             when \a weston_log_continue is called, and should append
- *             its output to the current line, without any header or
- *             other content in between.
- *
- * \ingroup wlog
- */
 WL_EXPORT void
-weston_log_set_handler(log_func_t log, log_func_t cont)
+weston_set_log_handler(void (*handler)(const char *))
 {
-	log_handler = log;
-	log_continue_handler = cont;
+	log_handler = handler;
 }
 
 /** weston_vlog calls log_handler
@@ -103,7 +51,22 @@ weston_log_set_handler(log_func_t log, log_func_t cont)
 WL_EXPORT int
 weston_vlog(const char *fmt, va_list ap)
 {
-	return log_handler(fmt, ap);
+	char *msg;
+	int len, skip;
+
+	vasprintf(&msg, fmt, ap);
+
+	len = strlen(msg);
+
+	if (msg[len - 1] == '\n')
+		msg[len - 1] = '\0';
+
+	for (skip = 0; isspace(msg[skip]); skip++)
+		;
+
+	log_handler(msg + skip);
+
+	free(msg);
 }
 
 /** printf() equivalent in weston compositor.
@@ -136,7 +99,7 @@ weston_log(const char *fmt, ...)
 WL_EXPORT int
 weston_vlog_continue(const char *fmt, va_list argp)
 {
-	return log_continue_handler(fmt, argp);
+	return weston_vlog(fmt, argp);
 }
 
 /** weston_log_continue
