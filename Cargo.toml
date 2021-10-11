@@ -11,6 +11,8 @@ wayland-sys = { path = "third_party/wayland-sys" }
 wayland-server = { path = "third_party/wayland-server", features = ["use_system_lib"] }
 bitflags = "1.0"
 nix = "*"
+log = "*"
+env_logger = "*"
 
 [build-dependencies]
 wayland-scanner = { version = "0.28.2", path = "third_party/wayland-scanner" }

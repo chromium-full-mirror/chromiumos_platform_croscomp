@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use log::debug;
+
 use nix::sys::signal::{sigprocmask, SigSet, SigmaskHow};
 use std::os::unix::io::{AsRawFd, IntoRawFd, RawFd};
 use std::os::unix::net::UnixStream;
@@ -283,7 +285,7 @@ impl Compositor {
 
 impl Drop for Compositor {
     fn drop(&mut self) {
-        println!("drop compositor");
+        debug!("drop compositor");
         unsafe { ffi::weston_compositor_deinit(&mut self.native) }
     }
 }

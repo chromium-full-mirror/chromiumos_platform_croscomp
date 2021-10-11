@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use log::debug;
+
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -23,8 +25,6 @@ pub fn init(rc: &Rc<RefCell<crate::Shell>>) {
 
             let shell = &rc.borrow();
             let mut compositor = shell.compositor.borrow_mut();
-
-            println!("on_bind, send workspace info");
 
             for head in compositor.head_iter_mut().filter(|h| !h.output.is_null()) {
                 let output = unsafe { &*head.output };
@@ -69,7 +69,7 @@ pub fn init(rc: &Rc<RefCell<crate::Shell>>) {
                     container: _,
                 } => {
                     id.on_request(|_resource, request| match request {
-                        _ => println!("request: {:?}", request),
+                        _ => debug!("request: {:?}", request),
                     });
                 }
                 GetNotificationSurface {

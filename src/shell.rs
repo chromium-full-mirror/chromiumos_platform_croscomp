@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use log::debug;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -97,10 +98,10 @@ impl Shell {
             compositor: rc,
 
             idle_listener: ffi::WlListener::new(&mut compositor.native.idle_signal, || {
-                println!("-------------------- idle signal fired")
+                debug!("-------------------- idle signal fired")
             }),
             wake_listener: ffi::WlListener::new(&mut compositor.native.wake_signal, || {
-                println!("-------------------- wake signal fired")
+                debug!("-------------------- wake signal fired")
             }),
         }
     }
@@ -141,7 +142,6 @@ impl Shell {
                 ffi::weston_keyboard_modifier::MODIFIER_CTRL
                     | ffi::weston_keyboard_modifier::MODIFIER_ALT,
                 move |_, _, key| {
-                    println!("key: {:?}", key);
                     let mut compositor = rc.borrow_mut();
                     compositor.server.terminate();
                 },
@@ -228,6 +228,6 @@ impl Shell {
 
 impl Drop for Shell {
     fn drop(&mut self) {
-        println!("-------------------- drop Shell")
+        debug!("-------------------- drop Shell")
     }
 }

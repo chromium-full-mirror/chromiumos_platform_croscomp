@@ -4,6 +4,7 @@
 
 use crate::ffi;
 use crate::protocol;
+use log::{debug, warn};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -40,7 +41,7 @@ fn handle_request(_resource: &mut Resource<CroscompSplash>, request: &Request) {
             let head = output_resource.as_ref().user_data::<ffi::weston_head>();
 
             if surface.committed.is_some() {
-                println!("surface already committed");
+                warn!("surface already committed");
                 return;
             }
 
@@ -63,12 +64,12 @@ pub fn init(rc: &Rc<RefCell<crate::Shell>>) {
     let version = 1;
     let rc = Rc::clone(rc);
 
-    println!("from splash, allocating global");
+    debug!("from splash, allocating global");
     let global = compositor
         .server
         .create_global::<CroscompSplash>(version)
         .on_bind(|_| {
-            println!("splash: handle bind");
+            warn!("splash: handle bind, should check client");
             true
         })
         .on_request(|resource, request| handle_request(resource, request))

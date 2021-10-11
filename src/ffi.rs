@@ -260,7 +260,6 @@ impl wl_signal {
     where
         T: From<*mut wl_listener>,
     {
-        println!("destroy notify");
         unsafe { (*listener).link.remove() };
         let _ = T::from(listener);
     }
@@ -307,7 +306,6 @@ pub struct WlListener<F> {
 impl<F> Drop for WlListener<F> {
     fn drop(&mut self) {
         unsafe { wl_list_remove(&mut self.listener.link) };
-        println!("fbox dropped");
     }
 }
 

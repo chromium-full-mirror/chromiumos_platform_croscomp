@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::event_loop::EventLoop;
+use log::debug;
 use std::marker::PhantomData;
 use wayland_server::MessageGroup;
 
@@ -126,7 +127,7 @@ where
             0
         }
 
-        println!("set dispatcher for {}: {:?}", I::NAME, &f as *const _);
+        debug!("set dispatcher for {}: {:?}", I::NAME, &f as *const _);
 
         let dispatcher = Box::new(f);
         unsafe {
@@ -201,7 +202,7 @@ where
     I: wayland_server::Interface,
 {
     fn drop(&mut self) {
-        println!("drop global");
+        debug!("drop global");
     }
 }
 
@@ -219,7 +220,7 @@ impl<I: wayland_server::Interface> Global<I> {
     where
         F: 'static + Fn(&mut Resource<I>, &I::Request),
     {
-        println!("set dispatcher for {}: {:?}", I::NAME, &f as *const _);
+        debug!("set dispatcher for {}: {:?}", I::NAME, &f as *const _);
         self.handlers.dispatcher = Some(Box::new(f));
         self
     }
@@ -321,10 +322,8 @@ impl Server {
 
             let handlers = &mut *(data as *mut GlobalHandlers<I>);
 
-            println!("handlers: {:?}", handlers as *const _);
-
             let success = if let Some(ref handle_bind) = handlers.handle_bind {
-                println!(
+                debug!(
                     "calling handle_bind for {}: {:?}",
                     I::NAME,
                     &(*handle_bind) as *const _
@@ -335,13 +334,13 @@ impl Server {
             };
 
             if !success {
-                println!("on_bind returns failure");
+                debug!("on_bind returns failure");
                 resource.drop_native();
                 return;
             }
 
             if let Some(ref dispatcher) = handlers.dispatcher {
-                println!(
+                debug!(
                     "setting dispatcher for {}: {:?}",
                     I::NAME,
                     &(*dispatcher) as *const _
@@ -390,7 +389,7 @@ impl Server {
 
 impl Drop for Server {
     fn drop(&mut self) {
-        println!("drop display");
+        debug!("drop display");
         unsafe { ffi::wl_display_destroy(self.native) }
     }
 }

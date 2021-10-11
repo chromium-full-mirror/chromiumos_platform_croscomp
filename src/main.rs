@@ -5,6 +5,8 @@
 #[macro_use]
 extern crate bitflags;
 
+use log::{debug, warn};
+
 use nix::sys::stat::{umask, Mode};
 use nix::sys::wait::{waitpid, WaitPidFlag};
 
@@ -126,13 +128,15 @@ extern "C" fn head_notify(_listener: *mut ffi::wl_listener, data: *mut ::std::os
             set_seat(output, "\0".as_ptr() as *const _);
 
             if ffi::weston_output_enable(output) != 0 {
-                println!("weston_output_enable return non-0");
+                warn!("weston_output_enable return non-0");
             }
         }
     }
 }
 
 fn main() -> std::io::Result<()> {
+    env_logger::init();
+
     let ctx = unsafe { ffi::weston_log_ctx_create() };
 
     let compositor = Rc::new(RefCell::new(Compositor::new(ctx)));
@@ -227,7 +231,7 @@ fn main() -> std::io::Result<()> {
         ffi::wl_display_run(display)
     }
 
-    println!(
+    debug!(
         "# exit from main: shell strong count {}",
         Rc::strong_count(&shell)
     );

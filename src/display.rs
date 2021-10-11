@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use log::debug;
+
 use crate::ffi;
 use crate::protocol;
 use std::cell::RefCell;
@@ -16,8 +18,6 @@ fn handle_bind(
     compositor: &mut super::Compositor,
 ) -> bool {
     for head in compositor.head_iter().filter(|h| h.is_enabled()) {
-        println!("head {:?}", head);
-
         use super::protocol::croscomp_display::Event::Output;
         use super::protocol::croscomp_output::Event::{Done, Geometry, Mode};
         use super::protocol::croscomp_output::{Subpixel, Transform};
@@ -73,6 +73,6 @@ pub fn init(shell: &Rc<RefCell<crate::Shell>>) {
 
             handle_bind(resource, &mut compositor)
         })
-        .on_request(|_resource, request| println!("{:?}", request));
+        .on_request(|_resource, request| debug!("{:?}", request));
     Box::into_raw(Box::new(global));
 }

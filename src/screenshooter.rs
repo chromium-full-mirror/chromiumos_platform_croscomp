@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::Shell;
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use crate::ffi;
 use crate::protocol;
+use crate::Shell;
+
+use log::debug;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use crate::server::Resource;
 use protocol::weston_screenshooter::{Request, WestonScreenshooter};
@@ -29,7 +30,7 @@ impl ScreenShooter {
     }
 
     fn record(&mut self) {
-        println!("screenshooter record");
+        debug!("screenshooter record");
     }
 }
 
@@ -91,7 +92,6 @@ pub fn init(shell: &Rc<RefCell<Shell>>) {
         .on_destroy(move |_resource| {
             let mut s = destroy_rc.borrow_mut();
             s.client = None;
-            println!("destroy shooter")
         });
 
     Box::into_raw(Box::new(global));

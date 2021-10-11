@@ -35,7 +35,6 @@ impl<'a> From<&'a mut Box<Rotation>> for &'a mut ffi::wl_listener {
 
 impl Drop for Rotation {
     fn drop(&mut self) {
-        println!("rotation dropped");
         self.transform.link.remove();
     }
 }
@@ -49,7 +48,6 @@ fn key_rotate(surface: &mut ffi::weston_surface) {
     let (s, c) = f32::sin_cos(0.1);
 
     let mut rotation = view.destroy_signal.get().unwrap_or_else(|| {
-        println!("create rotation");
         let mut rotation = Box::new(Rotation {
             transform: ffi::weston_transform {
                 matrix: ffi::weston_matrix::new(),

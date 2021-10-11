@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use log::debug;
+
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -17,11 +19,11 @@ pub fn init(rc: &Rc<RefCell<crate::Shell>>) {
             use super::protocol::zaura_shell::Request;
             match request {
                 Request::GetAuraSurface { id, surface: _ } => {
-                    println!("get aura surface");
-                    id.on_request(|_, request| println!("request for aura surface: {:?}", request));
+                    debug!(target: "aura_shell", "get aura surface");
+                    id.on_request(|_, request| debug!(target: "aura_shell", "request for aura surface: {:?}", request));
                 }
                 Request::GetAuraOutput { .. } => {
-                    println!("get aura output");
+                    debug!(target: "aura_shell", "get aura output");
                 }
             }
         });
