@@ -34,6 +34,7 @@ fn run_bindgen(header: &str, output: &str) {
 fn main() {
     let protocols = [
         "wayland",
+        "xdg-shell",
         "weston-screenshooter",
         "linux-dmabuf-unstable-v1",
         "croscomp",

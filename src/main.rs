@@ -34,6 +34,7 @@ mod shell;
 mod splash;
 mod switcher;
 mod terminal;
+mod xdg_shell;
 
 use compositor::Compositor;
 use server::Server;
@@ -232,6 +233,8 @@ fn main() -> std::io::Result<()> {
     aura_shell::init(&shell);
 
     screenshooter::init(&shell);
+
+    xdg_shell::init(&shell);
 
     compositor.borrow_mut().wake();
 
