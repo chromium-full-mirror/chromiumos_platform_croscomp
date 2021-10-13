@@ -1,6 +1,6 @@
 [package]
 name = "wayland-sys"
-version = "0.28.2"
+version = "0.29.0"
 repository = "https://github.com/smithay/wayland-rs"
 documentation = "https://smithay.github.io/wayland-rs/wayland_sys/"
 authors = ["Victor Berger <victor.berger@m4x.org>"]
@@ -13,17 +13,18 @@ readme = "README.md"
 [dependencies]
 dlib = { path = "../dlib", optional = true }
 libc = { version = "0.2", optional = true }
-lazy_static = { version = "1", optional = true }
+lazy_static = { version = "1.0.2", optional = true }
+memoffset = { version = "0.6.4", optional = true }
 
 [build-dependencies]
-pkg-config = "0.3"
+pkg-config = "0.3.7"
 
 [features]
-dlopen = ["dlib/dlopen", "lazy_static"]
-client = [ "dlib" ]
-cursor = [ "client" ]
-egl = [ "client" ]
-server = ["libc", "dlib" ]
+dlopen = ["dlib", "lazy_static"]
+client = ["dlib"]
+cursor = ["client"]
+egl = ["client"]
+server = ["libc", "dlib", "memoffset"]
 
 [package.metadata.docs.rs]
 all-features = true

@@ -19,6 +19,7 @@ pub const MAX_BYTES_OUT: usize = 4096;
  */
 
 /// A wayland socket
+#[derive(Debug)]
 pub struct Socket {
     fd: RawFd,
 }
@@ -57,8 +58,12 @@ impl Socket {
         let mut cmsg = cmsg_space!([RawFd; MAX_FDS_OUT]);
         let iov = [uio::IoVec::from_mut_slice(buffer)];
 
-        let msg =
-            socket::recvmsg(self.fd, &iov[..], Some(&mut cmsg), socket::MsgFlags::MSG_DONTWAIT)?;
+        let msg = socket::recvmsg(
+            self.fd,
+            &iov[..],
+            Some(&mut cmsg),
+            socket::MsgFlags::MSG_DONTWAIT | socket::MsgFlags::MSG_CMSG_CLOEXEC,
+        )?;
 
         let mut fd_count = 0;
         let received_fds = msg.cmsgs().flat_map(|cmsg| match cmsg {
@@ -70,6 +75,11 @@ impl Socket {
             *place = fd;
         }
         Ok((msg.bytes, fd_count))
+    }
+
+    /// Retrieve the current value of the requested [socket::GetSockOpt]
+    pub fn opt<O: socket::GetSockOpt>(&self, opt: O) -> NixResult<O::Val> {
+        socket::getsockopt(self.fd, opt)
     }
 }
 
@@ -103,6 +113,7 @@ impl Drop for Socket {
 
 /// An adapter around a raw Socket that directly handles buffering and
 /// conversion from/to wayland messages
+#[derive(Debug)]
 pub struct BufferedSocket {
     socket: Socket,
     in_data: Buffer<u32>,
@@ -139,6 +150,9 @@ impl BufferedSocket {
     pub fn flush(&mut self) -> NixResult<()> {
         {
             let words = self.out_data.get_contents();
+            if words.is_empty() {
+                return Ok(());
+            }
             let bytes = unsafe {
                 ::std::slice::from_raw_parts(words.as_ptr() as *const u8, words.len() * 4)
             };
@@ -190,7 +204,7 @@ impl BufferedSocket {
             if !self.attempt_write_message(msg)? {
                 // If this fails again, this means the message is too big
                 // to be transmitted at all
-                return Err(::nix::Error::Sys(::nix::errno::Errno::E2BIG));
+                return Err(::nix::Error::E2BIG);
             }
         }
         Ok(())
@@ -217,7 +231,7 @@ impl BufferedSocket {
         };
         if in_bytes == 0 {
             // the other end of the socket was closed
-            return Err(::nix::Error::Sys(::nix::errno::Errno::EPIPE));
+            return Err(::nix::Error::EPIPE);
         }
         // advance the storage
         self.in_data.advance(in_bytes / 4 + if in_bytes % 4 > 0 { 1 } else { 0 });
@@ -346,7 +360,7 @@ impl BufferedSocket {
             // now, try to get more data
             match self.fill_incoming_buffers() {
                 Ok(()) => (),
-                Err(e @ ::nix::Error::Sys(::nix::errno::Errno::EAGAIN)) => {
+                Err(e @ ::nix::Error::EAGAIN) => {
                     // stop looping, returning Ok() or EAGAIN depending on whether messages
                     // were dispatched
                     if dispatched == 0 {
@@ -366,7 +380,7 @@ impl BufferedSocket {
 /*
  * Buffer
  */
-
+#[derive(Debug)]
 struct Buffer<T: Copy> {
     storage: Vec<T>,
     occupied: usize,

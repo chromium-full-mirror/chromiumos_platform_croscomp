@@ -66,7 +66,7 @@
 //! methods provides you with a file descriptor that can be used in a polling structure to integrate
 //! the wayland socket in an event loop.
 
-#![warn(missing_docs)]
+#![warn(missing_docs, missing_debug_implementations)]
 
 #[macro_use]
 extern crate bitflags;
@@ -79,7 +79,7 @@ mod display;
 mod globals;
 mod resource;
 
-pub use client::Client;
+pub use client::{Client, Credentials};
 pub use display::Display;
 pub use globals::Global;
 pub use resource::{Main, Resource};
@@ -234,10 +234,11 @@ mod anonymous_object {
 
 #[macro_export]
 macro_rules! request_enum(
-    ($enu:ident | $($evt_name:ident => $iface:ty),*) => {
-        $crate::request_enum!($enu | $($evt_name => $iface),* | );
+    ($(#[$attrs:meta])* $enu:ident | $($evt_name:ident => $iface:ty),*) => {
+        $crate::request_enum!($(#[$attrs])* $enu | $($evt_name => $iface),* | );
     };
-    ($enu:ident | $($evt_name:ident => $iface:ty),* | $($name:ident => $value:ty),*) => {
+    ($(#[$attrs:meta])* $enu:ident | $($evt_name:ident => $iface:ty),* | $($name:ident => $value:ty),*) => {
+        $(#[$attrs])*
         pub enum $enu {
             $(
                 $evt_name { request: <$iface as $crate::Interface>::Request, object: $crate::Main<$iface> },

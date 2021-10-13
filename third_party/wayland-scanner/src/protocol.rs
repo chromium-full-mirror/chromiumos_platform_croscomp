@@ -11,7 +11,12 @@ pub struct Protocol {
 
 impl Protocol {
     pub fn new(name: String) -> Protocol {
-        Protocol { name, copyright: None, description: None, interfaces: Vec::new() }
+        Protocol {
+            name,
+            copyright: None,
+            description: None,
+            interfaces: Vec::new(),
+        }
     }
 }
 
@@ -124,7 +129,13 @@ pub struct Entry {
 
 impl Entry {
     pub fn new() -> Entry {
-        Entry { name: String::new(), value: 0, since: 1, description: None, summary: None }
+        Entry {
+            name: String::new(),
+            value: 0,
+            since: 1,
+            description: None,
+            summary: None,
+        }
     }
 }
 

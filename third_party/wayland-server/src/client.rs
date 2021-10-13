@@ -7,12 +7,36 @@ use crate::imp::ClientInner;
 
 use crate::{Interface, Main, Resource, UserDataMap};
 
+/// Holds the client credentials the can be
+/// retrieved from the socket with [`Client::credentials`]
+#[derive(Debug, Clone, Copy)]
+pub struct Credentials {
+    /// pid of the client
+    pub pid: libc::pid_t,
+    /// uid of the client
+    pub uid: libc::uid_t,
+    /// gid of the client
+    pub gid: libc::gid_t,
+}
+
+impl From<nix::sys::socket::UnixCredentials> for Credentials {
+    fn from(credentials: nix::sys::socket::UnixCredentials) -> Self {
+        Self { pid: credentials.pid(), uid: credentials.uid(), gid: credentials.gid() }
+    }
+}
+
 /// A handle to a client connected to your server
 ///
 /// There can be several handles referring to the same client.
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct Client {
     inner: ClientInner,
+}
+
+impl std::fmt::Debug for Client {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Client { ... }")
+    }
 }
 
 impl Client {
@@ -58,6 +82,20 @@ impl Client {
         self.inner.kill()
     }
 
+    /// Returns the [`Credentials`] from the socket of this
+    /// client.
+    ///
+    /// The credentials come from getsockopt() with SO_PEERCRED, on the client socket fd.
+    ///
+    /// Be aware that for clients that a compositor forks and execs and then connects using
+    /// socketpair(), this function will return the credentials for the compositor.
+    /// The credentials for the socketpair are set at creation time in the compositor.
+    ///
+    /// Returns [None] if the client is already dead.
+    pub fn credentials(&self) -> Option<Credentials> {
+        self.inner.credentials()
+    }
+
     /// Returns a reference to the `UserDataMap` associated with this client
     ///
     /// See `UserDataMap` documentation for details about its use.
@@ -96,5 +134,17 @@ impl Client {
         version: u32,
     ) -> Option<Main<I>> {
         self.inner.create_resource::<I>(version).map(Main::wrap)
+    }
+
+    /// Retrieve a resource of this client for a given id
+    ///
+    /// You need to know in advance which is the interface of this object. If the given id does
+    /// not correspond to an existing object or the existing object is not of the requested
+    /// interface, this call returns `None`.
+    pub fn get_resource<I: Interface + From<Resource<I>> + AsRef<Resource<I>>>(
+        &self,
+        id: u32,
+    ) -> Option<I> {
+        self.inner.get_resource::<I>(id).map(|obj| Resource::wrap(obj).into())
     }
 }

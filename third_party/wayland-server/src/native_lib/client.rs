@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::ffi::CStr;
 use std::os::raw::c_void;
 use std::ptr;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -8,7 +9,7 @@ use wayland_commons::ThreadGuard;
 use wayland_sys::server::*;
 
 use super::resource::ResourceInner;
-use crate::{DispatchData, Interface, Resource, UserDataMap};
+use crate::{client::Credentials, DispatchData, Interface, Resource, UserDataMap};
 
 type BoxedDest = Box<dyn FnMut(Arc<UserDataMap>, DispatchData<'_>) + 'static>;
 
@@ -99,6 +100,26 @@ impl ClientInner {
         }
     }
 
+    pub(crate) fn credentials(&self) -> Option<Credentials> {
+        if !self.alive() {
+            return None;
+        }
+        let _c_safety_guard = super::C_SAFETY.lock();
+        unsafe {
+            let mut credentials = Credentials { pid: 0, uid: 0, gid: 0 };
+
+            ffi_dispatch!(
+                WAYLAND_SERVER_HANDLE,
+                wl_client_get_credentials,
+                self.ptr,
+                &mut credentials.pid,
+                &mut credentials.uid,
+                &mut credentials.gid
+            );
+            Some(credentials)
+        }
+    }
+
     pub(crate) fn user_data_map(&self) -> &UserDataMap {
         &self.internal.user_data_map
     }
@@ -143,6 +164,31 @@ impl ClientInner {
             );
             Some(ResourceInner::init_from_c_ptr::<I>(ptr))
         }
+    }
+
+    pub(crate) fn get_resource<I: Interface + From<Resource<I>> + AsRef<Resource<I>>>(
+        &self,
+        id: u32,
+    ) -> Option<ResourceInner> {
+        let _c_safety_guard = super::C_SAFETY.lock();
+        unsafe {
+            let ptr = ffi_dispatch!(WAYLAND_SERVER_HANDLE, wl_client_get_object, self.ptr(), id);
+            if ptr.is_null() {
+                return None;
+            }
+            let interface = ffi_dispatch!(WAYLAND_SERVER_HANDLE, wl_resource_get_class, ptr);
+            let requested_interface = (*I::c_interface()).name;
+            if CStr::from_ptr(interface) != CStr::from_ptr(requested_interface) {
+                // interface of this resource is not the requested one
+                return None;
+            }
+            Some(ResourceInner::from_c_ptr::<I>(ptr))
+        }
+    }
+}
+impl PartialEq for ClientInner {
+    fn eq(&self, other: &Self) -> bool {
+        self.equals(other)
     }
 }
 

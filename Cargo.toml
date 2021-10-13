@@ -15,4 +15,4 @@ log = "*"
 env_logger = "*"
 
 [build-dependencies]
-wayland-scanner = { version = "0.28.2", path = "third_party/wayland-scanner" }
+wayland-scanner = { path = "third_party/wayland-scanner" }

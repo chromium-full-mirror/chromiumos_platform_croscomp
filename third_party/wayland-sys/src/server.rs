@@ -109,6 +109,7 @@ external_library!(WaylandServer, "wayland-server",
         fn wl_resource_set_user_data(*mut wl_resource, *mut c_void) -> (),
         fn wl_resource_get_user_data(*mut wl_resource) -> *mut c_void,
         fn wl_resource_get_version(*mut wl_resource) -> c_int,
+        fn wl_resource_get_class(*mut wl_resource) -> *const c_char,
         fn wl_resource_set_destructor(*mut wl_resource, Option<wl_resource_destroy_func_t>) -> (),
         fn wl_resource_instance_of(*mut wl_resource, *const wl_interface, *const c_void) -> c_int,
         fn wl_resource_add_destroy_listener(*mut wl_resource, wl_notify_func_t) -> (),
@@ -155,9 +156,9 @@ lazy_static::lazy_static!(
         let versions = ["libwayland-server.so",
                         "libwayland-server.so.0"];
         for ver in &versions {
-            match WaylandServer::open(ver) {
+            match unsafe { WaylandServer::open(ver) } {
                 Ok(h) => return Some(h),
-                Err(::dlib::DlError::NotFound) => continue,
+                Err(::dlib::DlError::CantOpen(_)) => continue,
                 Err(::dlib::DlError::MissingSymbol(s)) => {
                     if ::std::env::var_os("WAYLAND_RS_DEBUG").is_some() {
                         // only print debug messages if WAYLAND_RS_DEBUG is set
@@ -195,21 +196,14 @@ pub mod signal {
     use std::os::raw::c_void;
     use std::ptr;
 
-    // TODO: Is this really not UB ?
-    macro_rules! offset_of(
-        ($ty:ty, $field:ident) => {
-            &(*(ptr::null() as *const $ty)).$field as *const _ as usize
-        }
-    );
-
     macro_rules! container_of(
-        ($ptr: expr, $container: ty, $field: ident) => {
-            ($ptr as *mut u8).offset(-(offset_of!($container, $field) as isize)) as *mut $container
+        ($ptr: expr, $container: ident, $field: ident) => {
+            ($ptr as *mut u8).offset(-(memoffset::offset_of!($container, $field) as isize)) as *mut $container
         }
     );
 
     macro_rules! list_for_each(
-        ($pos: ident, $head:expr, $container: ty, $field: ident, $action: block) => {
+        ($pos: ident, $head:expr, $container: ident, $field: ident, $action: block) => {
             let mut $pos = container_of!((*$head).next, $container, $field);
             while &mut (*$pos).$field as *mut _ != $head {
                 $action;
@@ -219,7 +213,7 @@ pub mod signal {
     );
 
     macro_rules! list_for_each_safe(
-        ($pos: ident, $head: expr, $container: ty, $field: ident, $action: block) => {
+        ($pos: ident, $head: expr, $container: ident, $field: ident, $action: block) => {
             let mut $pos = container_of!((*$head).next, $container, $field);
             let mut tmp = container_of!((*$pos).$field.next, $container, $field);
             while &mut (*$pos).$field as *mut _ != $head {

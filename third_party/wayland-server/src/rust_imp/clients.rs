@@ -14,7 +14,7 @@ use wayland_commons::socket::{BufferedSocket, Socket};
 use wayland_commons::wire::{Argument, ArgumentType, Message, MessageDesc, MessageParseError};
 use wayland_commons::{smallvec, ThreadGuard};
 
-use crate::{DispatchData, Interface, UserDataMap};
+use crate::{client::Credentials, DispatchData, Interface, UserDataMap};
 
 use super::event_loop_glue::{FdManager, Token};
 use super::globals::GlobalManager;
@@ -241,6 +241,18 @@ impl ClientInner {
         }
     }
 
+    pub(crate) fn credentials(&self) -> Option<Credentials> {
+        if let Some(ref mut cx) = *self.data.lock().unwrap() {
+            cx.socket
+                .get_socket()
+                .opt(nix::sys::socket::sockopt::PeerCredentials)
+                .ok()
+                .map(Credentials::from)
+        } else {
+            None
+        }
+    }
+
     pub(crate) fn user_data_map(&self) -> &UserDataMap {
         &self.user_data_map
     }
@@ -300,6 +312,20 @@ impl ClientInner {
         Some(ResourceInner::from_id(id, map, self.clone()).unwrap())
     }
 
+    pub(crate) fn get_resource<I: Interface>(&self, id: u32) -> Option<ResourceInner> {
+        let object = self
+            .data
+            .lock()
+            .unwrap()
+            .as_ref()
+            .and_then(|cx| ResourceInner::from_id(id, cx.map.clone(), self.clone()))?;
+        if object.is_interface::<I>() {
+            Some(object)
+        } else {
+            None
+        }
+    }
+
     pub(crate) fn set_dispatcher_for(
         &self,
         id: u32,
@@ -324,6 +350,11 @@ impl ClientInner {
                 obj.meta.destructor = Some(destructor);
             });
         }
+    }
+}
+impl PartialEq for ClientInner {
+    fn eq(&self, other: &Self) -> bool {
+        self.equals(other)
     }
 }
 
@@ -523,7 +554,7 @@ impl ClientImplementation {
             };
 
             let msg = match ret {
-                Ok(None) | Err(Error::Nix(::nix::Error::Sys(::nix::errno::Errno::EAGAIN))) => {
+                Ok(None) | Err(Error::Nix(::nix::Error::EAGAIN)) => {
                     // Nothing more to read.
                     return;
                 }

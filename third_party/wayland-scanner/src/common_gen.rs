@@ -38,7 +38,11 @@ impl ToTokens for Enum {
                     .map(description_to_doc_attr)
                     .or_else(|| entry.summary.as_ref().map(|s| to_doc_attr(s)));
 
-                let prefix = if entry.name.chars().next().unwrap().is_numeric() { "_" } else { "" };
+                let prefix = if entry.name.chars().next().unwrap().is_numeric() {
+                    "_"
+                } else {
+                    ""
+                };
                 let ident = Ident::new(
                     &format!("{}{}", prefix, snake_to_camel(&entry.name)),
                     Span::call_site(),
@@ -79,7 +83,11 @@ impl ToTokens for Enum {
                     .map(description_to_doc_attr)
                     .or_else(|| entry.summary.as_ref().map(|s| to_doc_attr(s)));
 
-                let prefix = if entry.name.chars().next().unwrap().is_numeric() { "_" } else { "" };
+                let prefix = if entry.name.chars().next().unwrap().is_numeric() {
+                    "_"
+                } else {
+                    ""
+                };
                 let variant = Ident::new(
                     &format!("{}{}", prefix, snake_to_camel(&entry.name)),
                     Span::call_site(),
@@ -106,7 +114,11 @@ impl ToTokens for Enum {
             let match_arms = self.entries.iter().map(|entry| {
                 let value = Literal::u32_unsuffixed(entry.value);
 
-                let prefix = if entry.name.chars().next().unwrap().is_numeric() { "_" } else { "" };
+                let prefix = if entry.name.chars().next().unwrap().is_numeric() {
+                    "_"
+                } else {
+                    ""
+                };
                 let variant = Ident::new(
                     &format!("{}{}", prefix, snake_to_camel(&entry.name)),
                     Span::call_site(),
@@ -140,8 +152,10 @@ impl ToTokens for Enum {
 
 pub(crate) fn gen_since_constants(requests: &[Message], events: &[Message]) -> TokenStream {
     let req_constants = requests.iter().map(|msg| {
-        let cstname =
-            Ident::new(&format!("REQ_{}_SINCE", msg.name.to_ascii_uppercase()), Span::call_site());
+        let cstname = Ident::new(
+            &format!("REQ_{}_SINCE", msg.name.to_ascii_uppercase()),
+            Span::call_site(),
+        );
         let since = msg.since;
         quote! {
             /// The minimal object version supporting this request
@@ -149,8 +163,10 @@ pub(crate) fn gen_since_constants(requests: &[Message], events: &[Message]) -> T
         }
     });
     let evt_constants = events.iter().map(|msg| {
-        let cstname =
-            Ident::new(&format!("EVT_{}_SINCE", msg.name.to_ascii_uppercase()), Span::call_site());
+        let cstname = Ident::new(
+            &format!("EVT_{}_SINCE", msg.name.to_ascii_uppercase()),
+            Span::call_site(),
+        );
         let since = msg.since;
         quote! {
             /// The minimal object version supporting this event
@@ -183,7 +199,10 @@ pub(crate) fn gen_messagegroup(
             );
         }
         if msg.since > 1 {
-            docs += &format!("\nOnly available since version {} of the interface", msg.since);
+            docs += &format!(
+                "\nOnly available since version {} of the interface",
+                msg.since
+            );
         }
 
         let doc_attr = to_doc_attr(&docs);
@@ -193,7 +212,11 @@ pub(crate) fn gen_messagegroup(
         } else {
             let fields = msg.args.iter().flat_map(|arg| {
                 let field_name = Ident::new(
-                    &format!("{}{}", if is_keyword(&arg.name) { "_" } else { "" }, arg.name),
+                    &format!(
+                        "{}{}",
+                        if is_keyword(&arg.name) { "_" } else { "" },
+                        arg.name
+                    ),
                     Span::call_site(),
                 );
                 let field_type_inner = if let Some(ref enu) = arg.enum_ {
@@ -289,7 +312,11 @@ pub(crate) fn gen_messagegroup(
         }
     });
 
-    let map_type = if side == Side::Client { quote!(ProxyMap) } else { quote!(ResourceMap) };
+    let map_type = if side == Side::Client {
+        quote!(ProxyMap)
+    } else {
+        quote!(ResourceMap)
+    };
 
     // Can't be a closure because closures are never Copy / Clone in rustc < 1.26.0, and we supports 1.21.0
     fn map_fn((ref msg, ref name): (&Message, &Ident)) -> TokenStream {
@@ -301,7 +328,7 @@ pub(crate) fn gen_messagegroup(
         } else {
             quote!(#msg_type_qualified { .. })
         }
-    };
+    }
 
     let message_match_patterns = messages.iter().zip(iter::repeat(name)).map(map_fn);
 
@@ -316,15 +343,21 @@ pub(crate) fn gen_messagegroup(
         is_destructor_match_arms.push(quote!(_ => false));
     }
 
-    let opcode_match_arms = message_match_patterns.clone().enumerate().map(|(opcode, pattern)| {
-        let value = Literal::u16_unsuffixed(opcode as u16);
-        quote!(#pattern => #value)
-    });
+    let opcode_match_arms = message_match_patterns
+        .clone()
+        .enumerate()
+        .map(|(opcode, pattern)| {
+            let value = Literal::u16_unsuffixed(opcode as u16);
+            quote!(#pattern => #value)
+        });
 
-    let since_match_arms = messages.iter().zip(message_match_patterns).map(|(msg, pattern)| {
-        let since = Literal::u32_unsuffixed(msg.since as u32);
-        quote!(#pattern => #since)
-    });
+    let since_match_arms = messages
+        .iter()
+        .zip(message_match_patterns)
+        .map(|(msg, pattern)| {
+            let since = Literal::u32_unsuffixed(msg.since as u32);
+            quote!(#pattern => #since)
+        });
 
     let child_match_arms = messages
         .iter()
@@ -727,7 +760,11 @@ pub fn method_prototype<'a>(
     }
 
     let fn_name = Ident::new(
-        &format!("{}{}", if is_keyword(&msg.name) { "_" } else { "" }, msg.name),
+        &format!(
+            "{}{}",
+            if is_keyword(&msg.name) { "_" } else { "" },
+            msg.name
+        ),
         Span::call_site(),
     );
 
@@ -772,12 +809,19 @@ pub fn method_prototype<'a>(
         };
 
         let arg_name = Ident::new(
-            &format!("{}{}", if is_keyword(&arg.name) { "_" } else { "" }, arg.name),
+            &format!(
+                "{}{}",
+                if is_keyword(&arg.name) { "_" } else { "" },
+                arg.name
+            ),
             Span::call_site(),
         );
 
-        let arg_type =
-            if arg.allow_null { quote!(Option<#arg_type_inner>) } else { arg_type_inner };
+        let arg_type = if arg.allow_null {
+            quote!(Option<#arg_type_inner>)
+        } else {
+            arg_type_inner
+        };
 
         Some(quote!(#arg_name: #arg_type))
     }));

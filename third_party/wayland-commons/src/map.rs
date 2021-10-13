@@ -40,6 +40,18 @@ pub struct Object<Meta: ObjectMetadata> {
     pub childs_from_requests: fn(u16, u32, &Meta) -> Option<Object<Meta>>,
 }
 
+impl<Meta: ObjectMetadata + std::fmt::Debug> std::fmt::Debug for Object<Meta> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Object")
+            .field("interface", &self.interface)
+            .field("version", &self.version)
+            .field("requests", &self.requests)
+            .field("events", &self.events)
+            .field("meta", &self.meta)
+            .finish()
+    }
+}
+
 impl<Meta: ObjectMetadata> Object<Meta> {
     /// Create an Object corresponding to given interface and version
     pub fn from_interface<I: Interface>(version: u32, meta: Meta) -> Object<Meta> {
@@ -98,7 +110,7 @@ fn childs_from<M: MessageGroup, Meta: ObjectMetadata>(
 ///
 /// Keeps track of which object id is associated to which
 /// interface object, and which is currently unused.
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct ObjectMap<Meta: ObjectMetadata> {
     client_objects: Vec<Option<Object<Meta>>>,
     server_objects: Vec<Option<Object<Meta>>>,
@@ -140,6 +152,8 @@ impl<Meta: ObjectMetadata> ObjectMap<Meta> {
     ///
     /// Can fail if the requested id is not the next free id of this store.
     /// (In which case this is a protocol error)
+    // -- The lint is allowed because fixing it would be a breaking change --
+    #[allow(clippy::result_unit_err)]
     pub fn insert_at(&mut self, id: u32, object: Object<Meta>) -> Result<(), ()> {
         if id == 0 {
             Err(())
@@ -161,6 +175,8 @@ impl<Meta: ObjectMetadata> ObjectMap<Meta> {
     }
 
     /// Mutably access an object of the map
+    // -- The lint is allowed because fixing it would be a breaking change --
+    #[allow(clippy::result_unit_err)]
     pub fn with<T, F: FnOnce(&mut Object<Meta>) -> T>(&mut self, id: u32, f: F) -> Result<T, ()> {
         if id == 0 {
             Err(())
