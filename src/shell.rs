@@ -141,7 +141,7 @@ impl Shell {
                 KEY_BACKSPACE,
                 ffi::weston_keyboard_modifier::MODIFIER_CTRL
                     | ffi::weston_keyboard_modifier::MODIFIER_ALT,
-                move |_, _, key| {
+                move |_, _, _| {
                     let mut compositor = rc.borrow_mut();
                     compositor.server.terminate();
                 },
