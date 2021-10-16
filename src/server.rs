@@ -122,7 +122,11 @@ where
             0
         }
 
-        debug!("set dispatcher for {}: {:?}", I::NAME, &f as *const _);
+        debug!(
+            "set dispatcher for resource {}: {:?}",
+            I::NAME,
+            &f as *const _
+        );
 
         let dispatcher = Box::new(f);
         unsafe {
@@ -215,7 +219,11 @@ impl<I: wayland_server::Interface> Global<I> {
     where
         F: 'static + Fn(&mut Resource<I>, &I::Request),
     {
-        debug!("set dispatcher for {}: {:?}", I::NAME, &f as *const _);
+        debug!(
+            "set dispatcher for global {}: {:?}",
+            I::NAME,
+            &f as *const _
+        );
         self.handlers.dispatcher = Some(Box::new(f));
         self
     }
