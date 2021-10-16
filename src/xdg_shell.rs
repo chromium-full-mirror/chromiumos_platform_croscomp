@@ -83,10 +83,10 @@ impl Positioner {
 }
 
 fn handle_positioner_request(
-    _resource: &mut Resource<XdgPositioner>,
+    resource: &mut Resource<XdgPositioner>,
     request: &xdg_positioner::Request,
 ) {
-    let mut p = Positioner::new();
+    let mut p = resource.user_data::<Positioner>();
 
     debug!("{:?}", request);
 
@@ -218,6 +218,8 @@ fn handle_xdg_wm_base_request(_resource: &mut Resource<XdgWmBase>, request: &xdg
         CreatePositioner { id } => {
             debug!("create positioner");
             id.on_request(handle_positioner_request);
+            let b = Box::new(Positioner::new());
+            id.set_user_data(Box::into_raw(b));
         }
         GetXdgSurface { id, surface: _ } => {
             debug!("get xdg surface");
