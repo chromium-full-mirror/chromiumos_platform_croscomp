@@ -26,8 +26,8 @@ create_cross_file() {
     # encounters EOF
     set +e
 
-    source ../../third_party/portage-stable/eclass/toolchain-funcs.eclass
-    source ../../third_party/eclass-overlay/eclass/meson.eclass
+    source ~/trunk/src/third_party/portage-stable/eclass/toolchain-funcs.eclass
+    source ~/trunk/src/third_party/eclass-overlay/eclass/meson.eclass
 
     T=$1
     mkdir -p $T
