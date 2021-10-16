@@ -31,6 +31,7 @@
 #include <string.h>
 #include <sys/time.h>
 #include <time.h>
+#include <ctype.h>
 
 #include <wayland-util.h>
 
@@ -54,7 +55,8 @@ weston_vlog(const char *fmt, va_list ap)
 	char *msg;
 	int len, skip;
 
-	vasprintf(&msg, fmt, ap);
+	if (vasprintf(&msg, fmt, ap) == -1)
+		return -1;
 
 	len = strlen(msg);
 
@@ -67,6 +69,8 @@ weston_vlog(const char *fmt, va_list ap)
 	log_handler(msg + skip);
 
 	free(msg);
+
+	return 0;
 }
 
 /** printf() equivalent in weston compositor.
