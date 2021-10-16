@@ -433,6 +433,24 @@ impl wl_shell_surface_resize {
     }
 }
 
+impl weston_seat {
+    pub fn get_pointer(&mut self) -> Option<&mut weston_pointer> {
+        if self.pointer_device_count > 0 {
+            unsafe { Some(&mut *(self.pointer_state)) }
+        } else {
+            None
+        }
+    }
+
+    pub fn get_touch(&mut self) -> Option<&mut weston_touch> {
+        if self.touch_device_count > 0 {
+            unsafe { Some(&mut *(self.touch_state)) }
+        } else {
+            None
+        }
+    }
+}
+
 impl weston_keyboard {
     pub fn start_grab(&mut self, grab: *mut weston_keyboard_grab) {
         unsafe { weston_keyboard_start_grab(self, grab) }
@@ -440,6 +458,12 @@ impl weston_keyboard {
 
     pub fn set_focus(&mut self, surface: *mut weston_surface) {
         unsafe { weston_keyboard_set_focus(self, surface) }
+    }
+}
+
+impl weston_pointer {
+    pub fn r#move(&mut self, event: *mut weston_pointer_motion_event) {
+        unsafe { weston_pointer_move(self, event) }
     }
 }
 
@@ -543,12 +567,6 @@ impl ops::Sub<wl_fixed_t> for wl_fixed_t {
 
     fn sub(self, rhs: wl_fixed_t) -> wl_fixed_t {
         wl_fixed_t(self.0 - rhs.0)
-    }
-}
-
-impl weston_pointer {
-    pub fn r#move(&mut self, event: *mut weston_pointer_motion_event) {
-        unsafe { weston_pointer_move(self, event) }
     }
 }
 
