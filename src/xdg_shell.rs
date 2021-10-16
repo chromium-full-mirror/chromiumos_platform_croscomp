@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::ffi;
 use crate::protocol;
 use log::{debug, error, warn};
 use std::cell::RefCell;
@@ -15,31 +16,21 @@ use protocol::xdg_toplevel::{self, XdgToplevel};
 use protocol::xdg_wm_base::{self, XdgWmBase};
 
 struct Positioner {
-    size_width: i32,
-    size_height: i32,
-    anchor_x: i32,
-    anchor_y: i32,
-    anchor_width: i32,
-    anchor_height: i32,
+    size: ffi::weston_size,
+    anchor_rect: ffi::weston_geometry,
     anchor: xdg_positioner::Anchor,
-    offset_x: i32,
-    offset_y: i32,
+    offset: ffi::weston_position,
     gravity: xdg_positioner::Gravity,
     constraint_adjustment: xdg_positioner::ConstraintAdjustment,
 }
 
 impl Positioner {
-    fn new() -> Self {
-        Self {
-            size_width: 0,
-            size_height: 0,
-            anchor_x: 0,
-            anchor_y: 0,
-            anchor_width: 0,
-            anchor_height: 0,
+    fn new() -> Positioner {
+        Positioner {
+            size: ffi::weston_size { width: 0, height: 0 },
+            anchor_rect: ffi::weston_geometry { x: 0, y: 0, width: 0, height: 0 },
             anchor: xdg_positioner::Anchor::None,
-            offset_x: 0,
-            offset_y: 0,
+            offset: ffi::weston_position { x: 0, y: 0 },
             gravity: xdg_positioner::Gravity::None,
             constraint_adjustment: xdg_positioner::ConstraintAdjustment::None,
         }
@@ -62,41 +53,26 @@ fn handle_positioner_request(
                 error!("width and height must me non-negative");
                 // xxx send error and return
             }
-            p.size_width = width;
-            p.size_height = height;
+            p.size = ffi::weston_size { width, height };
         }
-        SetAnchorRect {
-            x,
-            y,
-            width,
-            height,
-        } => {
+        SetAnchorRect { x, y, width, height } => {
             if width < 0 || height < 0 {
                 error!("width and height must me non-negative");
                 // xxx send error and return
             }
-            p.anchor_x = x;
-            p.anchor_y = y;
-            p.anchor_width = width;
-            p.anchor_height = height;
+            p.anchor_rect = ffi::weston_geometry { x, y, width, height };
         }
         SetAnchor { anchor } => p.anchor = anchor,
         SetGravity { gravity } => p.gravity = gravity,
-        SetConstraintAdjustment {
-            constraint_adjustment,
-        } => match xdg_positioner::ConstraintAdjustment::from_raw(constraint_adjustment) {
-            Some(adjustment) => p.constraint_adjustment = adjustment,
-            _ => error!("send error"),
-        },
-        SetOffset { x, y } => {
-            p.offset_x = x;
-            p.offset_y = y
+        SetConstraintAdjustment { constraint_adjustment } => {
+            match xdg_positioner::ConstraintAdjustment::from_raw(constraint_adjustment) {
+                Some(adjustment) => p.constraint_adjustment = adjustment,
+                _ => error!("send error"),
+            }
         }
+        SetOffset { x, y } => p.offset = ffi::weston_position { x, y },
         SetReactive => {}
-        SetParentSize {
-            parent_width: _,
-            parent_height: _,
-        } => {}
+        SetParentSize { parent_width: _, parent_height: _ } => {}
         SetParentConfigure { serial: _ } => {}
     }
 }
