@@ -48,9 +48,7 @@ struct Umask {
 
 impl Umask {
     fn with_mode(mode: Mode) -> Umask {
-        Umask {
-            old_mode: umask(mode),
-        }
+        Umask { old_mode: umask(mode) }
     }
 }
 

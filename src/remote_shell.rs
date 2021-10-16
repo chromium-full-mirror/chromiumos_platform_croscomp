@@ -63,26 +63,16 @@ pub fn init(rc: &Rc<RefCell<crate::Shell>>) {
             use super::protocol::zcr_remote_shell_v1::Request::*;
             match request {
                 Destroy => {}
-                GetRemoteSurface {
-                    id,
-                    surface: _,
-                    container: _,
-                } => {
+                GetRemoteSurface { id, surface: _, container: _ } => {
                     id.on_request(|_resource, request| match request {
                         _ => debug!("request: {:?}", request),
                     });
                 }
-                GetNotificationSurface {
-                    id: _,
-                    surface: _,
-                    notification_key: _,
-                } => {}
+                GetNotificationSurface { id: _, surface: _, notification_key: _ } => {}
                 GetInputMethodSurface { id: _, surface: _ } => {}
                 GetToastSurface { id: _, surface: _ } => {}
                 GetRemoteOutput { id: _, output: _ } => {}
-                SetUseDefaultDeviceScaleCancellation {
-                    use_default_device_scale_factor: _,
-                } => {}
+                SetUseDefaultDeviceScaleCancellation { use_default_device_scale_factor: _ } => {}
             }
         });
     Box::into_raw(Box::new(global));

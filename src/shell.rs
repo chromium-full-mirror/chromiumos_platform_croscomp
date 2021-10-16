@@ -65,10 +65,7 @@ impl Shell {
                     },
                     anim_sticky_list: ffi::wl_list::zeroed(),
                     anim_dir: 0,
-                    anim_timestamp: ffi::timespec {
-                        tv_sec: 0,
-                        tv_nsec: 0,
-                    },
+                    anim_timestamp: ffi::timespec { tv_sec: 0, tv_nsec: 0 },
                     anim_current: 0.0,
                     anim_from: std::ptr::null_mut(),
                     anim_to: std::ptr::null_mut(),
@@ -89,10 +86,7 @@ impl Shell {
                 output_move_listener: ffi::wl_listener::zeroed(),
                 output_list: ffi::wl_list::zeroed(),
                 client: std::ptr::null_mut(),
-                startup_time: ffi::timespec {
-                    tv_sec: 0,
-                    tv_nsec: 0,
-                },
+                startup_time: ffi::timespec { tv_sec: 0, tv_nsec: 0 },
                 initialized_inputs: false,
             },
             compositor: rc,

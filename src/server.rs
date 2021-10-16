@@ -40,10 +40,7 @@ where
     }
 
     pub fn from_c_ptr(native: *mut ffi::wl_resource) -> Self {
-        Resource::<I> {
-            native,
-            phantom: PhantomData,
-        }
+        Resource::<I> { native, phantom: PhantomData }
     }
 
     pub fn drop_native(&mut self) {
@@ -54,9 +51,7 @@ where
     where
         J: wayland_server::Interface + From<Resource<J>> + AsRef<Resource<J>>,
     {
-        Some(Main::<J> {
-            resource: self.new(id),
-        })
+        Some(Main::<J> { resource: self.new(id) })
     }
 
     pub fn c_ptr(&self) -> *mut ffi::wl_resource {
@@ -295,10 +290,7 @@ impl Server {
             let b =
                 &*(ffi::wl_resource_get_user_data(native) as *mut Box<dyn Fn(&mut Resource<I>)>);
 
-            let mut resource = Resource::<I> {
-                native,
-                phantom: PhantomData,
-            };
+            let mut resource = Resource::<I> { native, phantom: PhantomData };
 
             b(&mut resource)
         }
@@ -315,10 +307,7 @@ impl Server {
 
             let native = client.create_resource(&mut *(I::c_interface() as *mut _), version, id);
 
-            let mut resource = Resource::<I> {
-                native,
-                phantom: PhantomData,
-            };
+            let mut resource = Resource::<I> { native, phantom: PhantomData };
 
             let handlers = &mut *(data as *mut GlobalHandlers<I>);
 

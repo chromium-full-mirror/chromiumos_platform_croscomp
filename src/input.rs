@@ -132,10 +132,7 @@ impl PointerGrab {
         };
 
         PointerGrab {
-            grab: ffi::weston_pointer_grab {
-                interface: &INTERFACE,
-                pointer: pointer,
-            },
+            grab: ffi::weston_pointer_grab { interface: &INTERFACE, pointer: pointer },
             handler: None,
         }
     }

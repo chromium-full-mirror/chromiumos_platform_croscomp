@@ -176,12 +176,7 @@ impl wl_client {
 
 impl pixman_box32 {
     pub fn new() -> Self {
-        Self {
-            x1: 0,
-            y1: 0,
-            x2: 0,
-            y2: 0,
-        }
+        Self { x1: 0, y1: 0, x2: 0, y2: 0 }
     }
 }
 
@@ -325,10 +320,7 @@ where
             (fbox.f)();
         }
 
-        let mut fbox = Box::new(Self {
-            listener: wl_listener::zeroed(),
-            f: f,
-        });
+        let mut fbox = Box::new(Self { listener: wl_listener::zeroed(), f: f });
 
         fbox.listener.notify = Some(call_closure::<F>);
         unsafe {
@@ -406,9 +398,7 @@ impl weston_view {
 
     pub fn from_global<T: Into<f32>, U: From<f32>>(&mut self, x: T, y: T) -> (U, U) {
         let local = if self.transform.enabled {
-            let global = weston_vector {
-                f: [x.into(), y.into(), 0.0, 1.0],
-            };
+            let global = weston_vector { f: [x.into(), y.into(), 0.0, 1.0] };
             let local = self.transform.inverse.transform(&global);
 
             ((local.f[0] / local.f[3]), (local.f[1] / local.f[3]))

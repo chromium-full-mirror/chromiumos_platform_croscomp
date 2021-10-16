@@ -23,9 +23,7 @@ fn handle_bind(
         use super::protocol::croscomp_output::{Subpixel, Transform};
 
         let output_resource = resource.new::<CroscompOutput>(0);
-        resource.send(Output {
-            id: output_resource.clone(),
-        });
+        resource.send(Output { id: output_resource.clone() });
 
         let make = "panel".to_string();
         let model = "foo".to_string();
