@@ -4,6 +4,7 @@
 
 use crate::event_loop::EventLoop;
 use log::debug;
+use std::boxed::Box;
 use std::marker::PhantomData;
 use wayland_server::MessageGroup;
 
@@ -66,8 +67,28 @@ where
         unsafe { ffi::wl_resource_get_id(self.native) }
     }
 
+    pub fn set_user_data<J>(&self, data: *mut J) {
+        debug!(
+            "{}: set_user_data: native={:?} from_raw={:?}",
+            std::any::type_name::<J>(),
+            self.native,
+            data
+        );
+
+        unsafe { ffi::wl_resource_set_user_data(self.native, data as *mut _) }
+    }
+
     pub fn user_data<J>(&self) -> &mut J {
-        unsafe { &mut *(ffi::wl_resource_get_user_data(self.native) as *mut J) }
+        unsafe {
+            let data = ffi::wl_resource_get_user_data(self.native);
+            debug!(
+                "{}: user_data: native={:?} from_raw={:?}",
+                std::any::type_name::<J>(),
+                self.native,
+                data
+            );
+            Box::leak(Box::from_raw(data as *mut J))
+        }
     }
 
     pub fn send(&self, message: I::Event) {
@@ -161,6 +182,10 @@ where
     {
         self.resource.on_request(f);
         self
+    }
+
+    pub fn set_user_data<J>(&self, data: *mut J) {
+        self.resource.set_user_data(data);
     }
 }
 
