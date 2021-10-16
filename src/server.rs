@@ -319,6 +319,22 @@ impl Server {
 
             let handlers = &mut *(data as *mut GlobalHandlers<I>);
 
+            if let Some(ref dispatcher) = handlers.dispatcher {
+                debug!(
+                    "setting dispatcher for {}: {:?}",
+                    I::NAME,
+                    &(*dispatcher) as *const _
+                );
+
+                ffi::wl_resource_set_dispatcher(
+                    resource.native,
+                    Some(call_dispatcher::<I>),
+                    handlers as *mut _ as *mut std::ffi::c_void,
+                    std::ptr::null_mut(),
+                    None,
+                )
+            }
+
             let success = if let Some(ref handle_bind) = handlers.handle_bind {
                 debug!(
                     "calling handle_bind for {}: {:?}",
@@ -334,22 +350,6 @@ impl Server {
                 debug!("on_bind returns failure");
                 resource.drop_native();
                 return;
-            }
-
-            if let Some(ref dispatcher) = handlers.dispatcher {
-                debug!(
-                    "setting dispatcher for {}: {:?}",
-                    I::NAME,
-                    &(*dispatcher) as *const _
-                );
-
-                ffi::wl_resource_set_dispatcher(
-                    resource.native,
-                    Some(call_dispatcher::<I>),
-                    handlers as *mut _ as *mut std::ffi::c_void,
-                    std::ptr::null_mut(),
-                    None,
-                )
             }
 
             if let Some(ref mut handle_destroy) = handlers.handle_destroy {
