@@ -35,6 +35,51 @@ impl Positioner {
             constraint_adjustment: xdg_positioner::ConstraintAdjustment::None,
         }
     }
+
+    fn get_geometry(&self) -> ffi::weston_geometry {
+        use xdg_positioner::{Anchor, Gravity};
+
+        let anchor = ffi::weston_position {
+            x: match self.anchor {
+                Anchor::Left | Anchor::TopLeft | Anchor::BottomLeft => self.anchor_rect.x,
+                Anchor::Right | Anchor::TopRight | Anchor::BottomRight => {
+                    self.anchor_rect.x + self.anchor_rect.width
+                }
+                Anchor::None | Anchor::Top | Anchor::Bottom => {
+                    self.anchor_rect.x + self.anchor_rect.width / 2
+                }
+            },
+            y: match self.anchor {
+                Anchor::Top | Anchor::TopLeft | Anchor::TopRight => self.anchor_rect.y,
+                Anchor::Bottom | Anchor::BottomLeft | Anchor::BottomRight => {
+                    self.anchor_rect.x + self.anchor_rect.height
+                }
+                Anchor::None | Anchor::Left | Anchor::Right => {
+                    self.anchor_rect.y + self.anchor_rect.height / 2
+                }
+            },
+        };
+
+        let gravity = ffi::weston_position {
+            x: match self.gravity {
+                Gravity::Left | Gravity::TopLeft | Gravity::BottomLeft => self.size.width,
+                Gravity::None | Gravity::Top | Gravity::Bottom => self.size.width / 2,
+                Gravity::Right | Gravity::TopRight | Gravity::BottomRight => 0,
+            },
+            y: match self.gravity {
+                Gravity::Top | Gravity::TopLeft | Gravity::TopRight => self.size.height,
+                Gravity::None | Gravity::Left | Gravity::Right => self.size.height / 2,
+                Gravity::Bottom | Gravity::BottomLeft | Gravity::BottomRight => 0,
+            },
+        };
+
+        ffi::weston_geometry {
+            x: self.offset.x + anchor.x - gravity.x,
+            y: self.offset.y + anchor.y - gravity.y,
+            width: self.size.width,
+            height: self.size.height,
+        }
+    }
 }
 
 fn handle_positioner_request(
