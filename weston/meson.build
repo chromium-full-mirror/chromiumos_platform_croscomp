@@ -2,7 +2,7 @@ project('weston',
 	'c',
 	version: '9.0.0',
 	default_options: [
-		'warning_level=3',
+		'warning_level=1',
 		'c_std=gnu99',
 		'b_lundef=true',
 	],
