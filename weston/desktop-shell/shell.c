@@ -2830,17 +2830,3 @@ desktop_shell_init(struct desktop_shell *shell,
 
 	return 0;
 }
-
-/* croscomp rs glue code */
-
-int
-vlog(const char *fmt, va_list ap)
-{
-	return vprintf(fmt, ap);
-}
-
-int
-vlog_continue(const char *fmt, va_list argp)
-{
-	return vlog(fmt, argp);
-}
