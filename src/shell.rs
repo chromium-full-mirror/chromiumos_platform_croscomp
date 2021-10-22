@@ -43,7 +43,6 @@ impl Shell {
                 input_panel_layer: ffi::weston_layer::zeroed(),
                 pointer_focus_listener: ffi::wl_listener::zeroed(),
                 grab_surface: std::ptr::null_mut(),
-                xdg_wm_base: std::ptr::null_mut(),
                 locked: false,
                 showing_input_panels: false,
                 prepare_event_sent: false,

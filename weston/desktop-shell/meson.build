@@ -3,13 +3,8 @@ if get_option('shell-desktop')
 
 	srcs_shell_desktop = [
 		'shell.c',
-		'client.c',
 		'seat.c',
-		'surface.c',
-		'xdg-shell.c',
 		'workspace.c',
-		xdg_shell_server_protocol_h,
-		xdg_shell_protocol_c,
 	]
 	deps_shell_desktop = [
 		dep_libm,

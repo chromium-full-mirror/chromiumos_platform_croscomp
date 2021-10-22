@@ -418,6 +418,18 @@ impl shell_surface {
         unsafe { get_shell_surface(surface).as_mut() }
     }
 
+    pub fn r#move(&mut self, pointer: &mut weston_pointer, client_initiated: bool) {
+        unsafe {
+            shell_surface_move(self, pointer as *mut _, client_initiated);
+        }
+    }
+
+    pub fn resize(&mut self, pointer: &mut weston_pointer, edges: u32) {
+        unsafe {
+            shell_surface_resize(self, pointer as *mut _, edges);
+        }
+    }
+
     pub fn set_size(&mut self, width: i32, height: i32) {
         unsafe { shell_surface_set_size(self, width, height) }
     }
@@ -427,7 +439,7 @@ impl shell_surface {
     }
 
     pub fn get_geometry(&mut self) -> weston_geometry {
-        unsafe { weston_desktop_surface_get_geometry(self.desktop_surface) }
+        unsafe { shell_surface_get_geometry(self) }
     }
 }
 

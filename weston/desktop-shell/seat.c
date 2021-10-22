@@ -271,12 +271,16 @@ weston_desktop_seat_from_seat(struct weston_seat *wseat)
 struct weston_desktop_surface *
 weston_desktop_seat_popup_grab_get_topmost_surface(struct weston_desktop_seat *seat)
 {
+	return NULL;
+
+#if 0
 	if (seat == NULL || wl_list_empty(&seat->popup_grab.surfaces))
 		return NULL;
 
 	struct wl_list *grab_link = seat->popup_grab.surfaces.next;
 
 	return weston_desktop_surface_from_grab_link(grab_link);
+#endif
 }
 
 bool
@@ -326,12 +330,13 @@ weston_desktop_seat_popup_grab_end(struct weston_desktop_seat *seat)
 
 	while (!wl_list_empty(&seat->popup_grab.surfaces)) {
 		struct wl_list *link = seat->popup_grab.surfaces.prev;
-		struct weston_desktop_surface *surface =
-			weston_desktop_surface_from_grab_link(link);
+
+		//struct weston_desktop_surface *surface =
+		//weston_desktop_surface_from_grab_link(link);
 
 		wl_list_remove(link);
 		wl_list_init(link);
-		weston_desktop_surface_popup_dismiss(surface);
+		//weston_desktop_surface_popup_dismiss(surface);
 	}
 
 	if (keyboard != NULL &&

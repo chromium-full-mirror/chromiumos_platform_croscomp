@@ -32,18 +32,11 @@ extern "C" fn client_destroy_notify(
 
 impl Terminal {
     fn hide(&mut self) {
-        let mut shell = self.shell.borrow_mut();
-
         if let Some(surface) = self.client_surface {
             unsafe {
-                let ds = ffi::weston_surface_get_desktop_surface(surface);
-                ffi::weston_desktop_api_fullscreen_requested(
-                    &mut shell.native,
-                    ds,
-                    false,
-                    0 as *mut _,
-                );
-                ffi::weston_desktop_api_minimized_requested(&mut shell.native, ds);
+                let shsurf = ffi::get_shell_surface(surface);
+                ffi::shell_surface_set_fullscreen(shsurf, false, 0 as *mut _);
+                ffi::shell_surface_set_minimized(shsurf);
             }
         }
     }
@@ -53,7 +46,7 @@ impl Terminal {
 
         match (self.client_surface, self.client) {
             (Some(surface), _) => unsafe {
-                let ds = ffi::weston_surface_get_desktop_surface(surface);
+                let shsurf = ffi::get_shell_surface(surface);
                 let view = ffi::get_default_view(surface);
                 ffi::activate(
                     &mut shell.native,
@@ -62,12 +55,7 @@ impl Terminal {
                     ffi::weston_activate_flag::WESTON_ACTIVATE_FLAG_CONFIGURE as u32,
                 );
 
-                ffi::weston_desktop_api_fullscreen_requested(
-                    &mut shell.native,
-                    ds,
-                    true,
-                    (*surface).output,
-                );
+                ffi::shell_surface_set_fullscreen(shsurf, true, (*surface).output);
             },
             (None, None) => {
                 let terminal_client_path = "/usr/bin/croscomp-terminal\0";
