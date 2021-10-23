@@ -36,6 +36,10 @@ impl Switcher {
             thumbnails: Vec::new(),
         });
 
+        if keyboard.focus.is_null() {
+            return;
+        }
+
         switcher.view_destroy_listener.link.init();
 
         unsafe {
