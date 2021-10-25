@@ -38,6 +38,7 @@ DEPEND="${COMMON_DEPEND}
 	virtual/bindgen:=
 	>=dev-rust/libc-0.2.44:= <dev-rust/libc-0.3.0
 	=dev-rust/cfg-if-1.0.0:=
+	>=dev-rust/structopt-0.3.20:=
 	>=dev-rust/parking_lot-0.7.1:=
 	>=dev-rust/scoped-tls-0.1.0:=
 "
