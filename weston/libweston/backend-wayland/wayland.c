@@ -115,6 +115,7 @@ struct wayland_output {
 		struct xdg_toplevel *xdg_toplevel;
 		int configure_width, configure_height;
 		bool wait_for_configure;
+		bool fullscreen;
 	} parent;
 
 	int keyboard_count;
@@ -919,12 +920,19 @@ wayland_output_set_windowed(struct wayland_output *output)
 
 	wayland_output_resize_surface(output);
 
-	if (output->parent.xdg_toplevel) {
-		xdg_toplevel_unset_fullscreen(output->parent.xdg_toplevel);
-	} else if (output->parent.shell_surface) {
-		wl_shell_surface_set_toplevel(output->parent.shell_surface);
-	} else {
-		abort();
+	if (output->parent.fullscreen) {
+		/* Only unset fullscreen if server state is
+		 * fullscreen. This is a workaround for an exo bug,
+		 * unsetting fullscreen when not fullscreen should do
+		 * nothing.
+		 */
+		if (output->parent.xdg_toplevel) {
+			xdg_toplevel_unset_fullscreen(output->parent.xdg_toplevel);
+		} else if (output->parent.shell_surface) {
+			wl_shell_surface_set_toplevel(output->parent.shell_surface);
+		} else {
+			abort();
+		}
 	}
 
 	return 0;
@@ -1150,6 +1158,16 @@ handle_xdg_toplevel_configure(void *data, struct xdg_toplevel *toplevel,
 			  struct wl_array *states)
 {
 	struct wayland_output *output = data;
+	uint32_t *p;
+
+	output->parent.fullscreen = false;
+	wl_array_for_each(p, states) {
+		switch (*p) {
+		case XDG_TOPLEVEL_STATE_FULLSCREEN:
+			output->parent.fullscreen = true;
+			break;
+		}
+	}
 
 	output->parent.configure_width = width;
 	output->parent.configure_height = height;
