@@ -106,8 +106,7 @@ extern "C" fn head_notify(_listener: *mut ffi::wl_listener, data: *mut ::std::os
                 std::mem::size_of::<ffi::weston_drm_output_api>() as ffi::size_t,
             ) as *mut ffi::weston_drm_output_api;
 
-            let output = native.create_output("output\0");
-            output.attach_head(head);
+            let output = native.create_output_with_head(head);
 
             use ffi::weston_drm_backend_output_mode::*;
             let set_mode = (*api).set_mode.unwrap();

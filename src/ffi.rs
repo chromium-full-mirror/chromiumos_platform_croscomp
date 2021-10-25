@@ -345,6 +345,10 @@ impl weston_compositor {
     pub fn create_output(&mut self, name: &str) -> &mut weston_output {
         unsafe { &mut *weston_compositor_create_output(self, name.as_ptr() as *const _) }
     }
+
+    pub fn create_output_with_head(&mut self, head: *mut weston_head) -> &mut weston_output {
+        unsafe { &mut *weston_compositor_create_output_with_head(self, head) }
+    }
 }
 
 impl weston_surface {
