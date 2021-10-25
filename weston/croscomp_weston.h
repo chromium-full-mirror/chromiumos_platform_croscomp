@@ -5,4 +5,6 @@
  */
 
 #include "include/libweston/backend-drm.h"
+#include "include/libweston/backend-wayland.h"
+#include "include/libweston/windowed-output-api.h"
 #include "desktop-shell/shell.h"

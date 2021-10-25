@@ -6,6 +6,7 @@
 extern crate bitflags;
 
 use log::{debug, info, warn};
+use structopt::StructOpt;
 
 use nix::sys::stat::{umask, Mode};
 use nix::sys::wait::{waitpid, WaitPidFlag};
@@ -58,7 +59,7 @@ impl Drop for Umask {
     }
 }
 
-fn bind_socket() -> UnixListener {
+fn bind_socket(name: &str) -> UnixListener {
     let path = env::var_os("XDG_RUNTIME_DIR")
         .expect("environment variable XDG_RUNTIME_DIR is not set.")
         .into_string()
@@ -66,7 +67,7 @@ fn bind_socket() -> UnixListener {
 
     let _guard = Umask::with_mode(Mode::empty());
 
-    let socket_path = format!("{}/wayland-0", path);
+    let socket_path = format!("{}/{}", path, name);
     if let Ok(sock) = UnixListener::bind(&socket_path) {
         return sock;
     }
@@ -91,7 +92,7 @@ fn bind_socket() -> UnixListener {
     }
 }
 
-extern "C" fn head_notify(_listener: *mut ffi::wl_listener, data: *mut ::std::os::raw::c_void) {
+extern "C" fn drm_head_notify(_listener: *mut ffi::wl_listener, data: *mut ::std::os::raw::c_void) {
     let native = unsafe { &mut *(data as *mut ffi::weston_compositor) };
     let compositor = unsafe { &mut *container_of_mut!(native as *mut _, Compositor, native) };
 
@@ -132,6 +133,41 @@ extern "C" fn head_notify(_listener: *mut ffi::wl_listener, data: *mut ::std::os
     }
 }
 
+extern "C" fn wayland_head_notify(
+    _listener: *mut ffi::wl_listener,
+    data: *mut ::std::os::raw::c_void,
+) {
+    let native = unsafe { &mut *(data as *mut ffi::weston_compositor) };
+    let compositor = unsafe { &mut *container_of_mut!(native as *mut _, Compositor, native) };
+
+    for head in compositor
+        .head_iter_mut()
+        .filter(|h| h.connected && !h.is_enabled())
+    {
+        unsafe {
+            let api = ffi::weston_plugin_api_get(
+                native,
+                ffi::WESTON_WINDOWED_OUTPUT_API_NAME.as_ptr() as *const _,
+                std::mem::size_of::<ffi::weston_windowed_output_api>() as ffi::size_t,
+            ) as *mut ffi::weston_windowed_output_api;
+
+            let output = native.create_output_with_head(head);
+
+            output.set_scale(1);
+
+            use ffi::wl_output_transform::*;
+            output.set_transform(WL_OUTPUT_TRANSFORM_NORMAL);
+
+            let set_size = (*api).output_set_size.unwrap();
+            set_size(output, 1024, 600);
+
+            if ffi::weston_output_enable(output) != 0 {
+                warn!("weston_output_enable return non-0");
+            }
+        }
+    }
+}
+
 extern "C" fn weston_log_bridge(msg: *const ::std::os::raw::c_char) {
     unsafe {
         info!(
@@ -143,30 +179,7 @@ extern "C" fn weston_log_bridge(msg: *const ::std::os::raw::c_char) {
     }
 }
 
-fn main() -> std::io::Result<()> {
-    unsafe { ffi::weston_set_log_handler(Some(weston_log_bridge)) };
-    env_logger::init();
-    let ctx = unsafe { ffi::weston_log_ctx_create() };
-
-    let compositor = Rc::new(RefCell::new(Compositor::new(ctx)));
-    compositor.borrow_mut().init();
-
-    let mut listener = ffi::wl_listener::new(head_notify);
-
-    compositor
-        .borrow_mut()
-        .add_heads_changed_listener(&mut listener);
-
-    let mut rules = ffi::xkb_rule_names {
-        rules: std::ptr::null(),
-        model: std::ptr::null(),
-        layout: std::ptr::null(),
-        variant: std::ptr::null(),
-        options: std::ptr::null(),
-    };
-
-    compositor.borrow_mut().set_xkb_rule_names(&mut rules);
-
+fn load_drm_backend(compositor: Rc<RefCell<Compositor>>) -> Result<ffi::wl_listener, ()> {
     let mut config = ffi::weston_drm_backend_config {
         base: ffi::weston_backend_config {
             struct_version: ffi::WESTON_DRM_BACKEND_CONFIG_VERSION,
@@ -191,6 +204,94 @@ fn main() -> std::io::Result<()> {
         )
     };
 
+    Ok(ffi::wl_listener::new(drm_head_notify))
+}
+
+fn load_wayland_backend(compositor: Rc<RefCell<Compositor>>) -> Result<ffi::wl_listener, ()> {
+    let mut config = ffi::weston_wayland_backend_config {
+        base: ffi::weston_backend_config {
+            struct_version: ffi::WESTON_WAYLAND_BACKEND_CONFIG_VERSION,
+            struct_size: std::mem::size_of::<ffi::weston_wayland_backend_config>() as ffi::size_t,
+        },
+        use_pixman: true,
+        sprawl: false,
+        display_name: 0 as *mut _,
+        fullscreen: false,
+        cursor_theme: 0 as *mut _,
+        cursor_size: 32,
+    };
+
+    let native = &mut compositor.borrow_mut().native;
+
+    unsafe {
+        let res = ffi::weston_compositor_load_backend(
+            native,
+            ffi::weston_compositor_backend::WESTON_BACKEND_WAYLAND,
+            &mut config.base,
+        );
+        if res == -1 {
+            return Err(());
+        };
+
+        let api = ffi::weston_plugin_api_get(
+            native,
+            ffi::WESTON_WINDOWED_OUTPUT_API_NAME.as_ptr() as *const _,
+            std::mem::size_of::<ffi::weston_windowed_output_api>() as ffi::size_t,
+        ) as *mut ffi::weston_windowed_output_api;
+
+        let create_head = (*api).create_head.unwrap();
+        create_head(native, "head\0".as_ptr() as *mut _);
+    }
+
+    Ok(ffi::wl_listener::new(wayland_head_notify))
+}
+
+#[derive(StructOpt, Debug)]
+#[structopt(name = "croscomp", about = "ChromeOS compositor")]
+struct Opt {
+    /// Use wayland backend
+    #[structopt(long)]
+    use_wayland: bool,
+
+    /// Don't run splash screen
+    #[structopt(long)]
+    no_splash: bool,
+
+    /// Name of wayland socket. Relative to XDG_RUNTIME_DIR.
+    #[structopt(long)]
+    socket: Option<String>,
+}
+
+fn main() -> std::io::Result<()> {
+    let opt = Opt::from_args();
+
+    unsafe { ffi::weston_set_log_handler(Some(weston_log_bridge)) };
+    env_logger::init();
+    let ctx = unsafe { ffi::weston_log_ctx_create() };
+
+    let compositor = Rc::new(RefCell::new(Compositor::new(ctx)));
+    compositor.borrow_mut().init();
+
+    let mut rules = ffi::xkb_rule_names {
+        rules: std::ptr::null(),
+        model: std::ptr::null(),
+        layout: std::ptr::null(),
+        variant: std::ptr::null(),
+        options: std::ptr::null(),
+    };
+
+    compositor.borrow_mut().set_xkb_rule_names(&mut rules);
+
+    let mut listener = if opt.use_wayland {
+        load_wayland_backend(compositor.clone()).unwrap()
+    } else {
+        load_drm_backend(compositor.clone()).unwrap()
+    };
+
+    compositor
+        .borrow_mut()
+        .add_heads_changed_listener(&mut listener);
+
     compositor.borrow_mut().flush_heads_changed();
 
     compositor.borrow_mut().server.event_loop.on_signal(
@@ -200,7 +301,12 @@ fn main() -> std::io::Result<()> {
         },
     );
 
-    let sock = bind_socket();
+    let socket_name = match (&opt.socket, opt.use_wayland) {
+	(None, true) => "wayland-10",
+	(None, false) => "wayland-0",
+	(Some(socket), _) => socket
+    };
+    let sock = bind_socket(socket_name);
 
     let rc = Rc::clone(&compositor);
     compositor
@@ -219,7 +325,9 @@ fn main() -> std::io::Result<()> {
 
     terminal::init(&shell);
 
-    splash::init(&shell);
+    if !opt.no_splash {
+	splash::init(&shell);
+    }
 
     switcher::init(&shell);
 
