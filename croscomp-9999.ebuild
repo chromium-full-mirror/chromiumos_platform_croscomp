@@ -60,40 +60,6 @@ src_prepare() {
 }
 
 src_configure() {
-	emesonargs+=(
-		-Dexecmem=false
-		-Dbackend-default=drm
-		-Dbackend-drm=true
-		-Dbackend-drm-screencast-vaapi=false
-		-Dbackend-fbdev=false
-		-Dbackend-headless=true
-		-Dbackend-rdp=false
-		-Dbackend-wayland=true
-		-Dbackend-x11=false
-		-Dcolor-management-colord=false
-		-Dcolor-management-lcms=true
-		-Ddemo-clients=true
-		-Ddesktop-shell-client-default=weston-desktop-shell
-		-Ddoc=false
-		-Dimage-jpeg=false
-		-Dimage-webp=false
-		-Dimage-png=true
-		-Dlauncher-logind=false
-		-Dpipewire=false
-		-Dremoting=false
-		-Drenderer-gl=true
-		-Dresize-pool=true
-		-Dscreenshare=true
-		-Dshell-desktop=true
-		-Dshell-fullscreen=false
-		-Dshell-ivi=false
-		-Dshell-kiosk=false
-		-Dsystemd=false
-		-Dtest-gl-renderer=true
-		-Dtest-junit-xml=false
-		-Dwcap-decode=false
-		-Dweston-launch=false
-	)
 	export MESON_BUILD_DIR="${WORKDIR}/${P}-build"
 	EMESON_SOURCE=${S}/weston
 	meson_src_configure

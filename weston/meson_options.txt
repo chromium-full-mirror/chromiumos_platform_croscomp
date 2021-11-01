@@ -11,7 +11,7 @@ option(
 option(
 	'backend-drm-screencast-vaapi',
 	type: 'boolean',
-	value: true,
+	value: false,
 	description: 'DRM/KMS backend support for VA-API screencasting'
 )
 option(
@@ -23,13 +23,13 @@ option(
 option(
 	'backend-rdp',
 	type: 'boolean',
-	value: true,
+	value: false,
 	description: 'Weston backend: RDP remote screensharing'
 )
 option(
 	'screenshare',
 	type: 'boolean',
-	value: true,
+	value: false,
 	description: 'Compositor: RDP screen-sharing support'
 )
 option(
@@ -41,13 +41,13 @@ option(
 option(
 	'backend-x11',
 	type: 'boolean',
-	value: true,
+	value: false,
 	description: 'Weston backend: X11 (nested)'
 )
 option(
 	'backend-fbdev',
 	type: 'boolean',
-	value: true,
+	value: false,
 	description: 'Weston backend: fbdev'
 )
 option(
@@ -68,28 +68,28 @@ option(
 option(
 	'weston-launch',
 	type: 'boolean',
-	value: true,
+	value: false,
 	description: 'Weston launcher for systems without logind'
 )
 
 option(
 	'systemd',
 	type: 'boolean',
-	value: true,
+	value: false,
 	description: 'systemd service plugin: state notify, watchdog, socket activation'
 )
 
 option(
 	'remoting',
 	type: 'boolean',
-	value: true,
+	value: false,
 	description: 'Virtual remote output with GStreamer on DRM backend'
 )
 
 option(
 	'pipewire',
 	type: 'boolean',
-	value: true,
+	value: false,
 	description: 'Virtual remote output with Pipewire on DRM backend'
 )
 
@@ -102,19 +102,19 @@ option(
 option(
 	'shell-fullscreen',
 	type: 'boolean',
-	value: true,
+	value: false,
 	description: 'Weston shell UI: fullscreen/kiosk'
 )
 option(
 	'shell-ivi',
 	type: 'boolean',
-	value: true,
+	value: false,
 	description: 'Weston shell UI: IVI (automotive)'
 )
 option(
 	'shell-kiosk',
 	type: 'boolean',
-	value: true,
+	value: false,
 	description: 'Weston shell UI: kiosk (desktop apps)'
 )
 
@@ -134,27 +134,27 @@ option(
 option(
 	'color-management-colord',
 	type: 'boolean',
-	value: true,
+	value: false,
 	description: 'Compositor color management: colord (requires lcms)'
 )
 
 option(
 	'launcher-logind',
 	type: 'boolean',
-	value: true,
+	value: false,
 	description: 'Compositor: support systemd-logind D-Bus protocol'
 )
 
 option(
 	'image-jpeg',
 	type: 'boolean',
-	value: true,
+	value: false,
 	description: 'JPEG loading support'
 )
 option(
 	'image-webp',
 	type: 'boolean',
-	value: true,
+	value: false,
 	description: 'WebP loading support'
 )
 
@@ -187,14 +187,14 @@ option(
 option(
 	'wcap-decode',
 	type: 'boolean',
-	value: true,
+	value: false,
 	description: 'Tools: screen recording decoder tool'
 )
 
 option(
 	'test-junit-xml',
 	type: 'boolean',
-	value: true,
+	value: false,
 	description: 'Tests: output JUnit XML results'
 )
 option(
