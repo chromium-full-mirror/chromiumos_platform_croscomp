@@ -57,6 +57,19 @@ impl<'a, T> Iterator for WlListIter<'a, T> {
     }
 }
 
+impl<'a, T> DoubleEndedIterator for WlListIter<'a, T> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if self.next == self.head {
+            None
+        } else {
+            self.head = unsafe { (*self.head).prev };
+            let current = self.head;
+
+            unsafe { Some(&*(((current as usize) - self.offset) as *mut T)) }
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct WlListIterMut<'a, T: 'a> {
     offset: usize,
@@ -79,6 +92,19 @@ impl<'a, T> Iterator for WlListIterMut<'a, T> {
     }
 }
 
+impl<'a, T> DoubleEndedIterator for WlListIterMut<'a, T> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if self.next == self.head {
+            None
+        } else {
+            self.head = unsafe { (*self.head).prev };
+            let current = self.head;
+
+            unsafe { Some(&mut *(((current as usize) - self.offset) as *mut T)) }
+        }
+    }
+}
+
 impl wl_list {
     pub fn zeroed() -> Self {
         unsafe { std::mem::zeroed() }
@@ -91,6 +117,10 @@ impl wl_list {
 
     pub fn remove(&mut self) {
         unsafe { wl_list_remove(self) }
+    }
+
+    pub fn insert(&mut self, other: &mut wl_list) {
+        unsafe { wl_list_insert(self, other) }
     }
 
     pub fn iter<'a, T>(&self, offset: usize) -> WlListIter<'a, T> {
@@ -126,6 +156,61 @@ macro_rules! wl_list_iter_mut {
 
 	$ptr.iter_mut::<$container>(offset)
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::wl_list;
+
+    #[derive(Debug)]
+    #[repr(C)]
+    struct Element<T> {
+        value: T,
+        link: wl_list,
+    }
+
+    fn add_array<T>(head: &mut wl_list, array: &[T])
+    where
+        T: std::fmt::Debug + Copy,
+    {
+        for value in array {
+            let mut e = Box::new(Element { value: *value, link: wl_list::zeroed() });
+            unsafe {
+                (*head.prev).insert(&mut e.link);
+            }
+            Box::into_raw(e);
+        }
+    }
+
+    fn compare<'a, I, T>(iter: I, array: &'a [T])
+    where
+        T: std::fmt::Debug + Copy + Eq,
+        I: Iterator<Item = &'a Element<T>>,
+    {
+        for (e, v) in iter.zip(array) {
+            assert_eq!(e.value, *v);
+        }
+    }
+
+    #[test]
+    fn iterator_test() {
+        let mut list = wl_list::zeroed();
+        list.init();
+
+        let array = [1, 2, 3];
+        add_array(&mut list, &array);
+
+        let iter = wl_list_iter!(list, Element<i32>, link);
+        compare(iter, &[1, 2, 3]);
+
+        let iter = wl_list_iter!(list, Element<i32>, link).rev();
+        compare(iter, &[3, 2, 1]);
+
+        let mut iter = wl_list_iter!(list, Element<i32>, link);
+        iter.next();
+        let iter = iter.rev();
+        compare(iter, &[3, 2]);
+    }
 }
 
 include!(concat!(env!("OUT_DIR"), "/croscomp_weston.rs"));
