@@ -95,25 +95,29 @@ fn handle_positioner_request(
         Destroy => {}
         SetSize { width, height } => {
             if width < 1 || height < 1 {
-                error!("width and height must me non-negative");
-                // xxx send error and return
+                resource.post_error(
+                    xdg_positioner::Error::InvalidInput as u32,
+                    "width and height must be positives and non-zero",
+                );
+                return;
             }
             p.size = ffi::weston_size { width, height };
         }
         SetAnchorRect { x, y, width, height } => {
             if width < 0 || height < 0 {
-                error!("width and height must me non-negative");
-                // xxx send error and return
+                resource.post_error(
+                    xdg_positioner::Error::InvalidInput as u32,
+                    "width and height must be non-negative",
+                );
+                return;
             }
             p.anchor_rect = ffi::weston_geometry { x, y, width, height };
         }
         SetAnchor { anchor } => p.anchor = anchor,
         SetGravity { gravity } => p.gravity = gravity,
-        SetConstraintAdjustment { constraint_adjustment } => {
-            match xdg_positioner::ConstraintAdjustment::from_raw(constraint_adjustment) {
-                Some(adjustment) => p.constraint_adjustment = adjustment,
-                _ => error!("send error"),
-            }
+        SetConstraintAdjustment { constraint_adjustment: bits } => {
+            p.constraint_adjustment =
+                xdg_positioner::ConstraintAdjustment::from_bits_truncate(bits);
         }
         SetOffset { x, y } => p.offset = ffi::weston_position { x, y },
         SetReactive => {}
