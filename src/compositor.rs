@@ -217,6 +217,33 @@ impl Compositor {
         };
     }
 
+    pub fn bind_touch<F>(&mut self, modifier: ffi::weston_keyboard_modifier, f: F)
+    where
+        F: Fn(&mut ffi::weston_touch, *const ffi::timespec),
+    {
+        extern "C" fn call_touch_closure<F>(
+            touch: *mut ffi::weston_touch,
+            time: *const ffi::timespec,
+            data: *mut std::ffi::c_void,
+        ) where
+            F: Fn(&mut ffi::weston_touch, *const ffi::timespec),
+        {
+            let touch = unsafe { &mut *touch };
+            (unsafe { &mut *(data as *mut F) })(touch, time)
+        }
+
+        let handler = Box::new(f);
+
+        unsafe {
+            ffi::weston_compositor_add_touch_binding(
+                &mut self.native,
+                modifier,
+                Some(call_touch_closure::<F>),
+                Box::into_raw(handler) as *mut _,
+            )
+        };
+    }
+
     pub fn create_client(&self, fd: RawFd) -> *mut ffi::wl_client {
         unsafe { ffi::wl_client_create(self.server.native, fd) }
     }
