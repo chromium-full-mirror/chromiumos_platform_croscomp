@@ -302,9 +302,9 @@ fn main() -> std::io::Result<()> {
     );
 
     let socket_name = match (&opt.socket, opt.use_wayland) {
-	(None, true) => "wayland-10",
-	(None, false) => "wayland-0",
-	(Some(socket), _) => socket
+        (None, true) => "wayland-10",
+        (None, false) => "wayland-0",
+        (Some(socket), _) => socket,
     };
     let sock = bind_socket(socket_name);
 
@@ -326,7 +326,7 @@ fn main() -> std::io::Result<()> {
     terminal::init(&shell);
 
     if !opt.no_splash {
-	splash::init(&shell);
+        splash::init(&shell);
     }
 
     switcher::init(&shell);
