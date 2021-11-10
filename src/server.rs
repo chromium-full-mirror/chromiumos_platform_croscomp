@@ -2,21 +2,45 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::event_loop::EventLoop;
 use log::debug;
 use std::boxed::Box;
 use std::marker::PhantomData;
 use wayland_server::MessageGroup;
 
+use crate::event_loop::EventLoop;
 use crate::ffi;
 
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Eq, PartialEq, Debug)]
 pub struct Resource<I>
 where
     I: wayland_server::Interface,
 {
     native: *mut ffi::wl_resource,
     phantom: PhantomData<I>,
+}
+
+impl<I> Clone for Resource<I>
+where
+    I: wayland_server::Interface,
+{
+    fn clone(&self) -> Self {
+        Self {
+            native: self.native,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<I> From<Main<I>> for Resource<I>
+where
+    I: wayland_server::Interface,
+{
+    fn from(m: Main<I>) -> Self {
+        Self {
+            native: m.resource.native,
+            phantom: PhantomData,
+        }
+    }
 }
 
 impl<I> Resource<I>
