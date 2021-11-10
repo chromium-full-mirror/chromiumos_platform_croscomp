@@ -176,7 +176,7 @@ impl Switcher {
                 &mut shell.native,
                 t.view,
                 seat,
-                ffi::weston_activate_flag::WESTON_ACTIVATE_FLAG_CONFIGURE as u32,
+                ffi::weston_activate_flag::WESTON_ACTIVATE_FLAG_CONFIGURE.0,
             );
         }
 

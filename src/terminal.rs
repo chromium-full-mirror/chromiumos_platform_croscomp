@@ -52,7 +52,7 @@ impl Terminal {
                     &mut shell.native,
                     view,
                     keyboard.seat,
-                    ffi::weston_activate_flag::WESTON_ACTIVATE_FLAG_CONFIGURE as u32,
+                    ffi::weston_activate_flag::WESTON_ACTIVATE_FLAG_CONFIGURE.0,
                 );
 
                 ffi::shell_surface_set_fullscreen(shsurf, true, (*surface).output);

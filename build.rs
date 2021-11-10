@@ -19,6 +19,7 @@ fn run_bindgen(header: &str, output: &str) {
         .args(&["--default-enum-style", "rust_non_exhaustive"])
         .args(&["--bitfield-enum", "weston_keyboard_modifier"])
         .args(&["--bitfield-enum", "wl_shell_surface_resize"])
+        .args(&["--bitfield-enum", "weston_activate_flag"])
         .arg(header)
         .arg("--")
         .arg(format!("--sysroot={}", sysroot))
