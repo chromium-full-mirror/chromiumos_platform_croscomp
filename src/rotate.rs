@@ -49,10 +49,7 @@ fn key_rotate(surface: &mut ffi::weston_surface) {
 
     let mut rotation = view.destroy_signal.get().unwrap_or_else(|| {
         let mut rotation = Box::new(Rotation {
-            transform: ffi::weston_transform {
-                matrix: ffi::weston_matrix::new(),
-                link: ffi::wl_list::zeroed(),
-            },
+            transform: ffi::weston_transform::new(),
             view_destroy_listener: ffi::wl_listener::zeroed(),
         });
 

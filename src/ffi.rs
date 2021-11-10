@@ -568,9 +568,18 @@ impl weston_pointer {
     }
 }
 
+impl weston_transform {
+    pub fn new() -> Self {
+        Self {
+            matrix: weston_matrix::new(),
+            link: wl_list::zeroed(),
+        }
+    }
+}
+
 impl weston_matrix {
     pub fn new() -> weston_matrix {
-        weston_matrix {
+        Self {
             d: [
                 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
             ],
