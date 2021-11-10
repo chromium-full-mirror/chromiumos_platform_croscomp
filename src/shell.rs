@@ -23,165 +23,173 @@ pub struct Shell {
 }
 
 impl Shell {
-    pub fn new(compositor: &Rc<RefCell<Compositor>>) -> Self {
-        let rc = Rc::clone(compositor);
-        let compositor = &mut compositor.borrow_mut();
-        Shell {
-            native: ffi::desktop_shell {
-                compositor: &mut compositor.native as *mut _,
-                idle_listener: ffi::wl_listener::zeroed(),
-                wake_listener: ffi::wl_listener::zeroed(),
-                resized_listener: ffi::wl_listener::zeroed(),
-                destroy_listener: ffi::wl_listener::zeroed(),
-                show_input_panel_listener: ffi::wl_listener::zeroed(),
-                hide_input_panel_listener: ffi::wl_listener::zeroed(),
-                update_input_panel_listener: ffi::wl_listener::zeroed(),
-                fullscreen_layer: ffi::weston_layer::zeroed(),
-                panel_layer: ffi::weston_layer::zeroed(),
-                background_layer: ffi::weston_layer::zeroed(),
-                lock_layer: ffi::weston_layer::zeroed(),
-                input_panel_layer: ffi::weston_layer::zeroed(),
-                pointer_focus_listener: ffi::wl_listener::zeroed(),
-                grab_surface: std::ptr::null_mut(),
-                locked: false,
-                showing_input_panels: false,
-                prepare_event_sent: false,
-                text_input: ffi::desktop_shell__bindgen_ty_1 {
-                    surface: std::ptr::null_mut(),
-                    cursor_rectangle: ffi::pixman_box32::new(),
-                },
-                lock_surface: std::ptr::null_mut(),
-                lock_surface_listener: ffi::wl_listener::zeroed(),
-                workspaces: ffi::desktop_shell__bindgen_ty_2 {
-                    array: ffi::wl_array::new(),
-                    current: 0,
-                    num: 2,
-                    client_list: ffi::wl_list::zeroed(),
-                    animation: ffi::weston_animation {
-                        frame: None,
-                        frame_counter: 0,
-                        link: ffi::wl_list::zeroed(),
+    pub fn new(rc: &Rc<RefCell<Compositor>>) -> Rc<RefCell<Self>> {
+        let rc = {
+            let compositor = &mut rc.borrow_mut();
+            Rc::new(RefCell::new(Shell {
+                native: ffi::desktop_shell {
+                    compositor: &mut compositor.native as *mut _,
+                    idle_listener: ffi::wl_listener::zeroed(),
+                    wake_listener: ffi::wl_listener::zeroed(),
+                    resized_listener: ffi::wl_listener::zeroed(),
+                    destroy_listener: ffi::wl_listener::zeroed(),
+                    show_input_panel_listener: ffi::wl_listener::zeroed(),
+                    hide_input_panel_listener: ffi::wl_listener::zeroed(),
+                    update_input_panel_listener: ffi::wl_listener::zeroed(),
+                    fullscreen_layer: ffi::weston_layer::zeroed(),
+                    panel_layer: ffi::weston_layer::zeroed(),
+                    background_layer: ffi::weston_layer::zeroed(),
+                    lock_layer: ffi::weston_layer::zeroed(),
+                    input_panel_layer: ffi::weston_layer::zeroed(),
+                    pointer_focus_listener: ffi::wl_listener::zeroed(),
+                    grab_surface: std::ptr::null_mut(),
+                    locked: false,
+                    showing_input_panels: false,
+                    prepare_event_sent: false,
+                    text_input: ffi::desktop_shell__bindgen_ty_1 {
+                        surface: std::ptr::null_mut(),
+                        cursor_rectangle: ffi::pixman_box32::new(),
                     },
-                    anim_sticky_list: ffi::wl_list::zeroed(),
-                    anim_dir: 0,
-                    anim_timestamp: ffi::timespec { tv_sec: 0, tv_nsec: 0 },
-                    anim_current: 0.0,
-                    anim_from: std::ptr::null_mut(),
-                    anim_to: std::ptr::null_mut(),
+                    lock_surface: std::ptr::null_mut(),
+                    lock_surface_listener: ffi::wl_listener::zeroed(),
+                    workspaces: ffi::desktop_shell__bindgen_ty_2 {
+                        array: ffi::wl_array::new(),
+                        current: 0,
+                        num: 2,
+                        client_list: ffi::wl_list::zeroed(),
+                        animation: ffi::weston_animation {
+                            frame: None,
+                            frame_counter: 0,
+                            link: ffi::wl_list::zeroed(),
+                        },
+                        anim_sticky_list: ffi::wl_list::zeroed(),
+                        anim_dir: 0,
+                        anim_timestamp: ffi::timespec { tv_sec: 0, tv_nsec: 0 },
+                        anim_current: 0.0,
+                        anim_from: std::ptr::null_mut(),
+                        anim_to: std::ptr::null_mut(),
+                    },
+                    input_panel: ffi::desktop_shell__bindgen_ty_3 {
+                        binding: std::ptr::null_mut(),
+                        surfaces: ffi::wl_list::zeroed(),
+                    },
+                    allow_zap: true,
+                    binding_modifier: ffi::weston_keyboard_modifier::MODIFIER_SUPER.0,
+                    win_animation_type: ffi::animation_type::ANIMATION_NONE,
+                    win_close_animation_type: ffi::animation_type::ANIMATION_FADE,
+                    startup_animation_type: ffi::animation_type::ANIMATION_ZOOM,
+                    focus_animation_type: ffi::animation_type::ANIMATION_NONE,
+                    minimized_layer: ffi::weston_layer::zeroed(),
+                    seat_create_listener: ffi::wl_listener::zeroed(),
+                    output_create_listener: ffi::wl_listener::zeroed(),
+                    output_move_listener: ffi::wl_listener::zeroed(),
+                    output_list: ffi::wl_list::zeroed(),
+                    client: std::ptr::null_mut(),
+                    startup_time: ffi::timespec { tv_sec: 0, tv_nsec: 0 },
+                    initialized_inputs: false,
                 },
-                input_panel: ffi::desktop_shell__bindgen_ty_3 {
-                    binding: std::ptr::null_mut(),
-                    surfaces: ffi::wl_list::zeroed(),
-                },
-                allow_zap: true,
-                binding_modifier: ffi::weston_keyboard_modifier::MODIFIER_SUPER.0,
-                win_animation_type: ffi::animation_type::ANIMATION_NONE,
-                win_close_animation_type: ffi::animation_type::ANIMATION_FADE,
-                startup_animation_type: ffi::animation_type::ANIMATION_ZOOM,
-                focus_animation_type: ffi::animation_type::ANIMATION_NONE,
-                minimized_layer: ffi::weston_layer::zeroed(),
-                seat_create_listener: ffi::wl_listener::zeroed(),
-                output_create_listener: ffi::wl_listener::zeroed(),
-                output_move_listener: ffi::wl_listener::zeroed(),
-                output_list: ffi::wl_list::zeroed(),
-                client: std::ptr::null_mut(),
-                startup_time: ffi::timespec { tv_sec: 0, tv_nsec: 0 },
-                initialized_inputs: false,
-            },
-            compositor: rc,
+                compositor: Rc::clone(rc),
 
-            idle_listener: ffi::WlListener::new(&mut compositor.native.idle_signal, || {
-                debug!("-------------------- idle signal fired")
-            }),
-            wake_listener: ffi::WlListener::new(&mut compositor.native.wake_signal, || {
-                debug!("-------------------- wake signal fired")
-            }),
-        }
+                idle_listener: ffi::WlListener::new(&mut compositor.native.idle_signal, || {
+                    debug!("-------------------- idle signal fired")
+                }),
+                wake_listener: ffi::WlListener::new(&mut compositor.native.wake_signal, || {
+                    debug!("-------------------- wake signal fired")
+                }),
+            }))
+        };
+
+        rc.borrow_mut().init();
+        rc
     }
 
-    pub fn init(&mut self) {
+    fn init_layers(&mut self) {
+        let compositor = &mut self.compositor.borrow_mut().native as *mut _;
+
+        self.native.fullscreen_layer.init(compositor);
+        self.native
+            .fullscreen_layer
+            .set_position(ffi::weston_layer_position::WESTON_LAYER_POSITION_FULLSCREEN);
+        self.native.panel_layer.init(compositor);
+        self.native
+            .panel_layer
+            .set_position(ffi::weston_layer_position::WESTON_LAYER_POSITION_UI);
+        self.native.background_layer.init(compositor);
+        self.native
+            .background_layer
+            .set_position(ffi::weston_layer_position::WESTON_LAYER_POSITION_BACKGROUND);
+
+        self.native.lock_layer.init(compositor);
+        self.native.input_panel_layer.init(compositor);
+        self.native.minimized_layer.init(compositor);
+
+        unsafe { ffi::desktop_shell_init(&mut self.native, compositor) };
+    }
+
+    fn init_bindings(&mut self) {
+        use crate::ffi::evdev::*;
+
+        let mut compositor = self.compositor.borrow_mut();
+        let rc = Rc::clone(&self.compositor);
+        compositor.bind_key(
+            KEY_BACKSPACE,
+            ffi::weston_keyboard_modifier::MODIFIER_CTRL
+                | ffi::weston_keyboard_modifier::MODIFIER_ALT,
+            move |_, _, _| {
+                let mut compositor = rc.borrow_mut();
+                compositor.server.terminate();
+            },
+        );
+
+        let no_mods = ffi::weston_keyboard_modifier(0);
+        let mods = ffi::weston_keyboard_modifier(self.native.binding_modifier);
+        compositor.bind_key(KEY_K, mods, move |keyboard, _, _| {
+            if let Some(surface) = unsafe { keyboard.focus.as_ref() } {
+                let resource = server::Resource::<protocol::wl_surface::WlSurface>::from_c_ptr(
+                    surface.resource,
+                );
+                let client = unsafe { &mut *resource.client() };
+                let (pid, _, _) = client.get_credentials();
+                signal::kill(nix::unistd::Pid::from_raw(pid), signal::SIGTERM).unwrap();
+            }
+        });
+
+        let rc = Rc::clone(&self.compositor);
+        let backlight_binding =
+            move |_: &mut ffi::weston_keyboard, _: *const ffi::timespec, key: u32| {
+                let mut compositor = rc.borrow_mut();
+                let mut output = match compositor.default_output() {
+                    Some(o) => o,
+                    _ => return,
+                };
+                let backlight = (output.backlight_current
+                    + match key {
+                        KEY_F9 | KEY_BRIGHTNESSDOWN => -25,
+                        KEY_F10 | KEY_BRIGHTNESSUP => 25,
+                        _ => return,
+                    })
+                .min(255)
+                .max(5);
+
+                output.backlight_current = backlight;
+
+                if let Some(set_backlight) = output.set_backlight {
+                    unsafe { set_backlight(output, backlight as u32) }
+                }
+            };
+
+        compositor.bind_key(KEY_BRIGHTNESSDOWN, no_mods, backlight_binding.clone());
+        compositor.bind_key(KEY_BRIGHTNESSUP, no_mods, backlight_binding.clone());
+        compositor.bind_key(KEY_F9, mods, backlight_binding.clone());
+        compositor.bind_key(KEY_F10, mods, backlight_binding.clone());
+    }
+
+    fn init(&mut self) {
         self.native.workspaces.client_list.init();
 
-        {
-            let compositor = &mut self.compositor.borrow_mut().native as *mut _;
+        self.init_layers();
 
-            self.native.fullscreen_layer.init(compositor);
-            self.native
-                .fullscreen_layer
-                .set_position(ffi::weston_layer_position::WESTON_LAYER_POSITION_FULLSCREEN);
-            self.native.panel_layer.init(compositor);
-            self.native
-                .panel_layer
-                .set_position(ffi::weston_layer_position::WESTON_LAYER_POSITION_UI);
-            self.native.background_layer.init(compositor);
-            self.native
-                .background_layer
-                .set_position(ffi::weston_layer_position::WESTON_LAYER_POSITION_BACKGROUND);
-
-            self.native.lock_layer.init(compositor);
-            self.native.input_panel_layer.init(compositor);
-            self.native.minimized_layer.init(compositor);
-
-            unsafe { ffi::desktop_shell_init(&mut self.native, compositor) };
-        }
-
-        {
-            use crate::ffi::evdev::*;
-
-            let mut compositor = self.compositor.borrow_mut();
-            let rc = Rc::clone(&self.compositor);
-            compositor.bind_key(
-                KEY_BACKSPACE,
-                ffi::weston_keyboard_modifier::MODIFIER_CTRL
-                    | ffi::weston_keyboard_modifier::MODIFIER_ALT,
-                move |_, _, _| {
-                    let mut compositor = rc.borrow_mut();
-                    compositor.server.terminate();
-                },
-            );
-
-            let no_mods = ffi::weston_keyboard_modifier(0);
-            let mods = ffi::weston_keyboard_modifier(self.native.binding_modifier);
-            compositor.bind_key(KEY_K, mods, move |keyboard, _, _| {
-                if let Some(surface) = unsafe { keyboard.focus.as_ref() } {
-                    let resource = server::Resource::<protocol::wl_surface::WlSurface>::from_c_ptr(
-                        surface.resource,
-                    );
-                    let client = unsafe { &mut *resource.client() };
-                    let (pid, _, _) = client.get_credentials();
-                    signal::kill(nix::unistd::Pid::from_raw(pid), signal::SIGTERM).unwrap();
-                }
-            });
-
-            let rc = Rc::clone(&self.compositor);
-            let backlight_binding =
-                move |_: &mut ffi::weston_keyboard, _: *const ffi::timespec, key: u32| {
-                    let mut compositor = rc.borrow_mut();
-                    let mut output = match compositor.default_output() {
-                        Some(o) => o,
-                        _ => return,
-                    };
-                    let backlight = (output.backlight_current
-                        + match key {
-                            KEY_F9 | KEY_BRIGHTNESSDOWN => -25,
-                            KEY_F10 | KEY_BRIGHTNESSUP => 25,
-                            _ => return,
-                        })
-                    .min(255)
-                    .max(5);
-
-                    output.backlight_current = backlight;
-
-                    if let Some(set_backlight) = output.set_backlight {
-                        unsafe { set_backlight(output, backlight as u32) }
-                    }
-                };
-
-            compositor.bind_key(KEY_BRIGHTNESSDOWN, no_mods, backlight_binding.clone());
-            compositor.bind_key(KEY_BRIGHTNESSUP, no_mods, backlight_binding.clone());
-            compositor.bind_key(KEY_F9, mods, backlight_binding.clone());
-            compositor.bind_key(KEY_F10, mods, backlight_binding.clone());
-        }
+        self.init_bindings();
 
         self.create_background_surface();
     }

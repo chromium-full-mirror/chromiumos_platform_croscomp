@@ -318,8 +318,7 @@ fn main() -> std::io::Result<()> {
             compositor.create_client(fd);
         });
 
-    let shell = Rc::new(RefCell::new(Shell::new(&compositor)));
-    shell.borrow_mut().init();
+    let shell = Shell::new(&compositor);
 
     display::init(&shell);
 
