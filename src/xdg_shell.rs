@@ -297,7 +297,15 @@ fn handle_xdg_toplevel_surface_request(
             );
             return;
         }
-        SetWindowGeometry { x: _, y: _, width: _, height: _ } => todo!(),
+        SetWindowGeometry { x, y, width, height } => {
+            let shsurf = unsafe { &mut *toplevel.shsurf };
+            shsurf.geometry = ffi::weston_geometry {
+                x: *x,
+                y: *y,
+                width: *width,
+                height: *height,
+            }
+        }
         AckConfigure { serial: _ } => toplevel.configured = true,
     }
 }

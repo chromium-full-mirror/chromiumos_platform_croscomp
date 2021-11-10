@@ -126,6 +126,8 @@ struct shell_surface {
 		bool lowered;
 	} pending_state, state;
 
+	struct weston_geometry geometry;
+
 	int focus_count;
 
 	bool destroying;
