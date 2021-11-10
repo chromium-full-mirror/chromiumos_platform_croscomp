@@ -336,6 +336,10 @@ impl wl_signal {
         unsafe { std::mem::zeroed() }
     }
 
+    fn iter_mut<'a>(&'a mut self) -> WlListIterMut<'a, wl_listener> {
+        wl_list_iter_mut!(&mut self.listener_list, wl_listener, link)
+    }
+
     extern "C" fn destroy_notify<T>(listener: *mut wl_listener, _data: *mut ::std::os::raw::c_void)
     where
         T: From<*mut wl_listener>,
@@ -360,7 +364,7 @@ impl wl_signal {
     where
         T: From<*mut wl_listener>,
     {
-        wl_list_iter_mut!(&mut self.listener_list, wl_listener, link)
+        self.iter_mut()
             .find(|listener| listener.notify == Some(Self::destroy_notify::<T>))
             .map(|listener| T::from(listener))
     }
@@ -369,12 +373,23 @@ impl wl_signal {
     where
         T: From<*mut wl_listener>,
     {
-        wl_list_iter_mut!(&mut self.listener_list, wl_listener, link)
+        self.iter_mut()
             .find(|listener| listener.notify == Some(Self::destroy_notify::<T>))
             .map(|listener| {
                 listener.link.remove();
                 T::from(listener)
             })
+    }
+
+    pub fn emit<T>(&mut self, data: &mut T) {
+        let data = data as *mut _;
+        for l in self.iter_mut() {
+            if let Some(notify) = l.notify {
+                unsafe {
+                    notify(l as *mut _, data as *mut _);
+                }
+            }
+        }
     }
 }
 
