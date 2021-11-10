@@ -195,13 +195,13 @@ impl Compositor {
         extern "C" fn call_button_closure<F>(
             pointer: *mut ffi::weston_pointer,
             time: *const ffi::timespec,
-            key: u32,
+            button: u32,
             data: *mut std::ffi::c_void,
         ) where
             F: Fn(&mut ffi::weston_pointer, *const ffi::timespec, u32),
         {
             let pointer = unsafe { &mut *pointer };
-            (unsafe { &mut *(data as *mut F) })(pointer, time, key)
+            (unsafe { &mut *(data as *mut F) })(pointer, time, button)
         }
 
         let handler = Box::new(f);
