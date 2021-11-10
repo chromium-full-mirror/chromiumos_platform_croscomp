@@ -4,7 +4,8 @@
 
 use crate::ffi;
 use crate::protocol;
-use log::{debug, error};
+use log::debug;
+use std::any::Any;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -134,10 +135,23 @@ struct State {
     activated: bool,
 }
 
+fn state_to_xdg_vec(state: &State) -> Vec<u8> {
+    IntoIterator::into_iter([
+        (state.maximized, xdg_toplevel::State::Maximized),
+        (state.fullscreen, xdg_toplevel::State::Fullscreen),
+        (state.resizing, xdg_toplevel::State::Resizing),
+        (state.activated, xdg_toplevel::State::Activated),
+    ])
+    .filter_map(|(flag, token)| if flag { Some(token as u8) } else { None })
+    .collect()
+}
+
 struct Toplevel {
     shell: Rc<RefCell<crate::Shell>>,
     surface: *mut ffi::weston_surface,
     shsurf: *mut ffi::shell_surface,
+    surface_resource: Resource<XdgSurface>,
+    resource: Resource<XdgToplevel>,
     title: String,
     app_id: String,
 
@@ -151,23 +165,28 @@ struct Toplevel {
 
     next_geometry: Option<ffi::weston_geometry>,
     configured: bool,
+
+    commit_listener: Option<Box<dyn Any>>,
 }
 
 impl Toplevel {
-    fn new(
-        shell: Rc<RefCell<crate::Shell>>,
-        surface: *mut ffi::weston_surface,
-    ) -> Rc<RefCell<Self>> {
+    fn new(surface: &Surface, resource: Resource<XdgToplevel>) -> Rc<RefCell<Self>> {
         let shsurf = unsafe {
-            let view = ffi::weston_view_create(surface);
+            let view = ffi::weston_view_create(surface.surface);
 
-            ffi::shell_surface_create(&mut (shell.borrow_mut()).native as *mut _, surface, view)
+            ffi::shell_surface_create(
+                &mut (surface.shell.borrow_mut()).native as *mut _,
+                surface.surface,
+                view,
+            )
         };
 
-        Rc::new(RefCell::new(Toplevel {
-            shell,
-            surface: surface as *mut _,
+        let toplevel_rc = Rc::new(RefCell::new(Toplevel {
+            shell: Rc::clone(&surface.shell),
+            surface: surface.surface,
             shsurf,
+            surface_resource: surface.resource.clone(),
+            resource: resource.clone(),
             title: String::new(),
             app_id: String::new(),
             next_max_size: ffi::weston_size { width: 0, height: 0 },
@@ -180,21 +199,42 @@ impl Toplevel {
 
             next_geometry: None,
             configured: false,
-        }))
+
+            commit_listener: None,
+        }));
+
+        let mut toplevel = toplevel_rc.borrow_mut();
+        let rc = Rc::clone(&toplevel_rc);
+        let commit_signal = unsafe { &mut (*toplevel.surface).commit_signal };
+        toplevel.commit_listener = Some(ffi::WlListener::new(commit_signal, move || {
+            let mut toplevel = rc.borrow_mut();
+            if !toplevel.configured {
+                toplevel.schedule_configure(Rc::clone(&rc));
+            }
+        }));
+
+        drop(toplevel);
+        toplevel_rc
     }
 
-    fn schedule_configure(&mut self) {}
+    fn schedule_configure(&mut self, rc: Rc<RefCell<Toplevel>>) {
+        let shell = self.shell.borrow_mut();
+        let mut compositor = shell.compositor.borrow_mut();
+        debug!("schedule configure!");
+        compositor.server.event_loop.when_idle(move || {
+            let toplevel = rc.borrow_mut();
+            let configure = protocol::xdg_toplevel::Event::Configure {
+                width: toplevel.pending_size.width,
+                height: toplevel.pending_size.height,
+                states: state_to_xdg_vec(&toplevel.pending_state),
+            };
 
-    fn committed(&mut self) {
-        // to be called from shell.rs
-    }
+            toplevel.resource.send(configure);
 
-    fn close(&mut self) {
-        // will be called from shell.rs
-    }
+            let configure = protocol::xdg_surface::Event::Configure { serial: 0 };
 
-    fn destroy(&mut self) {
-        // called from shell.rs
+            toplevel.surface_resource.send(configure);
+        });
     }
 }
 
@@ -253,12 +293,12 @@ fn handle_xdg_toplevel_request(
         SetMaximized => unsafe {
             toplevel.pending_state.maximized = true;
             toplevel.pending_size = ffi::shell_surface_set_maximized(shsurf, true);
-            toplevel.schedule_configure();
+            toplevel.schedule_configure(Rc::clone(&rc));
         },
         UnsetMaximized => unsafe {
             toplevel.pending_state.maximized = false;
             toplevel.pending_size = ffi::shell_surface_set_maximized(shsurf, false);
-            toplevel.schedule_configure();
+            toplevel.schedule_configure(Rc::clone(&rc));
         },
         SetFullscreen { output } => unsafe {
             let output = match output {
@@ -267,12 +307,12 @@ fn handle_xdg_toplevel_request(
             };
             toplevel.pending_size = ffi::shell_surface_set_fullscreen(shsurf, true, output);
             toplevel.pending_state.fullscreen = true;
-            toplevel.schedule_configure();
+            toplevel.schedule_configure(Rc::clone(&rc));
         },
         UnsetFullscreen => unsafe {
             toplevel.pending_size = ffi::shell_surface_set_fullscreen(shsurf, false, 0 as *mut _);
             toplevel.pending_state.fullscreen = true;
-            toplevel.schedule_configure();
+            toplevel.schedule_configure(Rc::clone(&rc));
         },
         SetMinimized => unsafe {
             ffi::shell_surface_set_minimized(shsurf);
@@ -350,7 +390,7 @@ fn handle_xdg_surface_request(resource: &mut Resource<XdgSurface>, request: &xdg
     match request {
         Destroy => (),
         GetToplevel { id } => {
-            let toplevel = Toplevel::new(Rc::clone(&surface.shell), surface.surface);
+            let toplevel = Toplevel::new(&surface, id.clone().into());
             id.on_request(handle_xdg_toplevel_request);
             id.set_user_data(Rc::into_raw(Rc::clone(&toplevel)));
 
@@ -430,9 +470,7 @@ fn handle_xdg_wm_base_request(resource: &mut Resource<XdgWmBase>, request: &xdg_
             id.set_user_data(Rc::into_raw(xdg_surface));
         }
         Pong { serial: _ } => {
-            todo!("update timer");
-            todo!("end busy cursor");
-            todo!("pong");
+            todo!("update timer, end busy cursor, pong");
         }
     }
 }
