@@ -130,7 +130,7 @@ struct State {
     activated: bool,
 }
 
-struct Surface {
+struct Toplevel {
     shell: Rc<RefCell<crate::Shell>>,
     surface: *mut ffi::weston_surface,
     shsurf: *mut ffi::shell_surface,
@@ -149,12 +149,21 @@ struct Surface {
     configured: bool,
 }
 
-impl Surface {
-    fn new(shell: Rc<RefCell<crate::Shell>>, surface: &mut ffi::weston_surface) -> Self {
-        Surface {
-            shell: shell,
+impl Toplevel {
+    fn new(
+        shell: Rc<RefCell<crate::Shell>>,
+        surface: *mut ffi::weston_surface,
+    ) -> Rc<RefCell<Self>> {
+        let shsurf = unsafe {
+            let view = ffi::weston_view_create(surface);
+
+            ffi::shell_surface_create(&mut (shell.borrow_mut()).native as *mut _, surface, view)
+        };
+
+        Rc::new(RefCell::new(Toplevel {
+            shell,
             surface: surface as *mut _,
-            shsurf: 0 as *mut _,
+            shsurf,
             title: String::new(),
             app_id: String::new(),
             next_max_size: ffi::weston_size { width: 0, height: 0 },
@@ -167,7 +176,7 @@ impl Surface {
 
             next_geometry: None,
             configured: false,
-        }
+        }))
     }
 
     fn schedule_configure(&mut self) {}
@@ -191,14 +200,16 @@ fn handle_xdg_toplevel_request(
 ) {
     use xdg_toplevel::Request::*;
 
-    let surface = resource.user_data::<Surface>();
-    let shsurf = unsafe { &mut *surface.shsurf };
+    let rc = resource.user_data_rc::<RefCell<Toplevel>>();
+    let mut toplevel = rc.borrow_mut();
+
+    let shsurf = unsafe { &mut *toplevel.shsurf };
 
     match request {
         Destroy => (),
         SetParent { parent: _ } => (),
-        SetTitle { title } => surface.title = title.clone(),
-        SetAppId { app_id } => surface.app_id = app_id.clone(),
+        SetTitle { title } => toplevel.title = title.clone(),
+        SetAppId { app_id } => toplevel.app_id = app_id.clone(),
         ShowWindowMenu { seat: _, serial: _, x: _, y: _ } => (),
         Move { seat, serial } => {
             let seat = seat.as_ref().user_data::<ffi::weston_seat>();
@@ -230,34 +241,34 @@ fn handle_xdg_toplevel_request(
             }
         }
         SetMaxSize { width, height } => {
-            surface.next_max_size = ffi::weston_size { width: *width, height: *height }
+            toplevel.next_max_size = ffi::weston_size { width: *width, height: *height }
         }
         SetMinSize { width, height } => {
-            surface.next_min_size = ffi::weston_size { width: *width, height: *height }
+            toplevel.next_min_size = ffi::weston_size { width: *width, height: *height }
         }
         SetMaximized => unsafe {
-            surface.pending_state.maximized = true;
-            surface.pending_size = ffi::shell_surface_set_maximized(shsurf, true);
-            surface.schedule_configure();
+            toplevel.pending_state.maximized = true;
+            toplevel.pending_size = ffi::shell_surface_set_maximized(shsurf, true);
+            toplevel.schedule_configure();
         },
         UnsetMaximized => unsafe {
-            surface.pending_state.maximized = false;
-            surface.pending_size = ffi::shell_surface_set_maximized(shsurf, false);
-            surface.schedule_configure();
+            toplevel.pending_state.maximized = false;
+            toplevel.pending_size = ffi::shell_surface_set_maximized(shsurf, false);
+            toplevel.schedule_configure();
         },
         SetFullscreen { output } => unsafe {
             let output = match output {
                 Some(output) => output.as_ref().user_data::<ffi::weston_output>(),
                 None => 0 as *mut _,
             };
-            surface.pending_size = ffi::shell_surface_set_fullscreen(shsurf, true, output);
-            surface.pending_state.fullscreen = true;
-            surface.schedule_configure();
+            toplevel.pending_size = ffi::shell_surface_set_fullscreen(shsurf, true, output);
+            toplevel.pending_state.fullscreen = true;
+            toplevel.schedule_configure();
         },
         UnsetFullscreen => unsafe {
-            surface.pending_size = ffi::shell_surface_set_fullscreen(shsurf, false, 0 as *mut _);
-            surface.pending_state.fullscreen = true;
-            surface.schedule_configure();
+            toplevel.pending_size = ffi::shell_surface_set_fullscreen(shsurf, false, 0 as *mut _);
+            toplevel.pending_state.fullscreen = true;
+            toplevel.schedule_configure();
         },
         SetMinimized => unsafe {
             ffi::shell_surface_set_minimized(shsurf);
@@ -265,13 +276,55 @@ fn handle_xdg_toplevel_request(
     }
 }
 
+fn handle_xdg_toplevel_surface_request(
+    resource: &mut Resource<XdgSurface>,
+    request: &xdg_surface::Request,
+) {
+    use xdg_surface::Request::*;
+    let rc = resource.user_data_rc::<RefCell<Toplevel>>();
+    let mut toplevel = rc.borrow_mut();
+
+    match request {
+        Destroy => (),
+        GetToplevel { .. } | GetPopup { .. } => {
+            resource.post_error(
+                xdg_wm_base::Error::Role as u32,
+                "surface already has role XdgToplevel",
+            );
+            return;
+        }
+        SetWindowGeometry { x: _, y: _, width: _, height: _ } => todo!(),
+        AckConfigure { serial: _ } => toplevel.configured = true,
+    }
+}
+
 fn handle_xdg_popup_request(_resource: &mut Resource<XdgPopup>, request: &xdg_popup::Request) {
     use xdg_popup::Request::*;
 
     match request {
-        Destroy => (),
-        Grab { seat: _, serial: _ } => (),
-        Reposition { positioner: _, token: _ } => (),
+        Destroy => todo!(),
+        Grab { seat: _, serial: _ } => todo!(),
+        Reposition { positioner: _, token: _ } => todo!(),
+    }
+}
+
+fn handle_xdg_popup_surface_request(
+    resource: &mut Resource<XdgSurface>,
+    request: &xdg_surface::Request,
+) {
+    use xdg_surface::Request::*;
+
+    match request {
+        Destroy => todo!(),
+        GetToplevel { .. } | GetPopup { .. } => {
+            resource.post_error(
+                xdg_wm_base::Error::Role as u32,
+                "surface already has role XdgPopup",
+            );
+            return;
+        }
+        SetWindowGeometry { x: _, y: _, width: _, height: _ } => todo!(),
+        AckConfigure { serial: _ } => todo!(),
     }
 }
 
@@ -279,22 +332,19 @@ fn handle_xdg_surface_request(resource: &mut Resource<XdgSurface>, request: &xdg
     use xdg_surface::Request::*;
     use xdg_wm_base::Error;
 
-    let surface = resource.user_data::<Surface>();
+    let surface_rc = resource.user_data_rc::<RefCell<Surface>>();
+    let surface = surface_rc.borrow_mut();
 
     match request {
         Destroy => (),
-        GetToplevel { id } => unsafe {
+        GetToplevel { id } => {
+            let toplevel = Toplevel::new(Rc::clone(&surface.shell), surface.surface);
             id.on_request(handle_xdg_toplevel_request);
+            id.set_user_data(Rc::into_raw(Rc::clone(&toplevel)));
 
-            let view = ffi::weston_view_create(surface.surface);
-
-            surface.shsurf = ffi::shell_surface_create(
-                &mut (surface.shell.borrow_mut()).native as *mut _,
-                surface.surface,
-                view,
-            );
-            id.set_user_data(surface as *mut _);
-        },
+            resource.on_request(handle_xdg_toplevel_surface_request);
+            resource.set_user_data(Rc::into_raw(Rc::clone(&toplevel)));
+        }
         GetPopup { id, parent, positioner: _ } => {
             if parent.is_none() {
                 resource.post_error(
@@ -304,28 +354,13 @@ fn handle_xdg_surface_request(resource: &mut Resource<XdgSurface>, request: &xdg
                 return;
             };
             id.on_request(handle_xdg_popup_request);
+            resource.on_request(handle_xdg_popup_surface_request);
         }
-        SetWindowGeometry { x, y, width, height } => {
-            // xxx: check it's either toplevel or popup
-            surface.next_geometry = Some(ffi::weston_geometry {
-                x: *x,
-                y: *y,
-                width: *width,
-                height: *height,
-            })
-        }
-        AckConfigure { serial: _ } => {
-            // xxx: check it's either toplevel or popup
-
-            // xxx: lookup pending configure request instead of this stub
-            // xxx: free older configures
-            // xxx: XDG_WM_BASE_ERROR_INVALID_SURFACE_STATE if not found
-            let configure_state = State::default();
-            let configure_size = ffi::weston_size { width: 0, height: 0 };
-
-            surface.configured = true;
-            surface.next_state = configure_state;
-            surface.next_size = configure_size;
+        SetWindowGeometry { .. } | AckConfigure { .. } => {
+            resource.post_error(
+                xdg_surface::Error::NotConstructed as u32,
+                "xdg_surface must have a role",
+            );
         }
     }
 }
@@ -340,9 +375,19 @@ impl Client {
     }
 }
 
-impl<'a> From<&'a protocol::wl_surface::WlSurface> for &'a mut ffi::weston_surface {
-    fn from(item: &'a protocol::wl_surface::WlSurface) -> Self {
-        item.as_ref().user_data::<ffi::weston_surface>()
+struct Surface {
+    shell: Rc<RefCell<crate::Shell>>,
+    surface: *mut ffi::weston_surface,
+    resource: Resource<XdgSurface>,
+}
+
+impl Surface {
+    fn new(
+        shell: Rc<RefCell<crate::Shell>>,
+        surface: *mut ffi::weston_surface,
+        resource: Resource<XdgSurface>,
+    ) -> Rc<RefCell<Self>> {
+        Rc::new(RefCell::new(Self { shell, surface, resource }))
     }
 }
 
@@ -363,15 +408,19 @@ fn handle_xdg_wm_base_request(resource: &mut Resource<XdgWmBase>, request: &xdg_
         }
         GetXdgSurface { id, surface } => {
             debug!("get xdg surface");
-            let xs = Box::new(Surface::new(client.shell.clone(), surface.into()));
+            let xdg_surface = Surface::new(
+                Rc::clone(&client.shell),
+                surface.as_ref().user_data::<ffi::weston_surface>() as *mut _,
+                id.clone().into(),
+            );
 
             id.on_request(handle_xdg_surface_request);
-            id.set_user_data(Box::into_raw(xs) as *mut _);
+            id.set_user_data(Rc::into_raw(xdg_surface));
         }
         Pong { serial: _ } => {
-            // update timer
-            // end busy cursor
-            debug!("pong");
+            todo!("update timer");
+            todo!("end busy cursor");
+            todo!("pong");
         }
     }
 }
