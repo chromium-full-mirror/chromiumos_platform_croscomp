@@ -232,3 +232,59 @@ impl Drop for Shell {
         debug!("-------------------- drop Shell")
     }
 }
+
+pub type Surface = ffi::shell_surface;
+
+impl Surface {
+    pub fn new(
+        shell: &mut Shell,
+        surface: *mut ffi::weston_surface,
+        view: *mut ffi::weston_view,
+    ) -> *mut Self {
+        unsafe { ffi::shell_surface_create(&mut shell.native as *mut _, surface, view) }
+    }
+
+    pub fn get<'a>(surface: &mut ffi::weston_surface) -> Option<&'a mut Surface> {
+        unsafe { ffi::get_shell_surface(surface).as_mut() }
+    }
+
+    pub fn r#move(&mut self, pointer: &mut ffi::weston_pointer, client_initiated: bool) {
+        unsafe {
+            ffi::shell_surface_move(self, pointer as *mut _, client_initiated);
+        }
+    }
+
+    pub fn resize(&mut self, pointer: &mut ffi::weston_pointer, edges: u32) {
+        unsafe {
+            ffi::shell_surface_resize(self, pointer as *mut _, edges);
+        }
+    }
+
+    pub fn set_size(&mut self, width: i32, height: i32) {
+        unsafe { ffi::shell_surface_set_size(self, width, height) }
+    }
+
+    pub fn set_resizing(&mut self, edges: ffi::wl_shell_surface_resize) {
+        unsafe { ffi::shell_surface_set_resizing(self, edges.0) }
+    }
+
+    pub fn get_geometry(&mut self) -> ffi::weston_geometry {
+        unsafe { ffi::shell_surface_get_geometry(self) }
+    }
+
+    pub fn set_maximized(&mut self, enable: bool) -> ffi::weston_size {
+        unsafe { ffi::shell_surface_set_maximized(self, enable) }
+    }
+
+    pub fn set_fullscreen(
+        &mut self,
+        enable: bool,
+        output: *mut ffi::weston_output,
+    ) -> ffi::weston_size {
+        unsafe { ffi::shell_surface_set_fullscreen(self, enable, output) }
+    }
+
+    pub fn set_minimized(&mut self) {
+        unsafe { ffi::shell_surface_set_minimized(self) }
+    }
+}

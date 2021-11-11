@@ -4,10 +4,12 @@
 
 use crate::ffi;
 use crate::protocol;
+use crate::shell;
 use log::debug;
 use std::any::Any;
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::ops::DerefMut;
 
 use crate::server::Resource;
 use protocol::xdg_popup::{self, XdgPopup};
@@ -149,7 +151,7 @@ fn state_to_xdg_vec(state: &State) -> Vec<u8> {
 struct Toplevel {
     shell: Rc<RefCell<crate::Shell>>,
     surface: *mut ffi::weston_surface,
-    shsurf: *mut ffi::shell_surface,
+    shsurf: *mut shell::Surface,
     surface_resource: Resource<XdgSurface>,
     resource: Resource<XdgToplevel>,
     title: String,
@@ -174,8 +176,8 @@ impl Toplevel {
         let shsurf = unsafe {
             let view = ffi::weston_view_create(surface.surface);
 
-            ffi::shell_surface_create(
-                &mut (surface.shell.borrow_mut()).native as *mut _,
+            shell::Surface::new(
+                surface.shell.borrow_mut().deref_mut(),
                 surface.surface,
                 view,
             )
@@ -292,12 +294,12 @@ fn handle_xdg_toplevel_request(
         }
         SetMaximized => unsafe {
             toplevel.pending_state.maximized = true;
-            toplevel.pending_size = ffi::shell_surface_set_maximized(shsurf, true);
+            toplevel.pending_size = shsurf.set_maximized(true);
             toplevel.schedule_configure(Rc::clone(&rc));
         },
         UnsetMaximized => unsafe {
             toplevel.pending_state.maximized = false;
-            toplevel.pending_size = ffi::shell_surface_set_maximized(shsurf, false);
+            toplevel.pending_size = shsurf.set_maximized(false);
             toplevel.schedule_configure(Rc::clone(&rc));
         },
         SetFullscreen { output } => unsafe {
@@ -305,17 +307,17 @@ fn handle_xdg_toplevel_request(
                 Some(output) => output.as_ref().user_data::<ffi::weston_output>(),
                 None => 0 as *mut _,
             };
-            toplevel.pending_size = ffi::shell_surface_set_fullscreen(shsurf, true, output);
+            toplevel.pending_size = shsurf.set_fullscreen(true, output);
             toplevel.pending_state.fullscreen = true;
             toplevel.schedule_configure(Rc::clone(&rc));
         },
         UnsetFullscreen => unsafe {
-            toplevel.pending_size = ffi::shell_surface_set_fullscreen(shsurf, false, 0 as *mut _);
+            toplevel.pending_size = shsurf.set_fullscreen(false, 0 as *mut _);
             toplevel.pending_state.fullscreen = true;
             toplevel.schedule_configure(Rc::clone(&rc));
         },
         SetMinimized => unsafe {
-            ffi::shell_surface_set_minimized(shsurf);
+            shsurf.set_minimized();
         },
     }
 }
