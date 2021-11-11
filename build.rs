@@ -67,7 +67,9 @@ fn main() {
 
     let lib_paths = ["desktop-shell", "libweston"];
 
-    let build_dir = env::var("MESON_BUILD_DIR").unwrap();
+    let build_dir =
+        env::var("MESON_BUILD_DIR").unwrap_or(format!("{}/../../../weston", out_dir_str));
+
     for p in &lib_paths {
         println!("cargo:rustc-flags=-L{}/{}", build_dir, p);
     }
