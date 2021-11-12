@@ -151,7 +151,7 @@ fn state_to_xdg_vec(state: &State) -> Vec<u8> {
 struct Toplevel {
     shell: Rc<RefCell<crate::Shell>>,
     surface: *mut ffi::weston_surface,
-    shsurf: *mut shell::Surface,
+    shsurf: Box<shell::Surface>,
     surface_resource: Resource<XdgSurface>,
     resource: Resource<XdgToplevel>,
     title: String,
@@ -251,8 +251,6 @@ fn handle_xdg_toplevel_request(
     let rc = resource.user_data_rc::<RefCell<Toplevel>>();
     let mut toplevel = rc.borrow_mut();
 
-    let shsurf = unsafe { &mut *toplevel.shsurf };
-
     match request {
         Destroy => (),
         SetParent { parent: _ } => (),
@@ -269,7 +267,7 @@ fn handle_xdg_toplevel_request(
                     //let focus = &mut *pointer.focus;
                     //let focus = ffi::weston_surface_get_main_surface(focus.surface);
                     // if (focus == surface
-                    shsurf.r#move(pointer, true);
+                    toplevel.shsurf.r#move(pointer, true);
                 }
             }
             if let Some(touch) = seat.get_touch() {
@@ -284,7 +282,7 @@ fn handle_xdg_toplevel_request(
                     && pointer.grab_serial == *serial
                 {
                     // let focus = get main surf
-                    shsurf.resize(pointer, edges.to_raw())
+                    toplevel.shsurf.resize(pointer, edges.to_raw())
                 }
             }
         }
@@ -296,12 +294,12 @@ fn handle_xdg_toplevel_request(
         }
         SetMaximized => {
             toplevel.pending_state.maximized = true;
-            toplevel.pending_size = shsurf.set_maximized(true);
+            toplevel.pending_size = toplevel.shsurf.set_maximized(true);
             toplevel.schedule_configure(Rc::clone(&rc));
         }
         UnsetMaximized => {
             toplevel.pending_state.maximized = false;
-            toplevel.pending_size = shsurf.set_maximized(false);
+            toplevel.pending_size = toplevel.shsurf.set_maximized(false);
             toplevel.schedule_configure(Rc::clone(&rc));
         }
         SetFullscreen { output } => {
@@ -309,17 +307,17 @@ fn handle_xdg_toplevel_request(
                 Some(output) => output.as_ref().user_data::<ffi::weston_output>(),
                 None => 0 as *mut _,
             };
-            toplevel.pending_size = shsurf.set_fullscreen(true, output);
+            toplevel.pending_size = toplevel.shsurf.set_fullscreen(true, output);
             toplevel.pending_state.fullscreen = true;
             toplevel.schedule_configure(Rc::clone(&rc));
         }
         UnsetFullscreen => {
-            toplevel.pending_size = shsurf.set_fullscreen(false, 0 as *mut _);
+            toplevel.pending_size = toplevel.shsurf.set_fullscreen(false, 0 as *mut _);
             toplevel.pending_state.fullscreen = true;
             toplevel.schedule_configure(Rc::clone(&rc));
         }
         SetMinimized => {
-            shsurf.set_minimized();
+            toplevel.shsurf.set_minimized();
         }
     }
 }
@@ -342,8 +340,7 @@ fn handle_xdg_toplevel_surface_request(
             return;
         }
         SetWindowGeometry { x, y, width, height } => {
-            let shsurf = unsafe { &mut *toplevel.shsurf };
-            shsurf.geometry = ffi::weston_geometry {
+            toplevel.shsurf.geometry = ffi::weston_geometry {
                 x: *x,
                 y: *y,
                 width: *width,

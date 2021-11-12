@@ -240,7 +240,7 @@ impl Surface {
         shell: &mut Shell,
         surface: *mut ffi::weston_surface,
         view: *mut ffi::weston_view,
-    ) -> *mut Self {
+    ) -> Box<Self> {
         let mut shsurf = Box::new(Self {
             destroy_signal: ffi::wl_signal::zeroed(),
             view,
@@ -292,13 +292,13 @@ impl Surface {
         shsurf.children_list.init();
         shsurf.children_link.init();
 
-        let shsurf = Box::into_raw(shsurf);
+        let ptr = Box::into_raw(shsurf);
         if let Some(surface) = unsafe { surface.as_mut() } {
             surface.committed = Some(ffi::shell_surface_committed);
-            surface.committed_private = shsurf as *mut _;
+            surface.committed_private = ptr as *mut _;
         }
 
-        shsurf
+        unsafe { Box::from_raw(ptr) }
     }
 
     pub fn set_output(&mut self, output: *mut ffi::weston_output) {
