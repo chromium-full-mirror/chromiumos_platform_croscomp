@@ -353,3 +353,10 @@ impl Surface {
         unsafe { ffi::shell_surface_set_minimized(self) }
     }
 }
+
+impl Drop for Surface {
+    fn drop(&mut self) {
+        self.children_list.remove();
+        self.children_link.remove();
+    }
+}

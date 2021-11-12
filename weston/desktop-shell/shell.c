@@ -1367,46 +1367,6 @@ shell_surface_get_geometry(struct shell_surface *shsurf)
 }
 
 void
-shell_surface_destroy(struct desktop_shell *shell,
-		      struct shell_surface *shsurf)
-{
-	struct shell_surface *shsurf_child, *tmp;
-	struct weston_surface *surface = shsurf->surface;
-
-	wl_list_for_each_safe(shsurf_child, tmp, &shsurf->children_list, children_link) {
-		wl_list_remove(&shsurf_child->children_link);
-		wl_list_init(&shsurf_child->children_link);
-	}
-	wl_list_remove(&shsurf->children_link);
-
-	wl_signal_emit(&shsurf->destroy_signal, shsurf);
-
-	if (shsurf->fullscreen.black_view)
-		weston_surface_destroy(shsurf->fullscreen.black_view->surface);
-
-	weston_surface_set_label_func(surface, NULL);
-
-	if (weston_surface_is_mapped(surface) &&
-	    shsurf->shell->win_close_animation_type == ANIMATION_FADE) {
-		pixman_region32_fini(&surface->pending.input);
-		pixman_region32_init(&surface->pending.input);
-		pixman_region32_fini(&surface->input);
-		pixman_region32_init(&surface->input);
-		weston_fade_run(shsurf->view, 1.0, 0.0, 300.0,
-				fade_out_done, shsurf);
-	} else {
-		weston_view_destroy(shsurf->view);
-
-		if (shsurf->output_destroy_listener.notify) {
-			wl_list_remove(&shsurf->output_destroy_listener.link);
-			shsurf->output_destroy_listener.notify = NULL;
-		}
-
-		free(shsurf);
-	}
-}
-
-void
 shell_surface_committed(struct weston_surface *surface,
 			int32_t sx, int32_t sy)
 
