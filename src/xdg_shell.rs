@@ -206,12 +206,14 @@ impl Toplevel {
         }));
 
         let mut toplevel = toplevel_rc.borrow_mut();
-        let rc = Rc::clone(&toplevel_rc);
+        let weak = Rc::downgrade(&toplevel_rc);
         let commit_signal = unsafe { &mut (*toplevel.surface).commit_signal };
         toplevel.commit_listener = Some(ffi::WlListener::new(commit_signal, move || {
-            let mut toplevel = rc.borrow_mut();
-            if !toplevel.configured {
-                toplevel.schedule_configure(Rc::clone(&rc));
+            if let Some(rc) = weak.upgrade() {
+                let mut toplevel = rc.borrow_mut();
+                if !toplevel.configured {
+                    toplevel.schedule_configure(Rc::clone(&rc));
+                }
             }
         }));
 
