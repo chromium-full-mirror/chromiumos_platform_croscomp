@@ -8,8 +8,8 @@ use crate::shell;
 use log::debug;
 use std::any::Any;
 use std::cell::RefCell;
-use std::rc::Rc;
 use std::ops::DerefMut;
+use std::rc::Rc;
 
 use crate::server::Resource;
 use protocol::xdg_popup::{self, XdgPopup};
@@ -292,17 +292,17 @@ fn handle_xdg_toplevel_request(
         SetMinSize { width, height } => {
             toplevel.next_min_size = ffi::weston_size { width: *width, height: *height }
         }
-        SetMaximized => unsafe {
+        SetMaximized => {
             toplevel.pending_state.maximized = true;
             toplevel.pending_size = shsurf.set_maximized(true);
             toplevel.schedule_configure(Rc::clone(&rc));
-        },
-        UnsetMaximized => unsafe {
+        }
+        UnsetMaximized => {
             toplevel.pending_state.maximized = false;
             toplevel.pending_size = shsurf.set_maximized(false);
             toplevel.schedule_configure(Rc::clone(&rc));
-        },
-        SetFullscreen { output } => unsafe {
+        }
+        SetFullscreen { output } => {
             let output = match output {
                 Some(output) => output.as_ref().user_data::<ffi::weston_output>(),
                 None => 0 as *mut _,
@@ -310,15 +310,15 @@ fn handle_xdg_toplevel_request(
             toplevel.pending_size = shsurf.set_fullscreen(true, output);
             toplevel.pending_state.fullscreen = true;
             toplevel.schedule_configure(Rc::clone(&rc));
-        },
-        UnsetFullscreen => unsafe {
+        }
+        UnsetFullscreen => {
             toplevel.pending_size = shsurf.set_fullscreen(false, 0 as *mut _);
             toplevel.pending_state.fullscreen = true;
             toplevel.schedule_configure(Rc::clone(&rc));
-        },
-        SetMinimized => unsafe {
+        }
+        SetMinimized => {
             shsurf.set_minimized();
-        },
+        }
     }
 }
 

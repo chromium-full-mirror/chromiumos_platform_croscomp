@@ -101,7 +101,7 @@ struct shell_surface {
 	int32_t saved_x, saved_y;
 	bool saved_position_valid;
 	bool saved_rotation_valid;
-	int unresponsive, grabbed;
+	bool unresponsive, grabbed;
 	uint32_t resize_edges;
 
 	struct {
@@ -125,6 +125,8 @@ struct shell_surface {
 		bool maximized;
 		bool lowered;
 	} pending_state, state;
+
+	struct weston_size pending_size;
 
 	struct weston_geometry geometry;
 
@@ -212,10 +214,19 @@ get_default_output(struct weston_compositor *compositor);
 struct weston_view *
 get_default_view(struct weston_surface *surface);
 
-struct shell_surface *
-shell_surface_create(struct desktop_shell *shell,
-		     struct weston_surface *surface,
-		     struct weston_view *view);
+void
+shell_surface_set_output(struct shell_surface *shsurf,
+                         struct weston_output *output);
+
+struct weston_size
+shell_surface_set_maximized(struct shell_surface *shsurf, bool maximized);
+
+struct weston_size
+shell_surface_set_fullscreen(struct shell_surface *shsurf, bool fullscreen,
+			     struct weston_output *output);
+
+void
+shell_surface_set_minimized(struct shell_surface *shsurf);
 
 bool
 is_shell_surface(struct weston_surface *surface);
@@ -230,21 +241,13 @@ int
 shell_surface_resize(struct shell_surface *shsurf,
 		     struct weston_pointer *pointer, uint32_t edges);
 
+void
+shell_surface_committed(struct weston_surface *surface,
+			int32_t sx, int32_t sy);
+
 struct weston_geometry
 shell_surface_get_geometry(struct shell_surface *shsurf);
 
-void
-shell_surface_set_size(struct shell_surface *shsurf,
-		       int32_t width, int32_t height);
-void
-shell_surface_set_resizing(struct shell_surface *shsurf, uint32_t edges);
-struct weston_size
-shell_surface_set_fullscreen(struct shell_surface *shsurf, bool fullscreen,
-			     struct weston_output *output);
-struct weston_size
-shell_surface_set_maximized(struct shell_surface *shsurf, bool maximized);
-void
-shell_surface_set_minimized(struct shell_surface *shsurf);
 void
 shell_surface_update_child_surface_layers (struct shell_surface *shsurf);
 

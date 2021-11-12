@@ -241,7 +241,68 @@ impl Surface {
         surface: *mut ffi::weston_surface,
         view: *mut ffi::weston_view,
     ) -> *mut Self {
-        unsafe { ffi::shell_surface_create(&mut shell.native as *mut _, surface, view) }
+        let mut shsurf = Box::new(Self {
+            destroy_signal: ffi::wl_signal::zeroed(),
+            view,
+            surface,
+            last_width: 0,
+            last_height: 0,
+            shell: &mut shell.native as *mut _,
+            children_list: ffi::wl_list::zeroed(),
+            children_link: ffi::wl_list::zeroed(),
+            saved_x: 0,
+            saved_y: 0,
+            saved_position_valid: true,
+            saved_rotation_valid: true,
+            unresponsive: false,
+            grabbed: false,
+            resize_edges: 0,
+            rotation: ffi::shell_surface__bindgen_ty_1 {
+                transform: ffi::weston_transform::new(),
+                rotation: ffi::weston_matrix::new(),
+            },
+            fullscreen: ffi::shell_surface__bindgen_ty_2 {
+                transform: ffi::weston_transform::new(),
+                black_view: 0 as *mut _,
+            },
+            workspace_transform: ffi::weston_transform::new(),
+            fullscreen_output: 0 as *mut _,
+            output: 0 as *mut _,
+            output_destroy_listener: ffi::wl_listener::zeroed(),
+            pending_state: ffi::shell_surface_surface_state {
+                fullscreen: false,
+                maximized: false,
+                lowered: false,
+            },
+            state: ffi::shell_surface_surface_state {
+                fullscreen: false,
+                maximized: false,
+                lowered: false,
+            },
+            pending_size: ffi::weston_size { width: 0, height: 0 },
+            geometry: ffi::weston_geometry { x: 0, y: 0, width: 0, height: 0 },
+            focus_count: 0,
+            destroying: false,
+        });
+
+        shsurf.fullscreen.transform.link.init();
+        shsurf.destroy_signal.init();
+        shsurf.rotation.transform.link.init();
+        shsurf.workspace_transform.link.init();
+        shsurf.children_list.init();
+        shsurf.children_link.init();
+
+        let shsurf = Box::into_raw(shsurf);
+        if let Some(surface) = unsafe { surface.as_mut() } {
+            surface.committed = Some(ffi::shell_surface_committed);
+            surface.committed_private = shsurf as *mut _;
+        }
+
+        shsurf
+    }
+
+    pub fn set_output(&mut self, output: *mut ffi::weston_output) {
+        unsafe { ffi::shell_surface_set_output(self, output) }
     }
 
     pub fn get<'a>(surface: &mut ffi::weston_surface) -> Option<&'a mut Surface> {
@@ -261,15 +322,19 @@ impl Surface {
     }
 
     pub fn set_size(&mut self, width: i32, height: i32) {
-        unsafe { ffi::shell_surface_set_size(self, width, height) }
+        self.pending_size = ffi::weston_size { width, height };
+        // emit state change signal
     }
 
     pub fn set_resizing(&mut self, edges: ffi::wl_shell_surface_resize) {
-        unsafe { ffi::shell_surface_set_resizing(self, edges.0) }
+        self.resize_edges = edges.0;
+        //self.pending_state.resizing =
+        //	    edges != ffi::wl_shell_surface_resize::WL_SHELL_SURFACE_RESIZE_NONE;
+        // emit state change signal
     }
 
     pub fn get_geometry(&mut self) -> ffi::weston_geometry {
-        unsafe { ffi::shell_surface_get_geometry(self) }
+        self.geometry
     }
 
     pub fn set_maximized(&mut self, enable: bool) -> ffi::weston_size {

@@ -690,29 +690,6 @@ notify_output_destroy(struct wl_listener *listener, void *data)
 }
 
 void
-shell_surface_set_size(struct shell_surface *shsurf,
-		       int32_t width, int32_t height)
-{
-	//weston_desktop_surface_set_size(shsurf->desktop_surface, width, height);
-	//shsurf->pending.size.width = width;
-	//shsurf->pending.size.height = height;
-	// emit state change signal, will trigger xdg configure event
-}
-
-void
-shell_surface_set_resizing(struct shell_surface *shsurf,
-			   uint32_t edges)
-{
-	//bool enable = edges != WL_SHELL_SURFACE_RESIZE_NONE;
-
-	//weston_desktop_surface_set_resizing(shsurf->desktop_surface, enable);
-	shsurf->resize_edges = edges;
-	//shsurf->pending.state.resizing = resizing;
-	// emit state change signal, will trigger xdg configure event
-
-}
-
-static void
 shell_surface_set_output(struct shell_surface *shsurf,
                          struct weston_output *output)
 {
@@ -1116,10 +1093,6 @@ fade_out_done(struct weston_view_animation *animation, void *data)
 	}
 }
 
-static void
-shell_surface_committed(struct weston_surface *surface,
-			int32_t sx, int32_t sy);
-
 bool
 is_shell_surface(struct weston_surface *surface)
 {
@@ -1375,34 +1348,9 @@ shell_surface_create(struct desktop_shell *shell,
 	surface->committed_private = shsurf;
 	weston_surface_set_label_func(surface, shell_surface_get_label);
 
-	shsurf->shell = shell;
-	shsurf->unresponsive = 0;
-	shsurf->saved_position_valid = false;
-	shsurf->saved_rotation_valid = false;
-	shsurf->view = view;
-	shsurf->surface = surface;
-	shsurf->fullscreen.black_view = NULL;
-	wl_list_init(&shsurf->fullscreen.transform.link);
 
 	shell_surface_set_output(
 		shsurf, get_default_output(shsurf->shell->compositor));
-
-	wl_signal_init(&shsurf->destroy_signal);
-
-	/* empty when not in use */
-	wl_list_init(&shsurf->rotation.transform.link);
-	weston_matrix_init(&shsurf->rotation.rotation);
-
-	wl_list_init(&shsurf->workspace_transform.link);
-
-	/*
-	 * initialize list as well as link. The latter allows to use
-	 * wl_list_remove() even when this surface is not in another list.
-	 */
-	wl_list_init(&shsurf->children_list);
-	wl_list_init(&shsurf->children_link);
-
-	// xxx set activated status?
 
 	return shsurf;
 }
@@ -1458,7 +1406,7 @@ shell_surface_destroy(struct desktop_shell *shell,
 	}
 }
 
-static void
+void
 shell_surface_committed(struct weston_surface *surface,
 			int32_t sx, int32_t sy)
 
