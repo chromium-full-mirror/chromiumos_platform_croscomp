@@ -118,6 +118,32 @@ where
         }
     }
 
+    pub fn set_user_data_rc<J>(&self, rc: Rc<J>) {
+        unsafe extern "C" fn call_drop<J>(resource: *mut ffi::wl_resource) {
+            let data = ffi::wl_resource_get_user_data(resource);
+            let rc = Rc::from_raw(data as *mut J);
+
+            debug!(
+                "rc resource destroyed: resource={:?}, strong count={}, type={}",
+                resource,
+                Rc::strong_count(&rc),
+                std::any::type_name::<J>()
+            );
+        }
+
+        debug!(
+            "set_user_data_rc: resource={:?}, strong count={}, type={}",
+            self.native,
+            Rc::strong_count(&rc),
+            std::any::type_name::<J>(),
+        );
+
+        unsafe {
+            ffi::wl_resource_set_user_data(self.native, Rc::into_raw(rc) as *mut _);
+            ffi::wl_resource_set_destructor(self.native, Some(call_drop::<J>));
+        }
+    }
+
     pub fn user_data_rc<J>(&self) -> Rc<J> {
         unsafe {
             let data = ffi::wl_resource_get_user_data(self.native);
@@ -230,6 +256,10 @@ where
 
     pub fn set_user_data<J>(&self, data: *const J) {
         self.resource.set_user_data(data);
+    }
+
+    pub fn set_user_data_rc<J>(&self, data: Rc<J>) {
+        self.resource.set_user_data_rc(data);
     }
 }
 

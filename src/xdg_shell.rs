@@ -394,10 +394,10 @@ fn handle_xdg_surface_request(resource: &mut Resource<XdgSurface>, request: &xdg
         GetToplevel { id } => {
             let toplevel = Toplevel::new(&surface, id.clone().into());
             id.on_request(handle_xdg_toplevel_request);
-            id.set_user_data(Rc::into_raw(Rc::clone(&toplevel)));
+            id.set_user_data_rc(Rc::clone(&toplevel));
 
             resource.on_request(handle_xdg_toplevel_surface_request);
-            resource.set_user_data(Rc::into_raw(Rc::clone(&toplevel)));
+            resource.set_user_data_rc(Rc::clone(&toplevel));
         }
         GetPopup { id, parent, positioner: _ } => {
             if parent.is_none() {
@@ -469,7 +469,7 @@ fn handle_xdg_wm_base_request(resource: &mut Resource<XdgWmBase>, request: &xdg_
             );
 
             id.on_request(handle_xdg_surface_request);
-            id.set_user_data(Rc::into_raw(xdg_surface));
+            id.set_user_data_rc(xdg_surface);
         }
         Pong { serial: _ } => {
             todo!("update timer, end busy cursor, pong");
