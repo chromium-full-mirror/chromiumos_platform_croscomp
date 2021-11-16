@@ -511,6 +511,19 @@ impl weston_view {
         };
         (local.0.into(), local.1.into())
     }
+
+    pub fn to_global<T: Into<f32>, U: From<f32>>(&self, x: T, y: T) -> (U, U) {
+	let global = if self.transform.enabled {
+	    let local = weston_vector { f: [ x.into(), y.into(), 0.0, 1.0 ] };
+	    let global = self.transform.matrix.transform(&local);
+
+	    (global.f[0] / global.f[3], global.f[1] / global.f[3])
+	} else {
+	    (x.into() + self.geometry.x, y.into() + self.geometry.y)
+	};
+
+	(global.0.into(), global.1.into())
+    }
 }
 
 impl wl_shell_surface_resize {
