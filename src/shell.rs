@@ -300,15 +300,10 @@ impl Surface {
             saved_x: 0,
             saved_y: 0,
             saved_position_valid: true,
-            saved_rotation_valid: true,
             unresponsive: false,
             grabbed: false,
             resize_edges: 0,
-            rotation: ffi::shell_surface__bindgen_ty_1 {
-                transform: ffi::weston_transform::new(),
-                rotation: ffi::weston_matrix::new(),
-            },
-            fullscreen: ffi::shell_surface__bindgen_ty_2 {
+            fullscreen: ffi::shell_surface__bindgen_ty_1 {
                 transform: ffi::weston_transform::new(),
                 black_view: 0 as *mut _,
             },
@@ -334,7 +329,6 @@ impl Surface {
 
         shsurf.fullscreen.transform.link.init();
         shsurf.destroy_signal.init();
-        shsurf.rotation.transform.link.init();
         shsurf.workspace_transform.link.init();
         shsurf.children_list.init();
         shsurf.children_link.init();

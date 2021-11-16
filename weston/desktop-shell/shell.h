@@ -100,14 +100,8 @@ struct shell_surface {
 
 	int32_t saved_x, saved_y;
 	bool saved_position_valid;
-	bool saved_rotation_valid;
 	bool unresponsive, grabbed;
 	uint32_t resize_edges;
-
-	struct {
-		struct weston_transform transform;
-		struct weston_matrix rotation;
-	} rotation;
 
 	struct {
 		struct weston_transform transform; /* matrix from x, y */
