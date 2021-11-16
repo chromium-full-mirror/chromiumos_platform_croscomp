@@ -233,6 +233,53 @@ impl Drop for Shell {
     }
 }
 
+fn get_work_area(output: *const ffi::weston_output) -> ffi::weston_geometry {
+    // Should be accounting for panels here or other UI elements that
+    // limit the maximized size.
+
+    let output = unsafe { output.as_ref().unwrap() };
+    ffi::weston_geometry {
+        x: output.x,
+        y: output.y,
+        width: output.width,
+        height: output.height,
+    }
+}
+
+fn get_focused_output(compositor: *mut ffi::weston_compositor) -> *mut ffi::weston_output {
+    let compositor = unsafe { compositor.as_mut().unwrap() };
+
+    for seat in compositor.seat_iter_mut() {
+        unsafe {
+            if let Some(touch) = seat.get_touch() {
+                if let Some(focus) = touch.focus.as_ref() {
+                    if !focus.output.is_null() {
+                        return focus.output;
+                    }
+                }
+            }
+
+            if let Some(pointer) = seat.get_pointer() {
+                if let Some(focus) = pointer.focus.as_ref() {
+                    if !focus.output.is_null() {
+                        return focus.output;
+                    }
+                }
+            }
+
+            if let Some(keyboard) = seat.get_keyboard() {
+                if let Some(focus) = keyboard.focus.as_ref() {
+                    if !focus.output.is_null() {
+                        return focus.output;
+                    }
+                }
+            }
+        }
+    }
+
+    std::ptr::null_mut()
+}
+
 pub type Surface = ffi::shell_surface;
 
 impl Surface {
@@ -294,11 +341,189 @@ impl Surface {
 
         let ptr = Box::into_raw(shsurf);
         if let Some(surface) = unsafe { surface.as_mut() } {
-            surface.committed = Some(ffi::shell_surface_committed);
+            surface.committed = Some(Surface::committed);
             surface.committed_private = ptr as *mut _;
         }
 
         unsafe { Box::from_raw(ptr) }
+    }
+
+    pub fn configure_fullscreen(&mut self) {
+        unsafe { ffi::shell_configure_fullscreen(self) };
+    }
+
+    pub fn configure_maximized(&mut self) {
+        let output = unsafe { &mut *self.output };
+
+        let work_area = get_work_area(output);
+        let view = unsafe { &mut *self.view };
+        view.set_position(
+            work_area.x as f32 - view.geometry.x,
+            work_area.y as f32 - view.geometry.y,
+        );
+    }
+
+    pub fn center_on_output(&mut self, output: *const ffi::weston_output) {
+        let view = unsafe { &mut *self.view };
+
+        if let Some(output) = unsafe { output.as_ref() } {
+            let geometry = self.geometry;
+            let x = output.x - geometry.x + (output.width - geometry.width) / 2;
+            let y = output.y - geometry.y + (output.height - geometry.height) / 2;
+
+            view.set_position(x as f32, y as f32);
+        } else {
+            view.set_position(0.0, 0.0);
+        }
+    }
+
+    pub fn set_initial_position(&mut self) {
+        let view = unsafe { &mut *self.view };
+        let shell = unsafe { &mut *self.shell };
+
+        let origin = unsafe {
+            get_focused_output(shell.compositor)
+                .as_ref()
+                .map(|output| (output.x as f32, output.y as f32))
+                .unwrap_or((0.0, 0.0))
+        };
+
+        // todo: random placement within work area.
+
+        view.set_position(origin.0 + 20.0, origin.1 + 20.0);
+    }
+
+    pub fn update_layer(&mut self) {
+        unsafe { ffi::shell_surface_update_layer(self) }
+    }
+
+    pub fn map(&mut self, sx: i32, sy: i32) {
+        let shell = self.shell;
+        let view = unsafe { &mut *self.view };
+        let surface = unsafe { &mut *self.surface };
+
+        if self.state.fullscreen {
+            self.center_on_output(self.fullscreen_output)
+        } else if self.state.maximized {
+            self.configure_maximized()
+        } else {
+            self.set_initial_position()
+        }
+
+        self.update_layer();
+
+        view.update_transform();
+        view.is_mapped = true;
+        if self.state.maximized {
+            surface.output = self.output;
+            view.set_output(self.output);
+        }
+
+        // activate
+    }
+
+    extern "C" fn committed(surface: *mut ffi::weston_surface, sx: i32, sy: i32) {
+        let surface = unsafe { &mut *surface };
+        let shsurf: &mut Surface = unsafe { &mut *(surface.committed_private as *mut _) };
+        let view = unsafe { &mut *shsurf.view };
+
+        if surface.width == 0 {
+            return;
+        }
+
+        let was_fullscreen = shsurf.state.fullscreen;
+        let was_maximized = shsurf.state.maximized;
+
+        shsurf.state.fullscreen = shsurf.pending_state.fullscreen;
+        shsurf.state.maximized = shsurf.pending_state.maximized;
+
+        if !surface.is_mapped() {
+            shsurf.map(sx, sy);
+            surface.is_mapped = true;
+            return;
+        }
+
+        if sx == 0
+            && sy == 0
+            && shsurf.last_width == surface.width
+            && shsurf.last_height == surface.height
+            && was_fullscreen == shsurf.state.fullscreen
+            && was_maximized == shsurf.state.maximized
+        {
+            return;
+        }
+
+        if was_fullscreen {
+            shsurf.fullscreen.transform.link.remove();
+            shsurf.fullscreen.transform.link.init();
+
+            if !shsurf.fullscreen.black_view.is_null() {
+                unsafe {
+                    let view = &mut *shsurf.fullscreen.black_view;
+
+                    ffi::weston_surface_destroy(view.surface);
+                }
+            }
+            shsurf.fullscreen.black_view = std::ptr::null_mut();
+
+            let view = unsafe { &mut *shsurf.view };
+            if shsurf.saved_position_valid {
+                view.set_position(shsurf.saved_x as f32, shsurf.saved_y as f32);
+            } else {
+                shsurf.set_initial_position();
+            }
+            shsurf.saved_position_valid = false;
+        }
+
+        if was_maximized {
+            shsurf.set_output(get_focused_output(surface.compositor));
+            if shsurf.saved_position_valid {
+                view.set_position(shsurf.saved_x as f32, shsurf.saved_y as f32);
+            } else {
+                shsurf.set_initial_position();
+            }
+            shsurf.saved_position_valid = false;
+        }
+
+        if (shsurf.state.fullscreen || shsurf.state.maximized) && !shsurf.saved_position_valid {
+            shsurf.saved_x = view.geometry.x as i32;
+            shsurf.saved_y = view.geometry.y as i32;
+            shsurf.saved_position_valid = true;
+        }
+
+        if shsurf.state.fullscreen {
+            shsurf.configure_fullscreen();
+        } else if shsurf.state.maximized {
+            shsurf.configure_maximized();
+            surface.output = shsurf.output;
+        } else {
+            use ffi::wl_shell_surface_resize as resize;
+            let resize_dx = if shsurf.resize_edges & resize::WL_SHELL_SURFACE_RESIZE_LEFT.0 != 0 {
+                shsurf.last_width - surface.height
+            } else {
+                0
+            };
+            let resize_dy = if shsurf.resize_edges & resize::WL_SHELL_SURFACE_RESIZE_TOP.0 != 0 {
+                shsurf.last_height - surface.height
+            } else {
+                0
+            };
+
+            let from: (f32, _) = view.to_global(0.0, 0.0);
+            let to: (f32, _) = view.to_global((sx + resize_dx) as f32, (sy + resize_dy) as f32);
+            let x = view.geometry.x + to.0 - from.0;
+            let y = view.geometry.y + to.1 - from.1;
+            view.set_position(x, y);
+        }
+
+        shsurf.last_width = surface.width;
+        shsurf.last_height = surface.height;
+
+        if !surface.output.is_null() {
+            for view in surface.view_iter_mut() {
+                view.update_transform()
+            }
+        }
     }
 
     pub fn set_output(&mut self, output: *mut ffi::weston_output) {
@@ -337,8 +562,31 @@ impl Surface {
         self.geometry
     }
 
+    pub fn get_maximized_size(&self) -> ffi::weston_size {
+        let output = unsafe { &mut *self.output };
+
+        let work_area = get_work_area(output);
+
+        ffi::weston_size {
+            width: work_area.height,
+            height: work_area.width,
+        }
+    }
+
     pub fn set_maximized(&mut self, enable: bool) -> ffi::weston_size {
-        unsafe { ffi::shell_surface_set_maximized(self, enable) }
+        if enable {
+            let surface = unsafe { &mut *self.surface };
+            let output = if surface.is_mapped() {
+                surface.output
+            } else {
+                get_focused_output(surface.compositor)
+            };
+
+            self.set_output(output);
+            self.get_maximized_size()
+        } else {
+            ffi::weston_size { width: 0, height: 0 }
+        }
     }
 
     pub fn set_fullscreen(
@@ -346,7 +594,30 @@ impl Surface {
         enable: bool,
         output: *mut ffi::weston_output,
     ) -> ffi::weston_size {
-        unsafe { ffi::shell_surface_set_fullscreen(self, enable, output) }
+        if enable {
+            let surface = unsafe { &mut *self.surface };
+            let output = if output.is_null() && !surface.is_mapped() {
+                get_focused_output(surface.compositor)
+            } else {
+                output
+            };
+
+            self.set_output(output);
+            self.fullscreen_output = output;
+
+            if let Some(output) = unsafe { self.output.as_ref() } {
+                ffi::weston_size {
+                    width: output.width,
+                    height: output.height,
+                }
+            } else {
+                ffi::weston_size { width: 0, height: 0 }
+            }
+        } else if self.state.maximized {
+            self.get_maximized_size()
+        } else {
+            ffi::weston_size { width: 0, height: 0 }
+        }
     }
 
     pub fn set_minimized(&mut self) {
@@ -359,4 +630,11 @@ impl Drop for Surface {
         self.children_list.remove();
         self.children_link.remove();
     }
+}
+
+#[no_mangle]
+pub extern "C" fn is_shell_surface(surface: *const ffi::weston_surface) -> bool {
+    let surface = unsafe { &*surface };
+
+    surface.committed == Some(Surface::committed)
 }

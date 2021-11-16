@@ -242,11 +242,10 @@ shell_surface_resize(struct shell_surface *shsurf,
 		     struct weston_pointer *pointer, uint32_t edges);
 
 void
-shell_surface_committed(struct weston_surface *surface,
-			int32_t sx, int32_t sy);
+shell_configure_fullscreen(struct shell_surface *shsurf);
 
-struct weston_geometry
-shell_surface_get_geometry(struct shell_surface *shsurf);
+void
+shell_surface_update_layer(struct shell_surface *shsurf);
 
 void
 shell_surface_update_child_surface_layers (struct shell_surface *shsurf);

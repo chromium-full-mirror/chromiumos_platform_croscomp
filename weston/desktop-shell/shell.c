@@ -165,18 +165,6 @@ shell_fade(struct desktop_shell *shell, enum fade_type type);
 static struct shell_seat *
 get_shell_seat(struct weston_seat *seat);
 
-static int
-shell_surface_get_label(struct weston_surface *surface, char *buf, size_t len)
-{
-	const char *t = "surface title";
-	const char *c = "app id";
-
-	return snprintf(buf, len, "%s window%s%s%s%s%s",
-		"top-level",
-		t ? " '" : "", t ?: "", t ? "'" : "",
-		c ? " of " : "", c ?: "");
-}
-
 static void
 destroy_shell_grab_shsurf(struct wl_listener *listener, void *data)
 {
@@ -656,7 +644,7 @@ shell_surface_update_child_surface_layers (struct shell_surface *shsurf)
  *
  * If any child surfaces exist and are mapped, ensure they’re in the same layer
  * as this surface. */
-static void
+void
 shell_surface_update_layer(struct shell_surface *shsurf)
 {
 	struct weston_surface *surface = shsurf->surface;
@@ -721,52 +709,6 @@ static void
 weston_view_set_initial_position(struct weston_view *view,
 				 struct desktop_shell *shell);
 
-static void
-unset_fullscreen(struct shell_surface *shsurf)
-{
-	/* Unset the fullscreen output, driver configuration and transforms. */
-	wl_list_remove(&shsurf->fullscreen.transform.link);
-	wl_list_init(&shsurf->fullscreen.transform.link);
-
-	if (shsurf->fullscreen.black_view)
-		weston_surface_destroy(shsurf->fullscreen.black_view->surface);
-	shsurf->fullscreen.black_view = NULL;
-
-	if (shsurf->saved_position_valid)
-		weston_view_set_position(shsurf->view,
-					 shsurf->saved_x, shsurf->saved_y);
-	else
-		weston_view_set_initial_position(shsurf->view, shsurf->shell);
-	shsurf->saved_position_valid = false;
-
-	if (shsurf->saved_rotation_valid) {
-		wl_list_insert(&shsurf->view->geometry.transformation_list,
-		               &shsurf->rotation.transform.link);
-		shsurf->saved_rotation_valid = false;
-	}
-}
-
-static void
-unset_maximized(struct shell_surface *shsurf)
-{
-	struct weston_surface *surface = shsurf->surface;
-
-	/* undo all maximized things here */
-	shell_surface_set_output(shsurf, get_default_output(surface->compositor));
-
-	if (shsurf->saved_position_valid)
-		weston_view_set_position(shsurf->view,
-					 shsurf->saved_x, shsurf->saved_y);
-	else
-		weston_view_set_initial_position(shsurf->view, shsurf->shell);
-	shsurf->saved_position_valid = false;
-
-	if (shsurf->saved_rotation_valid) {
-		wl_list_insert(&shsurf->view->geometry.transformation_list,
-			       &shsurf->rotation.transform.link);
-		shsurf->saved_rotation_valid = false;
-	}
-}
 
 static void
 surface_keyboard_focus_lost(struct weston_surface *surface)
@@ -916,7 +858,7 @@ shell_ensure_fullscreen_black_view(struct shell_surface *shsurf)
 
 /* Create black surface and append it to the associated fullscreen surface.
  * Handle size dismatch and positioning according to the method. */
-static void
+void
 shell_configure_fullscreen(struct shell_surface *shsurf)
 {
 	struct weston_surface *surface = shsurf->surface;
@@ -1093,12 +1035,6 @@ fade_out_done(struct weston_view_animation *animation, void *data)
 	}
 }
 
-bool
-is_shell_surface(struct weston_surface *surface)
-{
-	return surface->committed == shell_surface_committed;
-}
-
 struct shell_surface *
 get_shell_surface(struct weston_surface *surface)
 {
@@ -1106,70 +1042,6 @@ get_shell_surface(struct weston_surface *surface)
 		return surface->committed_private;
 
 	return NULL;
-}
-
-static void
-set_maximized_position(struct desktop_shell *shell,
-		       struct shell_surface *shsurf)
-{
-	pixman_rectangle32_t area;
-	struct weston_geometry geometry;
-
-	get_output_work_area(shell, shsurf->output, &area);
-	geometry = shell_surface_get_geometry(shsurf);
-
-	weston_view_set_position(shsurf->view,
-				 area.x - geometry.x,
-				 area.y - geometry.y);
-}
-
-static void
-map(struct desktop_shell *shell, struct shell_surface *shsurf,
-    int32_t sx, int32_t sy)
-{
-	struct weston_surface *surface = shsurf->surface;
-	struct weston_compositor *compositor = shell->compositor;
-	struct weston_seat *seat;
-
-	/* initial positioning, see also configure() */
-	if (shsurf->state.fullscreen) {
-		center_on_output(shsurf->view, shsurf->fullscreen_output);
-		shell_map_fullscreen(shsurf);
-	} else if (shsurf->state.maximized) {
-		set_maximized_position(shell, shsurf);
-	} else {
-		weston_view_set_initial_position(shsurf->view, shell);
-	}
-
-	/* Surface stacking order, see also activate(). */
-	shell_surface_update_layer(shsurf);
-
-	weston_view_update_transform(shsurf->view);
-	shsurf->view->is_mapped = true;
-	if (shsurf->state.maximized) {
-		surface->output = shsurf->output;
-		weston_view_set_output(shsurf->view, shsurf->output);
-	}
-
-	if (!shell->locked) {
-		wl_list_for_each(seat, &compositor->seat_list, link)
-			activate(shell, shsurf->view, seat,
-				 WESTON_ACTIVATE_FLAG_CONFIGURE);
-	}
-
-	if (!shsurf->state.fullscreen && !shsurf->state.maximized) {
-		switch (shell->win_animation_type) {
-		case ANIMATION_FADE:
-			weston_fade_run(shsurf->view, 0.0, 1.0, 300.0, NULL, NULL);
-			break;
-		case ANIMATION_ZOOM:
-			weston_zoom_run(shsurf->view, 0.5, 1.0, NULL, NULL);
-			break;
-		case ANIMATION_NONE:
-		default:
-			break;
-		}
-	}
 }
 
 static void
@@ -1324,139 +1196,6 @@ shell_api_pong(struct desktop_shell *shell,
 	//  desktop_surface_set_unresponsive,
 	//  &unresponsive);
 	end_busy_cursor(shell->compositor, client);
-}
-
-struct shell_surface *
-shell_surface_create(struct desktop_shell *shell,
-		     struct weston_surface *surface,
-		     struct weston_view *view)
-{
-	struct wl_client *client =
-		wl_resource_get_client(surface->resource);
-	struct shell_surface *shsurf;
-
-	shsurf = calloc(1, sizeof *shsurf);
-	if (!shsurf) {
-		if (client)
-			wl_client_post_no_memory(client);
-		else
-			weston_log("no memory to allocate shell surface\n");
-		return NULL;
-	}
-
-	surface->committed = shell_surface_committed;
-	surface->committed_private = shsurf;
-	weston_surface_set_label_func(surface, shell_surface_get_label);
-
-
-	shell_surface_set_output(
-		shsurf, get_default_output(shsurf->shell->compositor));
-
-	return shsurf;
-}
-
-struct weston_geometry
-shell_surface_get_geometry(struct shell_surface *shsurf)
-{
-	struct weston_geometry geometry =
-		{ 0, 0, shsurf->surface->width, shsurf->surface->height };
-
-	/* XXX: xdg-shell should set geometry */
-
-	return geometry;
-}
-
-void
-shell_surface_committed(struct weston_surface *surface,
-			int32_t sx, int32_t sy)
-
-{
-	struct shell_surface *shsurf =
-		surface->committed_private;
-	struct desktop_shell *shell = shsurf->shell;
-	struct weston_view *view = shsurf->view;
-	bool was_fullscreen;
-	bool was_maximized;
-
-	if (surface->width == 0)
-		return;
-
-	was_fullscreen = shsurf->state.fullscreen;
-	was_maximized = shsurf->state.maximized;
-
-	shsurf->state.fullscreen = shsurf->pending_state.fullscreen;
-	shsurf->state.maximized = shsurf->pending_state.maximized;
-
-	if (!weston_surface_is_mapped(surface)) {
-		map(shell, shsurf, sx, sy);
-		surface->is_mapped = true;
-		if (shsurf->shell->win_close_animation_type == ANIMATION_FADE)
-			++surface->ref_count;
-		return;
-	}
-
-	if (sx == 0 && sy == 0 &&
-	    shsurf->last_width == surface->width &&
-	    shsurf->last_height == surface->height &&
-	    was_fullscreen == shsurf->state.fullscreen &&
-	    was_maximized == shsurf->state.maximized)
-	    return;
-
-	if (was_fullscreen)
-		unset_fullscreen(shsurf);
-	if (was_maximized)
-		unset_maximized(shsurf);
-
-	if ((shsurf->state.fullscreen || shsurf->state.maximized) &&
-	    !shsurf->saved_position_valid) {
-		shsurf->saved_x = shsurf->view->geometry.x;
-		shsurf->saved_y = shsurf->view->geometry.y;
-		shsurf->saved_position_valid = true;
-
-		if (!wl_list_empty(&shsurf->rotation.transform.link)) {
-			wl_list_remove(&shsurf->rotation.transform.link);
-			wl_list_init(&shsurf->rotation.transform.link);
-			weston_view_geometry_dirty(shsurf->view);
-			shsurf->saved_rotation_valid = true;
-		}
-	}
-
-	if (shsurf->state.fullscreen) {
-		shell_configure_fullscreen(shsurf);
-	} else if (shsurf->state.maximized) {
-		set_maximized_position(shell, shsurf);
-		surface->output = shsurf->output;
-	} else {
-		float from_x, from_y;
-		float to_x, to_y;
-		float x, y;
-
-		if (shsurf->resize_edges) {
-			sx = 0;
-			sy = 0;
-		}
-
-		if (shsurf->resize_edges & RESIZE_EDGE_LEFT)
-			sx = shsurf->last_width - surface->width;
-		if (shsurf->resize_edges & RESIZE_EDGE_TOP)
-			sy = shsurf->last_height - surface->height;
-
-		weston_view_to_global_float(shsurf->view, 0, 0, &from_x, &from_y);
-		weston_view_to_global_float(shsurf->view, sx, sy, &to_x, &to_y);
-		x = shsurf->view->geometry.x + to_x - from_x;
-		y = shsurf->view->geometry.y + to_y - from_y;
-
-		weston_view_set_position(shsurf->view, x, y);
-	}
-
-	shsurf->last_width = surface->width;
-	shsurf->last_height = surface->height;
-
-	/* XXX: would a fullscreen surface need the same handling? */
-	if (surface->output) {
-		wl_list_for_each(view, &surface->views, surface_link)
-			weston_view_update_transform(view);
-	}
 }
 
 static void

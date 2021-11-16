@@ -449,6 +449,10 @@ impl weston_compositor {
     pub fn create_output_with_head(&mut self, head: *mut weston_head) -> &mut weston_output {
         unsafe { &mut *weston_compositor_create_output_with_head(self, head) }
     }
+
+    pub fn seat_iter_mut<'a>(&'a mut self) -> WlListIterMut<'a, weston_seat> {
+        wl_list_iter_mut!(&mut self.seat_list, weston_seat, link)
+    }
 }
 
 impl weston_surface {
@@ -466,6 +470,14 @@ impl weston_surface {
 
     pub fn damage(&mut self) {
         unsafe { weston_surface_damage(self) }
+    }
+
+    pub fn is_mapped(&mut self) -> bool {
+	unsafe { weston_surface_is_mapped(self) }
+    }
+
+    pub fn view_iter_mut<'a>(&'a mut self) -> WlListIterMut<'a, weston_view> {
+        wl_list_iter_mut!(&mut self.views, weston_view, surface_link)
     }
 }
 
@@ -498,6 +510,10 @@ impl weston_view {
 
     pub fn geometry_dirty(&mut self) {
         unsafe { weston_view_geometry_dirty(self) }
+    }
+
+    pub fn update_transform(&mut self) {
+        unsafe { weston_view_update_transform(self) }
     }
 
     pub fn from_global<T: Into<f32>, U: From<f32>>(&mut self, x: T, y: T) -> (U, U) {
@@ -533,6 +549,14 @@ impl wl_shell_surface_resize {
 }
 
 impl weston_seat {
+    pub fn get_keyboard(&mut self) -> Option<&mut weston_keyboard> {
+        if self.keyboard_device_count > 0 {
+            unsafe { Some(&mut *(self.keyboard_state)) }
+        } else {
+            None
+        }
+    }
+
     pub fn get_pointer(&mut self) -> Option<&mut weston_pointer> {
         if self.pointer_device_count > 0 {
             unsafe { Some(&mut *(self.pointer_state)) }
@@ -628,7 +652,7 @@ impl weston_matrix {
         self
     }
 
-    pub fn transform(&mut self, v: &weston_vector) -> weston_vector {
+    pub fn transform(&self, v: &weston_vector) -> weston_vector {
         let mut r = weston_vector { f: [0.0; 4] };
         for i in 0..4_usize {
             r.f[i] = (0..4_usize).map(|j| v.f[j] * self.d[i + j * 4]).sum()
