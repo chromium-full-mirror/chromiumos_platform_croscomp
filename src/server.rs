@@ -412,7 +412,7 @@ impl Server {
                 );
                 (*handle_bind)(&mut resource)
             } else {
-                false
+                true
             };
 
             if !success {
