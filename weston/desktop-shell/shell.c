@@ -1138,47 +1138,6 @@ shell_api_pong(struct desktop_shell *shell,
 }
 
 static void
-maximize_binding(struct weston_keyboard *keyboard, const struct timespec *time,
-		 uint32_t button, void *data)
-{
-	struct weston_surface *focus = keyboard->focus;
-	struct weston_surface *surface;
-	struct shell_surface *shsurf;
-
-	surface = weston_surface_get_main_surface(focus);
-	if (surface == NULL)
-		return;
-
-	shsurf = get_shell_surface(surface);
-	if (shsurf == NULL)
-		return;
-
-	shell_surface_set_maximized(shsurf, !shsurf->state.maximized);
-}
-
-static void
-fullscreen_binding(struct weston_keyboard *keyboard,
-		   const struct timespec *time, uint32_t button, void *data)
-{
-	struct weston_surface *focus = keyboard->focus;
-	struct weston_surface *surface;
-	struct shell_surface *shsurf;
-	bool fullscreen;
-
-	surface = weston_surface_get_main_surface(focus);
-	if (surface == NULL)
-		return;
-
-	shsurf = get_shell_surface(surface);
-	if (shsurf == NULL)
-		return;
-
-	fullscreen = shsurf->state.fullscreen;
-
-	shell_surface_set_fullscreen(shsurf, !fullscreen, NULL);
-}
-
-static void
 touch_move_binding(struct weston_touch *touch, const struct timespec *time, void *data)
 {
 	struct weston_surface *focus;
@@ -1819,10 +1778,6 @@ shell_add_bindings(struct weston_compositor *ec, struct desktop_shell *shell)
 	if (!mod)
 		return;
 
-	weston_compositor_add_key_binding(ec, KEY_M, mod | MODIFIER_SHIFT,
-					  maximize_binding, NULL);
-	weston_compositor_add_key_binding(ec, KEY_F, mod | MODIFIER_SHIFT,
-					  fullscreen_binding, NULL);
 	weston_compositor_add_touch_binding(ec, mod, touch_move_binding, shell);
 
 	weston_install_debug_key_binding(ec, mod);
