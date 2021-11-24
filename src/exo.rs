@@ -50,6 +50,17 @@ pub fn init(rc: &Rc<RefCell<crate::Shell>>) {
         .create_global::<ZcrKeyboardExtensionV1>(1)
         .on_request(|_resource, request| {
             // xxx: handle: get_extended_keyboard request
+            use super::protocol::zcr_keyboard_extension_v1::Request;
+            match request {
+                Request::GetExtendedKeyboard { id, keyboard: _ } => {
+                    debug!(target: "zcr_keyboard_extension_v1", 
+                           "get_extended_keyboard aura surface");
+                    id.on_request(|_, request| {
+                        debug!(target: "aura_shell", 
+                               "request for extended keyboard: {:?}", request)
+                    });
+                }
+            }
             debug!("{:?}", request)
         });
     Box::into_raw(Box::new(global));
