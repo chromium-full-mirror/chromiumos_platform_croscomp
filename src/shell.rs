@@ -144,24 +144,22 @@ impl Shell {
         let no_mods = ffi::weston_keyboard_modifier(0);
         let mods = ffi::weston_keyboard_modifier(self.native.binding_modifier);
         let mods_with_shift = ffi::weston_keyboard_modifier(self.native.binding_modifier)
-	    | ffi::weston_keyboard_modifier::MODIFIER_SHIFT;
-
-        let mods_with_shift = ffi::weston_keyboard_modifier::MODIFIER_SHIFT;
+            | ffi::weston_keyboard_modifier::MODIFIER_SHIFT;
 
         compositor.bind_key(KEY_M, mods_with_shift, move |keyboard, _, _| {
             if let Some(surface) = unsafe { keyboard.focus.as_mut() } {
-		if let Some(shsurf) = Surface::get(surface) {
-		    shsurf.set_maximized(!shsurf.state.maximized);
-		}
-	    }
-	});
+                if let Some(shsurf) = Surface::get(surface) {
+                    shsurf.set_maximized(!shsurf.state.maximized);
+                }
+            }
+        });
         compositor.bind_key(KEY_F, mods_with_shift, move |keyboard, _, _| {
-            if let Some(mut surface) = unsafe { keyboard.focus.as_mut() } {
-		if let Some(shsurf) = Surface::get(surface) {
-		    shsurf.set_fullscreen(!shsurf.state.fullscreen, std::ptr::null_mut());
-		}
-	    }
-	});
+            if let Some(surface) = unsafe { keyboard.focus.as_mut() } {
+                if let Some(shsurf) = Surface::get(surface) {
+                    shsurf.set_fullscreen(!shsurf.state.fullscreen, std::ptr::null_mut());
+                }
+            }
+        });
 
         compositor.bind_key(KEY_K, mods_with_shift, move |keyboard, _, _| {
             if let Some(surface) = unsafe { keyboard.focus.as_ref() } {

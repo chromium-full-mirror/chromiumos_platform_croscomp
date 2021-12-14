@@ -473,7 +473,7 @@ impl weston_surface {
     }
 
     pub fn is_mapped(&mut self) -> bool {
-	unsafe { weston_surface_is_mapped(self) }
+        unsafe { weston_surface_is_mapped(self) }
     }
 
     pub fn view_iter_mut<'a>(&'a mut self) -> WlListIterMut<'a, weston_view> {
@@ -529,16 +529,16 @@ impl weston_view {
     }
 
     pub fn to_global<T: Into<f32>, U: From<f32>>(&self, x: T, y: T) -> (U, U) {
-	let global = if self.transform.enabled {
-	    let local = weston_vector { f: [ x.into(), y.into(), 0.0, 1.0 ] };
-	    let global = self.transform.matrix.transform(&local);
+        let global = if self.transform.enabled {
+            let local = weston_vector { f: [x.into(), y.into(), 0.0, 1.0] };
+            let global = self.transform.matrix.transform(&local);
 
-	    (global.f[0] / global.f[3], global.f[1] / global.f[3])
-	} else {
-	    (x.into() + self.geometry.x, y.into() + self.geometry.y)
-	};
+            (global.f[0] / global.f[3], global.f[1] / global.f[3])
+        } else {
+            (x.into() + self.geometry.x, y.into() + self.geometry.y)
+        };
 
-	(global.0.into(), global.1.into())
+        (global.0.into(), global.1.into())
     }
 }
 
