@@ -308,6 +308,9 @@ impl Surface {
     ) -> Box<Self> {
         let mut shsurf = Box::new(Self {
             destroy_signal: ffi::wl_signal::zeroed(),
+
+            state_change_signal: ffi::wl_signal::zeroed(),
+
             view,
             surface,
             last_width: 0,
@@ -347,6 +350,7 @@ impl Surface {
 
         shsurf.fullscreen.transform.link.init();
         shsurf.destroy_signal.init();
+        shsurf.state_change_signal.init();
         shsurf.workspace_transform.link.init();
         shsurf.children_list.init();
         shsurf.children_link.init();
@@ -411,6 +415,10 @@ impl Surface {
 
     pub fn map(&mut self, sx: i32, sy: i32) {
         let shell = self.shell;
+    pub fn emit_state_changed(&mut self) {
+	self.state_change_signal.emit(&mut ())
+    }
+
         let view = unsafe { &mut *self.view };
         let surface = unsafe { &mut *self.surface };
 
@@ -560,14 +568,14 @@ impl Surface {
 
     pub fn set_size(&mut self, width: i32, height: i32) {
         self.pending_size = ffi::weston_size { width, height };
-        // emit state change signal
+	self.emit_state_changed()
     }
 
     pub fn set_resizing(&mut self, edges: ffi::wl_shell_surface_resize) {
         self.resize_edges = edges.0;
         //self.pending_state.resizing =
         //	    edges != ffi::wl_shell_surface_resize::WL_SHELL_SURFACE_RESIZE_NONE;
-        // emit state change signal
+	self.emit_state_changed()
     }
 
     pub fn get_geometry(&mut self) -> ffi::weston_geometry {

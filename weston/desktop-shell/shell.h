@@ -89,6 +89,8 @@ enum shell_resize_edge {
 struct shell_surface {
 	struct wl_signal destroy_signal;
 
+	struct wl_signal state_change_signal;
+
 	struct weston_view *view;
 	struct weston_surface *surface;
 	int32_t last_width, last_height;
