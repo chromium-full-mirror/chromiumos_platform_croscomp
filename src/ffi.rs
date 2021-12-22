@@ -479,6 +479,10 @@ impl weston_surface {
     pub fn view_iter_mut<'a>(&'a mut self) -> WlListIterMut<'a, weston_view> {
         wl_list_iter_mut!(&mut self.views, weston_view, surface_link)
     }
+
+    pub fn get_main_surface(&mut self) -> *mut weston_surface {
+        unsafe { weston_surface_get_main_surface(self) }
+    }
 }
 
 impl weston_output {
@@ -514,6 +518,14 @@ impl weston_view {
 
     pub fn update_transform(&mut self) {
         unsafe { weston_view_update_transform(self) }
+    }
+
+    pub fn is_mapped(&self) -> bool {
+        self.is_mapped
+    }
+
+    pub fn activate(&mut self, seat: *mut weston_seat, flags: u32) {
+        unsafe { weston_view_activate(self, seat, flags) }
     }
 
     pub fn from_global<T: Into<f32>, U: From<f32>>(&mut self, x: T, y: T) -> (U, U) {
