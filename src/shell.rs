@@ -640,7 +640,7 @@ impl Surface {
         unsafe { ffi::shell_surface_set_output(self, output) }
     }
 
-    pub fn get<'a>(surface: &mut ffi::weston_surface) -> Option<&'a mut Surface> {
+    pub fn get(surface: &mut ffi::weston_surface) -> Option<&mut Surface> {
         unsafe { ffi::get_shell_surface(surface).as_mut() }
     }
 
