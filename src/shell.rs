@@ -332,6 +332,19 @@ fn get_focused_output(compositor: *mut ffi::weston_compositor) -> *mut ffi::west
 
 pub type Surface = ffi::shell_surface;
 
+pub type SurfaceState = ffi::shell_surface_surface_state;
+
+impl SurfaceState {
+    pub fn new() -> SurfaceState {
+	SurfaceState {
+            fullscreen: false,
+            maximized: false,
+            lowered: false,
+            activated: false,
+        }
+    }
+}
+
 pub fn lower_fullscreen_layer(
     _shell: *mut ffi::desktop_shell,
     _lowering_output: *mut ffi::weston_output,
@@ -370,18 +383,8 @@ impl Surface {
             fullscreen_output: 0 as *mut _,
             output: 0 as *mut _,
             output_destroy_listener: ffi::wl_listener::zeroed(),
-            pending_state: ffi::shell_surface_surface_state {
-                fullscreen: false,
-                maximized: false,
-                lowered: false,
-                activated: false,
-            },
-            state: ffi::shell_surface_surface_state {
-                fullscreen: false,
-                maximized: false,
-                lowered: false,
-                activated: false,
-            },
+            pending_state: SurfaceState::new(),
+            state: SurfaceState::new(),
             pending_size: ffi::weston_size { width: 0, height: 0 },
             geometry: ffi::weston_geometry { x: 0, y: 0, width: 0, height: 0 },
             focus_count: 0,
@@ -544,8 +547,7 @@ impl Surface {
         let was_fullscreen = shsurf.state.fullscreen;
         let was_maximized = shsurf.state.maximized;
 
-        shsurf.state.fullscreen = shsurf.pending_state.fullscreen;
-        shsurf.state.maximized = shsurf.pending_state.maximized;
+        shsurf.state = shsurf.pending_state;
 
         if !surface.is_mapped() {
             shsurf.map(sx, sy);
@@ -683,8 +685,9 @@ impl Surface {
         }
     }
 
-    pub fn set_maximized(&mut self, enable: bool) -> ffi::weston_size {
-        if enable {
+    pub fn set_maximized(&mut self, enable: bool) {
+	self.pending_state.maximized = enable;
+	self.pending_size = if enable {
             let surface = unsafe { &mut *self.surface };
             let output = if surface.is_mapped() {
                 surface.output
@@ -696,15 +699,18 @@ impl Surface {
             self.get_maximized_size()
         } else {
             ffi::weston_size { width: 0, height: 0 }
-        }
+        };
+
+	self.emit_state_changed();
     }
 
     pub fn set_fullscreen(
         &mut self,
         enable: bool,
         output: *mut ffi::weston_output,
-    ) -> ffi::weston_size {
-        if enable {
+    ) {
+	self.pending_state.fullscreen = enable;
+	self.pending_size = if enable {
             let surface = unsafe { &mut *self.surface };
             let output = if output.is_null() && !surface.is_mapped() {
                 get_focused_output(surface.compositor)
@@ -727,7 +733,9 @@ impl Surface {
             self.get_maximized_size()
         } else {
             ffi::weston_size { width: 0, height: 0 }
-        }
+        };
+
+	self.emit_state_changed();
     }
 
     pub fn set_minimized(&mut self) {

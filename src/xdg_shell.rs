@@ -129,19 +129,10 @@ fn handle_positioner_request(
     }
 }
 
-#[derive(Default)]
-struct State {
-    maximized: bool,
-    fullscreen: bool,
-    resizing: bool,
-    activated: bool,
-}
-
-fn state_to_xdg_vec(state: &State) -> Vec<u8> {
+fn state_to_xdg_vec(state: &shell::SurfaceState) -> Vec<u8> {
     IntoIterator::into_iter([
         (state.maximized, xdg_toplevel::State::Maximized),
         (state.fullscreen, xdg_toplevel::State::Fullscreen),
-        (state.resizing, xdg_toplevel::State::Resizing),
         (state.activated, xdg_toplevel::State::Activated),
     ])
     .filter_map(|(flag, token)| if flag { Some(token as u8) } else { None })
@@ -159,16 +150,12 @@ struct Toplevel {
 
     next_max_size: ffi::weston_size,
     next_min_size: ffi::weston_size,
-    current_state: State,
-    next_state: State,
-    next_size: ffi::weston_size,
-    pending_state: State,
-    pending_size: ffi::weston_size,
 
-    next_geometry: Option<ffi::weston_geometry>,
     configured: bool,
 
     commit_listener: Option<Box<dyn Any>>,
+
+    state_change_listener: Option<Box<dyn Any>>,
 }
 
 impl Toplevel {
@@ -193,16 +180,12 @@ impl Toplevel {
             app_id: String::new(),
             next_max_size: ffi::weston_size { width: 0, height: 0 },
             next_min_size: ffi::weston_size { width: 0, height: 0 },
-            current_state: State::default(),
-            next_state: State::default(),
-            next_size: ffi::weston_size { width: 0, height: 0 },
-            pending_state: State::default(),
-            pending_size: ffi::weston_size { width: 0, height: 0 },
 
-            next_geometry: None,
             configured: false,
 
             commit_listener: None,
+
+            state_change_listener: None,
         }));
 
         let mut toplevel = toplevel_rc.borrow_mut();
@@ -217,6 +200,18 @@ impl Toplevel {
             }
         }));
 
+        let weak = Rc::downgrade(&toplevel_rc);
+        toplevel.state_change_listener = Some(ffi::WlListener::new(
+            &mut toplevel.shsurf.state_change_signal,
+            move |_| {
+                debug!("state change signal fired");
+                if let Some(rc) = weak.upgrade() {
+                    let mut toplevel = rc.borrow_mut();
+                    toplevel.schedule_configure(Rc::clone(&rc))
+                }
+            },
+        ));
+
         drop(toplevel);
         toplevel_rc
     }
@@ -228,10 +223,15 @@ impl Toplevel {
         compositor.server.event_loop.when_idle(move || {
             let toplevel = rc.borrow_mut();
             let configure = protocol::xdg_toplevel::Event::Configure {
-                width: toplevel.pending_size.width,
-                height: toplevel.pending_size.height,
-                states: state_to_xdg_vec(&toplevel.pending_state),
+                width: toplevel.shsurf.pending_size.width,
+                height: toplevel.shsurf.pending_size.height,
+                states: state_to_xdg_vec(&toplevel.shsurf.pending_state),
             };
+
+            debug!(
+                "Sending configure, surface state: {:?}",
+                toplevel.shsurf.pending_state
+            );
 
             toplevel.resource.send(configure);
 
@@ -292,33 +292,16 @@ fn handle_xdg_toplevel_request(
         SetMinSize { width, height } => {
             toplevel.next_min_size = ffi::weston_size { width: *width, height: *height }
         }
-        SetMaximized => {
-            toplevel.pending_state.maximized = true;
-            toplevel.pending_size = toplevel.shsurf.set_maximized(true);
-            toplevel.schedule_configure(Rc::clone(&rc));
-        }
-        UnsetMaximized => {
-            toplevel.pending_state.maximized = false;
-            toplevel.pending_size = toplevel.shsurf.set_maximized(false);
-            toplevel.schedule_configure(Rc::clone(&rc));
-        }
-        SetFullscreen { output } => {
-            let output = match output {
-                Some(output) => output.as_ref().user_data::<ffi::weston_output>(),
-                None => 0 as *mut _,
-            };
-            toplevel.pending_size = toplevel.shsurf.set_fullscreen(true, output);
-            toplevel.pending_state.fullscreen = true;
-            toplevel.schedule_configure(Rc::clone(&rc));
-        }
-        UnsetFullscreen => {
-            toplevel.pending_size = toplevel.shsurf.set_fullscreen(false, 0 as *mut _);
-            toplevel.pending_state.fullscreen = true;
-            toplevel.schedule_configure(Rc::clone(&rc));
-        }
-        SetMinimized => {
-            toplevel.shsurf.set_minimized();
-        }
+        SetMaximized => toplevel.shsurf.set_maximized(true),
+        UnsetMaximized => toplevel.shsurf.set_maximized(false),
+        SetFullscreen { output } => toplevel.shsurf.set_fullscreen(
+            true,
+            output
+                .as_ref()
+                .map_or(0 as *mut _, |output| output.as_ref().user_data()),
+        ),
+        UnsetFullscreen => toplevel.shsurf.set_fullscreen(false, 0 as *mut _),
+        SetMinimized => toplevel.shsurf.set_minimized(),
     }
 }
 
