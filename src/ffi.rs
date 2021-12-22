@@ -406,18 +406,18 @@ impl<F> Drop for WlListener<F> {
 
 impl<F> WlListener<F>
 where
-    F: Fn(),
+    F: Fn(*mut std::os::raw::c_void),
 {
     pub fn new(signal: &wl_signal, f: F) -> Box<Self> {
         extern "C" fn call_closure<F>(
             listener: *mut wl_listener,
-            _data: *mut ::std::os::raw::c_void,
+            data: *mut ::std::os::raw::c_void,
         ) where
-            F: Fn(),
+            F: Fn(*mut std::os::raw::c_void),
         {
             let fbox = unsafe { &mut *container_of_mut!(listener, WlListener<F>, listener) };
 
-            (fbox.f)();
+            (fbox.f)(data);
         }
 
         let mut fbox = Box::new(Self { listener: wl_listener::zeroed(), f: f });

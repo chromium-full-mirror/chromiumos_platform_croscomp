@@ -90,10 +90,10 @@ impl Shell {
                 },
                 compositor: Rc::clone(rc),
 
-                idle_listener: ffi::WlListener::new(&mut compositor.native.idle_signal, || {
+                idle_listener: ffi::WlListener::new(&mut compositor.native.idle_signal, |_| {
                     debug!("-------------------- idle signal fired")
                 }),
-                wake_listener: ffi::WlListener::new(&mut compositor.native.wake_signal, || {
+                wake_listener: ffi::WlListener::new(&mut compositor.native.wake_signal, |_| {
                     debug!("-------------------- wake signal fired")
                 }),
             }))
