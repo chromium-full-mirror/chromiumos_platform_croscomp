@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use log::debug;
+use std::any::Any;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -20,6 +21,7 @@ pub struct Shell {
     pub compositor: Rc<RefCell<Compositor>>,
     idle_listener: Box<dyn Drop>,
     wake_listener: Box<dyn Drop>,
+    activate_listener: Box<dyn Any>,
 }
 
 impl Shell {
@@ -96,6 +98,16 @@ impl Shell {
                 wake_listener: ffi::WlListener::new(&mut compositor.native.wake_signal, |_| {
                     debug!("-------------------- wake signal fired")
                 }),
+                activate_listener: ffi::WlListener::new(
+                    &mut compositor.native.activate_signal,
+                    |data| unsafe {
+			let data = &*(data as *mut ffi::weston_surface_activation_data);
+
+			data.surface.as_mut()
+			    .and_then(|surface| Surface::get(surface))
+			    .map(|shsurf| shsurf.activate(data.seat));
+                    },
+                ),
             }))
         };
 
@@ -145,6 +157,26 @@ impl Shell {
         let mods = ffi::weston_keyboard_modifier(self.native.binding_modifier);
         let mods_with_shift = ffi::weston_keyboard_modifier(self.native.binding_modifier)
             | ffi::weston_keyboard_modifier::MODIFIER_SHIFT;
+
+        let pointer_activate_binding = move |pointer: &mut ffi::weston_pointer, _, _| {
+            if pointer.grab != &mut pointer.default_grab as *mut _ {
+                return;
+            }
+	    if let Some(view) = unsafe { pointer.focus.as_mut() } {
+		view.activate(pointer.seat, 0)
+	    }
+        };
+        let touch_activate_binding = move |touch: &mut ffi::weston_touch, _| {
+            if touch.grab != &mut touch.default_grab as *mut _ {
+                return;
+            }
+	    if let Some(view) = unsafe { touch.focus.as_mut() } {
+		view.activate(touch.seat, 0)
+	    }
+        };
+        compositor.bind_button(BTN_LEFT, no_mods, pointer_activate_binding);
+        compositor.bind_button(BTN_RIGHT, no_mods, pointer_activate_binding);
+        compositor.bind_touch(no_mods, touch_activate_binding);
 
         compositor.bind_key(KEY_M, mods_with_shift, move |keyboard, _, _| {
             if let Some(surface) = unsafe { keyboard.focus.as_mut() } {
@@ -300,6 +332,12 @@ fn get_focused_output(compositor: *mut ffi::weston_compositor) -> *mut ffi::west
 
 pub type Surface = ffi::shell_surface;
 
+pub fn lower_fullscreen_layer(
+    _shell: *mut ffi::desktop_shell,
+    _lowering_output: *mut ffi::weston_output,
+) {
+}
+
 impl Surface {
     pub fn new(
         shell: &mut Shell,
@@ -336,11 +374,13 @@ impl Surface {
                 fullscreen: false,
                 maximized: false,
                 lowered: false,
+                activated: false,
             },
             state: ffi::shell_surface_surface_state {
                 fullscreen: false,
                 maximized: false,
                 lowered: false,
+                activated: false,
             },
             pending_size: ffi::weston_size { width: 0, height: 0 },
             geometry: ffi::weston_geometry { x: 0, y: 0, width: 0, height: 0 },
@@ -413,12 +453,59 @@ impl Surface {
         unsafe { ffi::shell_surface_update_layer(self) }
     }
 
-    pub fn map(&mut self, sx: i32, sy: i32) {
-        let shell = self.shell;
+    pub fn child_iter_mut<'a>(&'a mut self) -> ffi::WlListIterMut<'a, Surface> {
+        wl_list_iter_mut!(&mut self.children_list, Surface, children_link)
+    }
+
+    pub fn get_last_child<'a>(&'a mut self) -> Option<&'a mut Surface> {
+        self.child_iter_mut()
+            .rev()
+            .find(|shsurf| unsafe { shsurf.view.as_ref().map_or(false, |view| view.is_mapped()) })
+    }
+
+    pub fn shsurf_from_view<'a>(view: *mut ffi::weston_view) -> &'a mut Surface {
+        let view = unsafe { &mut *view };
+        let surface = unsafe { &mut *view.surface };
+        let surface = unsafe { &mut *surface.get_main_surface() };
+
+        Surface::get(surface).unwrap()
+    }
+
     pub fn emit_state_changed(&mut self) {
 	self.state_change_signal.emit(&mut ())
     }
 
+    fn activate(&mut self, seat: *mut ffi::weston_seat) {
+        if !self.output.is_null() {
+            lower_fullscreen_layer(self.shell, self.output);
+        }
+
+        if let Some(state) = unsafe { ffi::ensure_focus_state(self.shell, seat).as_mut() } {
+            let old_focus = unsafe { ffi::focus_state_set_focus(state, self.surface).as_mut() };
+            if let Some(shsurf) = old_focus.and_then(|surface| Surface::get(surface)) {
+                shsurf.focus_count = shsurf.focus_count - 1;
+                if shsurf.focus_count == 0 {
+                    shsurf.pending_state.activated = false;
+		    shsurf.emit_state_changed();
+                }
+            }
+
+            self.focus_count = self.focus_count + 1;
+            if self.focus_count == 1 {
+                self.pending_state.activated = true;
+		self.emit_state_changed();
+            }
+        }
+
+        if self.state.fullscreen {
+            self.configure_fullscreen()
+        }
+
+        self.update_layer();
+    }
+
+    pub fn map(&mut self, _sx: i32, _sy: i32) {
+        let shell = unsafe { &mut *self.shell };
         let view = unsafe { &mut *self.view };
         let surface = unsafe { &mut *self.surface };
 
@@ -439,7 +526,10 @@ impl Surface {
             view.set_output(self.output);
         }
 
-        // activate
+        let compositor = unsafe { &mut *shell.compositor };
+        for seat in compositor.seat_iter_mut() {
+            view.activate(seat, 0)
+        }
     }
 
     extern "C" fn committed(surface: *mut ffi::weston_surface, sx: i32, sy: i32) {

@@ -42,15 +42,14 @@ impl Terminal {
     }
 
     fn show(&mut self, keyboard: &mut ffi::weston_keyboard) {
-        let mut shell = self.shell.borrow_mut();
+        let shell = self.shell.borrow_mut();
 
         match (self.client_surface, self.client) {
             (Some(surface), _) => unsafe {
                 let shsurf = ffi::get_shell_surface(surface);
-                let view = ffi::get_default_view(surface);
-                ffi::activate(
-                    &mut shell.native,
-                    view,
+                let view = &mut *ffi::get_default_view(surface);
+
+                view.activate(
                     keyboard.seat,
                     ffi::weston_activate_flag::WESTON_ACTIVATE_FLAG_CONFIGURE.0,
                 );

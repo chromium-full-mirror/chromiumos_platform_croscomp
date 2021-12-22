@@ -503,8 +503,7 @@ busy_cursor_grab_button(struct weston_pointer_grab *base,
 	struct weston_seat *seat = pointer->seat;
 
 	if (shsurf && button == BTN_LEFT && state) {
-		activate(shsurf->shell, shsurf->view, seat,
-			 WESTON_ACTIVATE_FLAG_CONFIGURE);
+		weston_view_activate(shsurf->view, seat, 0);
 		shell_surface_move(shsurf, pointer, false);
 	}
 }
@@ -554,42 +553,12 @@ handle_pointer_focus(struct wl_listener *listener, void *data)
 }
 
 static void
-shell_surface_lose_keyboard_focus(struct shell_surface *shsurf)
-{
-	if (--shsurf->focus_count == 0) {
-		//shsurf->state.activated = false;
-		// emit state change signal
-	}
-}
-
-static void
-shell_surface_gain_keyboard_focus(struct shell_surface *shsurf)
-{
-	if (shsurf->focus_count++ == 0) {
-		//shsurf->state.activated = false;
-		// emit state change signal
-	}
-}
-
-static void
 handle_keyboard_focus(struct wl_listener *listener, void *data)
 {
 	struct weston_keyboard *keyboard = data;
 	struct shell_seat *seat = get_shell_seat(keyboard->seat);
 
-	if (seat->focused_surface) {
-		struct shell_surface *shsurf = get_shell_surface(seat->focused_surface);
-		if (shsurf)
-			shell_surface_lose_keyboard_focus(shsurf);
-	}
-
 	seat->focused_surface = weston_surface_get_main_surface(keyboard->focus);
-
-	if (seat->focused_surface) {
-		struct shell_surface *shsurf = get_shell_surface(seat->focused_surface);
-		if (shsurf)
-			shell_surface_gain_keyboard_focus(shsurf);
-	}
 }
 
 /* The surface will be inserted into the list immediately after the link
@@ -1213,135 +1182,10 @@ lower_fullscreen_layer(struct desktop_shell *shell,
 	}
 }
 
-static struct shell_surface *get_last_child(struct shell_surface *shsurf)
-{
-	struct shell_surface *shsurf_child;
-
-	wl_list_for_each_reverse(shsurf_child, &shsurf->children_list, children_link) {
-		if (weston_view_is_mapped(shsurf_child->view))
-			return shsurf_child;
-	}
-
-	return NULL;
-}
-
-void
-activate(struct desktop_shell *shell, struct weston_view *view,
-	 struct weston_seat *seat, uint32_t flags)
-{
-	struct weston_surface *es = view->surface;
-	struct weston_surface *main_surface;
-	struct focus_state *state;
-	struct workspace *ws;
-	struct weston_surface *old_es;
-	struct shell_surface *shsurf, *shsurf_child;
-
-	main_surface = weston_surface_get_main_surface(es);
-	shsurf = get_shell_surface(main_surface);
-	assert(shsurf);
-
-	shsurf_child = get_last_child(shsurf);
-	if (shsurf_child) {
-		/* Activate last xdg child instead of parent. */
-		activate(shell, shsurf_child->view, seat, flags);
-		return;
-	}
-
-	/* Only demote fullscreen surfaces on the output of activated shsurf.
-	 * Leave fullscreen surfaces on unrelated outputs alone. */
-	if (shsurf->output)
-		lower_fullscreen_layer(shell, shsurf->output);
-
-	weston_view_activate(view, seat, flags);
-
-	state = ensure_focus_state(shell, seat);
-	if (state == NULL)
-		return;
-
-	old_es = focus_state_set_focus(state, es);
-
-	if (shsurf->state.fullscreen &&
-	    flags & WESTON_ACTIVATE_FLAG_CONFIGURE)
-		shell_configure_fullscreen(shsurf);
-
-	/* Update the surface’s layer. This brings it to the top of the stacking
-	 * order as appropriate. */
-	shell_surface_update_layer(shsurf);
-
-	if (shell->focus_animation_type != ANIMATION_NONE) {
-		ws = get_current_workspace(shell);
-		animate_focus_change(shell, ws, get_default_view(old_es), get_default_view(es));
-	}
-}
-
 /* no-op func for checking black surface */
 static void
 black_surface_committed(struct weston_surface *es, int32_t sx, int32_t sy)
 {
-}
-
-static bool
-is_black_surface_view(struct weston_view *view, struct weston_view **fs_view)
-{
-	struct weston_surface *surface = view->surface;
-
-	if (surface->committed == black_surface_committed) {
-		if (fs_view)
-			*fs_view = surface->committed_private;
-		return true;
-	}
-	return false;
-}
-
-static void
-activate_binding(struct weston_seat *seat,
-		 struct desktop_shell *shell,
-		 struct weston_view *focus_view,
-		 uint32_t flags)
-{
-	struct weston_view *main_view;
-	struct weston_surface *main_surface;
-
-	if (!focus_view)
-		return;
-
-	if (is_black_surface_view(focus_view, &main_view))
-		focus_view = main_view;
-
-	main_surface = weston_surface_get_main_surface(focus_view->surface);
-	if (!get_shell_surface(main_surface))
-		return;
-
-	activate(shell, focus_view, seat, flags);
-}
-
-static void
-click_to_activate_binding(struct weston_pointer *pointer,
-		          const struct timespec *time,
-			  uint32_t button, void *data)
-{
-	if (pointer->grab != &pointer->default_grab)
-		return;
-	if (pointer->focus == NULL)
-		return;
-
-	activate_binding(pointer->seat, data, pointer->focus,
-			 WESTON_ACTIVATE_FLAG_CLICKED |
-			 WESTON_ACTIVATE_FLAG_CONFIGURE);
-}
-
-static void
-touch_to_activate_binding(struct weston_touch *touch,
-			  const struct timespec *time,
-			  void *data)
-{
-	if (touch->grab != &touch->default_grab)
-		return;
-	if (touch->focus == NULL)
-		return;
-
-	activate_binding(touch->seat, data, touch->focus,
-			 WESTON_ACTIVATE_FLAG_CONFIGURE);
 }
 
 static void
@@ -1762,17 +1606,6 @@ static void
 shell_add_bindings(struct weston_compositor *ec, struct desktop_shell *shell)
 {
 	uint32_t mod;
-
-	/* fixed bindings */
-	weston_compositor_add_button_binding(ec, BTN_LEFT, 0,
-					     click_to_activate_binding,
-					     shell);
-	weston_compositor_add_button_binding(ec, BTN_RIGHT, 0,
-					     click_to_activate_binding,
-					     shell);
-	weston_compositor_add_touch_binding(ec, 0,
-					    touch_to_activate_binding,
-					    shell);
 
 	mod = shell->binding_modifier;
 	if (!mod)

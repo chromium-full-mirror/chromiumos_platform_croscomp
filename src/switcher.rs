@@ -167,18 +167,14 @@ impl Switcher {
     }
 
     fn shutdown(&mut self) {
-        let mut shell = self.shell.borrow_mut();
         let seat = unsafe { &mut *(*self.grab.grab.keyboard).seat };
 
         let t = &mut self.thumbnails[self.current as usize];
-        unsafe {
-            ffi::activate(
-                &mut shell.native,
-                t.view,
-                seat,
-                ffi::weston_activate_flag::WESTON_ACTIVATE_FLAG_CONFIGURE.0,
-            );
-        }
+	let view = unsafe { &mut *t.view };
+        view.activate(
+            seat,
+            ffi::weston_activate_flag::WESTON_ACTIVATE_FLAG_CONFIGURE.0,
+        );
 
         for view in self.ui.drain(..) {
             unsafe {
@@ -191,7 +187,6 @@ impl Switcher {
             unsafe { ffi::weston_view_destroy(t.view) };
         }
 
-        drop(shell);
         let _ = unsafe { Box::from_raw(self as *mut _) };
     }
 }

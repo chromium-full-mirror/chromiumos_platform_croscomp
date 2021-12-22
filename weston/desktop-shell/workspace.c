@@ -215,8 +215,8 @@ focus_state_surface_destroy(struct wl_listener *listener, void *data)
 			wl_list_init(&state->surface_destroy_listener.link);
 		}
 		state->keyboard_focus = NULL;
-		activate(state->shell, next, state->seat,
-			 WESTON_ACTIVATE_FLAG_CONFIGURE);
+		weston_view_activate(next, state->seat,
+				     WESTON_ACTIVATE_FLAG_CONFIGURE);
 	} else {
 		if (state->shell->focus_animation_type == ANIMATION_DIM_LAYER) {
 			if (state->ws->focus_animation)

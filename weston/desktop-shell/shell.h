@@ -120,6 +120,7 @@ struct shell_surface {
 		bool fullscreen;
 		bool maximized;
 		bool lowered;
+		bool activated;
 	} pending_state, state;
 
 	struct weston_size pending_size;
@@ -274,10 +275,6 @@ get_output_work_area(struct desktop_shell *shell,
 void
 lower_fullscreen_layer(struct desktop_shell *shell,
 		       struct weston_output *lowering_output);
-
-void
-activate(struct desktop_shell *shell, struct weston_view *view,
-	 struct weston_seat *seat, uint32_t flags);
 
 int
 input_panel_setup(struct desktop_shell *shell);
