@@ -58,108 +58,6 @@ struct focus_state {
 	struct wl_listener surface_destroy_listener;
 };
 
-struct focus_surface {
-	struct weston_surface *surface;
-	struct weston_view *view;
-	struct weston_transform workspace_transform;
-};
-
-static int
-focus_surface_get_label(struct weston_surface *surface, char *buf, size_t len)
-{
-	return snprintf(buf, len, "focus highlight effect for output %s",
-			(surface->output ? surface->output->name : "NULL"));
-}
-
-/* no-op func for checking focus surface */
-static void
-focus_surface_committed(struct weston_surface *es, int32_t sx, int32_t sy)
-{
-}
-
-static struct focus_surface *
-get_focus_surface(struct weston_surface *surface)
-{
-	if (surface->committed == focus_surface_committed)
-		return surface->committed_private;
-	else
-		return NULL;
-}
-
-static bool
-is_focus_surface (struct weston_surface *es)
-{
-	return (es->committed == focus_surface_committed);
-}
-
-static bool
-is_focus_view (struct weston_view *view)
-{
-	return is_focus_surface (view->surface);
-}
-
-static struct focus_surface *
-create_focus_surface(struct weston_compositor *ec,
-		     struct weston_output *output)
-{
-	struct focus_surface *fsurf = NULL;
-	struct weston_surface *surface = NULL;
-
-	fsurf = malloc(sizeof *fsurf);
-	if (!fsurf)
-		return NULL;
-
-	fsurf->surface = weston_surface_create(ec);
-	surface = fsurf->surface;
-	if (surface == NULL) {
-		free(fsurf);
-		return NULL;
-	}
-
-	surface->committed = focus_surface_committed;
-	surface->output = output;
-	surface->is_mapped = true;
-	surface->committed_private = fsurf;
-	weston_surface_set_label_func(surface, focus_surface_get_label);
-
-	fsurf->view = weston_view_create(surface);
-	if (fsurf->view == NULL) {
-		weston_surface_destroy(surface);
-		free(fsurf);
-		return NULL;
-	}
-	weston_view_set_output(fsurf->view, output);
-	fsurf->view->is_mapped = true;
-
-	weston_surface_set_size(surface, output->width, output->height);
-	weston_view_set_position(fsurf->view, output->x, output->y);
-	weston_surface_set_color(surface, 0.0, 0.0, 0.0, 1.0);
-	pixman_region32_fini(&surface->opaque);
-	pixman_region32_init_rect(&surface->opaque, output->x, output->y,
-				  output->width, output->height);
-	pixman_region32_fini(&surface->input);
-	pixman_region32_init(&surface->input);
-
-	wl_list_init(&fsurf->workspace_transform.link);
-
-	return fsurf;
-}
-
-static void
-focus_surface_destroy(struct focus_surface *fsurf)
-{
-	weston_surface_destroy(fsurf->surface);
-	free(fsurf);
-}
-
-static void
-focus_animation_done(struct weston_view_animation *animation, void *data)
-{
-	struct workspace *ws = data;
-
-	ws->focus_animation = NULL;
-}
-
 static void
 focus_state_destroy(struct focus_state *state)
 {
@@ -196,8 +94,6 @@ focus_state_surface_destroy(struct wl_listener *listener, void *data)
 			 &state->ws->layer.view_list.link, layer_link.link) {
 		if (view->surface == main_surface)
 			continue;
-		if (is_focus_view(view))
-			continue;
 		if (!get_shell_surface(view->surface))
 			continue;
 
@@ -218,16 +114,6 @@ focus_state_surface_destroy(struct wl_listener *listener, void *data)
 		weston_view_activate(next, state->seat,
 				     WESTON_ACTIVATE_FLAG_CONFIGURE);
 	} else {
-		if (state->shell->focus_animation_type == ANIMATION_DIM_LAYER) {
-			if (state->ws->focus_animation)
-				weston_view_animation_destroy(state->ws->focus_animation);
-
-			state->ws->focus_animation = weston_fade_run(
-				state->ws->fsurf_front->view,
-				state->ws->fsurf_front->view->alpha, 0.0, 300,
-				focus_animation_done, state->ws);
-		}
-
 		wl_list_remove(&state->link);
 		focus_state_destroy(state);
 	}
@@ -364,71 +250,6 @@ drop_focus_state(struct desktop_shell *shell, struct workspace *ws,
 			focus_state_set_focus(state, NULL);
 }
 
-void
-animate_focus_change(struct desktop_shell *shell, struct workspace *ws,
-		     struct weston_view *from, struct weston_view *to)
-{
-	struct weston_output *output;
-	bool focus_surface_created = false;
-
-	/* FIXME: Only support dim animation using two layers */
-	if (from == to || shell->focus_animation_type != ANIMATION_DIM_LAYER)
-		return;
-
-	output = get_default_output(shell->compositor);
-	if (ws->fsurf_front == NULL && (from || to)) {
-		ws->fsurf_front = create_focus_surface(shell->compositor, output);
-		if (ws->fsurf_front == NULL)
-			return;
-		ws->fsurf_front->view->alpha = 0.0;
-
-		ws->fsurf_back = create_focus_surface(shell->compositor, output);
-		if (ws->fsurf_back == NULL) {
-			focus_surface_destroy(ws->fsurf_front);
-			return;
-		}
-		ws->fsurf_back->view->alpha = 0.0;
-
-		focus_surface_created = true;
-	} else {
-		weston_layer_entry_remove(&ws->fsurf_front->view->layer_link);
-		weston_layer_entry_remove(&ws->fsurf_back->view->layer_link);
-	}
-
-	if (ws->focus_animation) {
-		weston_view_animation_destroy(ws->focus_animation);
-		ws->focus_animation = NULL;
-	}
-
-	if (to)
-		weston_layer_entry_insert(&to->layer_link,
-					  &ws->fsurf_front->view->layer_link);
-	else if (from)
-		weston_layer_entry_insert(&ws->layer.view_list,
-					  &ws->fsurf_front->view->layer_link);
-
-	if (focus_surface_created) {
-		ws->focus_animation = weston_fade_run(
-			ws->fsurf_front->view,
-			ws->fsurf_front->view->alpha, 0.4, 300,
-			focus_animation_done, ws);
-	} else if (from) {
-		weston_layer_entry_insert(&from->layer_link,
-					  &ws->fsurf_back->view->layer_link);
-		ws->focus_animation = weston_stable_fade_run(
-			ws->fsurf_front->view, 0.0,
-			ws->fsurf_back->view, 0.4,
-			focus_animation_done, ws);
-	} else if (to) {
-		weston_layer_entry_insert(&ws->layer.view_list,
-					  &ws->fsurf_back->view->layer_link);
-		ws->focus_animation = weston_stable_fade_run(
-			ws->fsurf_front->view, 0.0,
-			ws->fsurf_back->view, 0.4,
-			focus_animation_done, ws);
-	}
-}
-
 static void
 workspace_destroy(struct workspace *ws)
 {
@@ -436,12 +257,6 @@ workspace_destroy(struct workspace *ws)
 
 	wl_list_for_each_safe(state, next, &ws->focus_list, link)
 		focus_state_destroy(state);
-
-	if (ws->fsurf_front)
-		focus_surface_destroy(ws->fsurf_front);
-	if (ws->fsurf_back)
-		focus_surface_destroy(ws->fsurf_back);
-
 	free(ws);
 }
 
@@ -471,8 +286,6 @@ workspace_create(struct desktop_shell *shell)
 	wl_list_init(&ws->focus_list);
 	wl_list_init(&ws->seat_destroyed_listener.link);
 	ws->seat_destroyed_listener.notify = seat_destroyed;
-	ws->fsurf_front = NULL;
-	ws->fsurf_back = NULL;
 	ws->focus_animation = NULL;
 
 	return ws;
@@ -520,13 +333,7 @@ get_output_height(struct weston_output *output)
 static struct weston_transform *
 view_get_transform(struct weston_view *view)
 {
-	struct focus_surface *fsurf = NULL;
 	struct shell_surface *shsurf = NULL;
-
-	if (is_focus_view(view)) {
-		fsurf = get_focus_surface(view->surface);
-		return &fsurf->workspace_transform;
-	}
 
 	shsurf = get_shell_surface(view->surface);
 	if (shsurf)
@@ -753,7 +560,6 @@ change_workspace(struct desktop_shell *shell, unsigned int index)
 {
 	struct workspace *from;
 	struct workspace *to;
-	struct focus_state *state;
 
 	if (index == shell->workspaces.current)
 		return;
@@ -778,18 +584,6 @@ change_workspace(struct desktop_shell *shell, unsigned int index)
 						  shell->workspaces.anim_to);
 
 	restore_focus_state(shell, to);
-
-	if (shell->focus_animation_type != ANIMATION_NONE) {
-		wl_list_for_each(state, &from->focus_list, link)
-			if (state->keyboard_focus)
-				animate_focus_change(shell, from,
-						     get_default_view(state->keyboard_focus), NULL);
-
-		wl_list_for_each(state, &to->focus_list, link)
-			if (state->keyboard_focus)
-				animate_focus_change(shell, to,
-						     NULL, get_default_view(state->keyboard_focus));
-	}
 
 	if (workspace_is_empty(to) && workspace_is_empty(from))
 		update_workspace(shell, index, from, to);
@@ -830,8 +624,7 @@ take_surface_to_workspace_by_seat(struct desktop_shell *shell,
 	surface = weston_surface_get_main_surface(keyboard->focus);
 	view = get_default_view(surface);
 	if (view == NULL ||
-	    index == shell->workspaces.current ||
-	    is_focus_view(view))
+	    index == shell->workspaces.current)
 		return;
 
 	from = get_current_workspace(shell);
@@ -883,8 +676,6 @@ workspace_up_binding(struct weston_keyboard *keyboard,
 	struct desktop_shell *shell = data;
 	unsigned int new_index = shell->workspaces.current;
 
-	if (shell->locked)
-		return;
 	if (new_index != 0)
 		new_index--;
 
@@ -898,8 +689,6 @@ workspace_down_binding(struct weston_keyboard *keyboard,
 	struct desktop_shell *shell = data;
 	unsigned int new_index = shell->workspaces.current;
 
-	if (shell->locked)
-		return;
 	if (new_index < shell->workspaces.num - 1)
 		new_index++;
 
@@ -913,8 +702,6 @@ workspace_f_binding(struct weston_keyboard *keyboard,
 	struct desktop_shell *shell = data;
 	unsigned int new_index;
 
-	if (shell->locked)
-		return;
 	new_index = key - KEY_F1;
 	if (new_index >= shell->workspaces.num)
 		new_index = shell->workspaces.num - 1;
@@ -930,9 +717,6 @@ workspace_move_surface_up_binding(struct weston_keyboard *keyboard,
 	struct desktop_shell *shell = data;
 	unsigned int new_index = shell->workspaces.current;
 
-	if (shell->locked)
-		return;
-
 	if (new_index != 0)
 		new_index--;
 
@@ -946,9 +730,6 @@ workspace_move_surface_down_binding(struct weston_keyboard *keyboard,
 {
 	struct desktop_shell *shell = data;
 	unsigned int new_index = shell->workspaces.current;
-
-	if (shell->locked)
-		return;
 
 	if (new_index < shell->workspaces.num - 1)
 		new_index++;

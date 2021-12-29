@@ -31,30 +31,12 @@ impl Shell {
             Rc::new(RefCell::new(Shell {
                 native: ffi::desktop_shell {
                     compositor: &mut compositor.native as *mut _,
-                    idle_listener: ffi::wl_listener::zeroed(),
-                    wake_listener: ffi::wl_listener::zeroed(),
-                    resized_listener: ffi::wl_listener::zeroed(),
                     destroy_listener: ffi::wl_listener::zeroed(),
-                    show_input_panel_listener: ffi::wl_listener::zeroed(),
-                    hide_input_panel_listener: ffi::wl_listener::zeroed(),
-                    update_input_panel_listener: ffi::wl_listener::zeroed(),
+
                     fullscreen_layer: ffi::weston_layer::zeroed(),
-                    panel_layer: ffi::weston_layer::zeroed(),
                     background_layer: ffi::weston_layer::zeroed(),
-                    lock_layer: ffi::weston_layer::zeroed(),
-                    input_panel_layer: ffi::weston_layer::zeroed(),
-                    pointer_focus_listener: ffi::wl_listener::zeroed(),
-                    grab_surface: std::ptr::null_mut(),
-                    locked: false,
-                    showing_input_panels: false,
-                    prepare_event_sent: false,
-                    text_input: ffi::desktop_shell__bindgen_ty_1 {
-                        surface: std::ptr::null_mut(),
-                        cursor_rectangle: ffi::pixman_box32::new(),
-                    },
-                    lock_surface: std::ptr::null_mut(),
-                    lock_surface_listener: ffi::wl_listener::zeroed(),
-                    workspaces: ffi::desktop_shell__bindgen_ty_2 {
+
+                    workspaces: ffi::desktop_shell__bindgen_ty_1 {
                         array: ffi::wl_array::new(),
                         current: 0,
                         num: 2,
@@ -71,24 +53,14 @@ impl Shell {
                         anim_from: std::ptr::null_mut(),
                         anim_to: std::ptr::null_mut(),
                     },
-                    input_panel: ffi::desktop_shell__bindgen_ty_3 {
-                        binding: std::ptr::null_mut(),
-                        surfaces: ffi::wl_list::zeroed(),
-                    },
-                    allow_zap: true,
+
                     binding_modifier: ffi::weston_keyboard_modifier::MODIFIER_SUPER.0,
-                    win_animation_type: ffi::animation_type::ANIMATION_NONE,
-                    win_close_animation_type: ffi::animation_type::ANIMATION_FADE,
-                    startup_animation_type: ffi::animation_type::ANIMATION_ZOOM,
-                    focus_animation_type: ffi::animation_type::ANIMATION_NONE,
                     minimized_layer: ffi::weston_layer::zeroed(),
-                    seat_create_listener: ffi::wl_listener::zeroed(),
                     output_create_listener: ffi::wl_listener::zeroed(),
                     output_move_listener: ffi::wl_listener::zeroed(),
                     output_list: ffi::wl_list::zeroed(),
                     client: std::ptr::null_mut(),
                     startup_time: ffi::timespec { tv_sec: 0, tv_nsec: 0 },
-                    initialized_inputs: false,
                 },
                 compositor: Rc::clone(rc),
 
@@ -101,11 +73,12 @@ impl Shell {
                 activate_listener: ffi::WlListener::new(
                     &mut compositor.native.activate_signal,
                     |data| unsafe {
-			let data = &*(data as *mut ffi::weston_surface_activation_data);
+                        let data = &*(data as *mut ffi::weston_surface_activation_data);
 
-			data.surface.as_mut()
-			    .and_then(|surface| Surface::get(surface))
-			    .map(|shsurf| shsurf.activate(data.seat));
+                        data.surface
+                            .as_mut()
+                            .and_then(|surface| Surface::get(surface))
+                            .map(|shsurf| shsurf.activate(data.seat));
                     },
                 ),
             }))
@@ -122,17 +95,11 @@ impl Shell {
         self.native
             .fullscreen_layer
             .set_position(ffi::weston_layer_position::WESTON_LAYER_POSITION_FULLSCREEN);
-        self.native.panel_layer.init(compositor);
-        self.native
-            .panel_layer
-            .set_position(ffi::weston_layer_position::WESTON_LAYER_POSITION_UI);
         self.native.background_layer.init(compositor);
         self.native
             .background_layer
             .set_position(ffi::weston_layer_position::WESTON_LAYER_POSITION_BACKGROUND);
 
-        self.native.lock_layer.init(compositor);
-        self.native.input_panel_layer.init(compositor);
         self.native.minimized_layer.init(compositor);
 
         unsafe { ffi::desktop_shell_init(&mut self.native, compositor) };
@@ -162,17 +129,17 @@ impl Shell {
             if pointer.grab != &mut pointer.default_grab as *mut _ {
                 return;
             }
-	    if let Some(view) = unsafe { pointer.focus.as_mut() } {
-		view.activate(pointer.seat, 0)
-	    }
+            if let Some(view) = unsafe { pointer.focus.as_mut() } {
+                view.activate(pointer.seat, 0)
+            }
         };
         let touch_activate_binding = move |touch: &mut ffi::weston_touch, _| {
             if touch.grab != &mut touch.default_grab as *mut _ {
                 return;
             }
-	    if let Some(view) = unsafe { touch.focus.as_mut() } {
-		view.activate(touch.seat, 0)
-	    }
+            if let Some(view) = unsafe { touch.focus.as_mut() } {
+                view.activate(touch.seat, 0)
+            }
         };
         compositor.bind_button(BTN_LEFT, no_mods, pointer_activate_binding);
         compositor.bind_button(BTN_RIGHT, no_mods, pointer_activate_binding);
@@ -336,7 +303,7 @@ pub type SurfaceState = ffi::shell_surface_surface_state;
 
 impl SurfaceState {
     pub fn new() -> SurfaceState {
-	SurfaceState {
+        SurfaceState {
             fullscreen: false,
             maximized: false,
             lowered: false,
@@ -475,7 +442,7 @@ impl Surface {
     }
 
     pub fn emit_state_changed(&mut self) {
-	self.state_change_signal.emit(&mut ())
+        self.state_change_signal.emit(&mut ())
     }
 
     fn activate(&mut self, seat: *mut ffi::weston_seat) {
@@ -489,14 +456,14 @@ impl Surface {
                 shsurf.focus_count = shsurf.focus_count - 1;
                 if shsurf.focus_count == 0 {
                     shsurf.pending_state.activated = false;
-		    shsurf.emit_state_changed();
+                    shsurf.emit_state_changed();
                 }
             }
 
             self.focus_count = self.focus_count + 1;
             if self.focus_count == 1 {
                 self.pending_state.activated = true;
-		self.emit_state_changed();
+                self.emit_state_changed();
             }
         }
 
@@ -660,14 +627,14 @@ impl Surface {
 
     pub fn set_size(&mut self, width: i32, height: i32) {
         self.pending_size = ffi::weston_size { width, height };
-	self.emit_state_changed()
+        self.emit_state_changed()
     }
 
     pub fn set_resizing(&mut self, edges: ffi::wl_shell_surface_resize) {
         self.resize_edges = edges.0;
         //self.pending_state.resizing =
         //	    edges != ffi::wl_shell_surface_resize::WL_SHELL_SURFACE_RESIZE_NONE;
-	self.emit_state_changed()
+        self.emit_state_changed()
     }
 
     pub fn get_geometry(&mut self) -> ffi::weston_geometry {
@@ -686,8 +653,8 @@ impl Surface {
     }
 
     pub fn set_maximized(&mut self, enable: bool) {
-	self.pending_state.maximized = enable;
-	self.pending_size = if enable {
+        self.pending_state.maximized = enable;
+        self.pending_size = if enable {
             let surface = unsafe { &mut *self.surface };
             let output = if surface.is_mapped() {
                 surface.output
@@ -701,16 +668,12 @@ impl Surface {
             ffi::weston_size { width: 0, height: 0 }
         };
 
-	self.emit_state_changed();
+        self.emit_state_changed();
     }
 
-    pub fn set_fullscreen(
-        &mut self,
-        enable: bool,
-        output: *mut ffi::weston_output,
-    ) {
-	self.pending_state.fullscreen = enable;
-	self.pending_size = if enable {
+    pub fn set_fullscreen(&mut self, enable: bool, output: *mut ffi::weston_output) {
+        self.pending_state.fullscreen = enable;
+        self.pending_size = if enable {
             let surface = unsafe { &mut *self.surface };
             let output = if output.is_null() && !surface.is_mapped() {
                 get_focused_output(surface.compositor)
@@ -735,7 +698,7 @@ impl Surface {
             ffi::weston_size { width: 0, height: 0 }
         };
 
-	self.emit_state_changed();
+        self.emit_state_changed();
     }
 
     pub fn set_minimized(&mut self) {
