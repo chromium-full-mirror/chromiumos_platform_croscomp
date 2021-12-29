@@ -147,9 +147,6 @@ shell_surface_get_shell(struct shell_surface *shsurf);
 static void
 set_busy_cursor(struct shell_surface *shsurf, struct weston_pointer *pointer);
 
-static void
-shell_fade(struct desktop_shell *shell, enum fade_type type);
-
 static struct shell_seat *
 get_shell_seat(struct weston_seat *seat);
 
@@ -1189,191 +1186,6 @@ black_surface_committed(struct weston_surface *es, int32_t sx, int32_t sy)
 }
 
 static void
-unfocus_all_seats(struct desktop_shell *shell)
-{
-	struct weston_seat *seat, *next;
-
-	wl_list_for_each_safe(seat, next, &shell->compositor->seat_list, link) {
-		struct weston_keyboard *keyboard =
-			weston_seat_get_keyboard(seat);
-
-		if (!keyboard)
-			continue;
-
-		weston_keyboard_set_focus(keyboard, NULL);
-	}
-}
-
-static void
-lock(struct desktop_shell *shell)
-{
-	struct workspace *ws = get_current_workspace(shell);
-
-	if (shell->locked) {
-		weston_compositor_sleep(shell->compositor);
-		return;
-	}
-
-	shell->locked = true;
-
-	/* Hide all surfaces by removing the fullscreen, panel and
-	 * toplevel layers.  This way nothing else can show or receive
-	 * input events while we are locked. */
-
-	weston_layer_unset_position(&shell->panel_layer);
-	weston_layer_unset_position(&shell->fullscreen_layer);
-	if (shell->showing_input_panels)
-		weston_layer_unset_position(&shell->input_panel_layer);
-	weston_layer_unset_position(&ws->layer);
-
-	weston_layer_set_position(&shell->lock_layer,
-				  WESTON_LAYER_POSITION_LOCK);
-
-	weston_compositor_sleep(shell->compositor);
-
-	/* Remove the keyboard focus on all seats. This will be
-	 * restored to the workspace's saved state via
-	 * restore_focus_state when the compositor is unlocked */
-	unfocus_all_seats(shell);
-
-	/* TODO: disable bindings that should not work while locked. */
-
-	/* All this must be undone in resume_desktop(). */
-}
-
-static void
-unlock(struct desktop_shell *shell)
-{
-	if (!shell->locked || shell->lock_surface) {
-		shell_fade(shell, FADE_IN);
-		return;
-	}
-}
-
-static void
-shell_fade_done_for_output(struct weston_view_animation *animation, void *data)
-{
-	struct shell_output *shell_output = data;
-	struct desktop_shell *shell = shell_output->shell;
-
-	shell_output->fade.animation = NULL;
-	switch (shell_output->fade.type) {
-	case FADE_IN:
-		weston_surface_destroy(shell_output->fade.view->surface);
-		shell_output->fade.view = NULL;
-		break;
-	case FADE_OUT:
-		lock(shell);
-		break;
-	default:
-		break;
-	}
-}
-
-static struct weston_view *
-shell_fade_create_surface_for_output(struct desktop_shell *shell, struct shell_output *shell_output)
-{
-	struct weston_compositor *compositor = shell->compositor;
-	struct weston_surface *surface;
-	struct weston_view *view;
-
-	surface = weston_surface_create(compositor);
-	if (!surface)
-		return NULL;
-
-	view = weston_view_create(surface);
-	if (!view) {
-		weston_surface_destroy(surface);
-		return NULL;
-	}
-
-	weston_surface_set_size(surface, shell_output->output->width, shell_output->output->height);
-	weston_view_set_position(view, shell_output->output->x, shell_output->output->y);
-	weston_surface_set_color(surface, 0.0, 0.0, 0.0, 1.0);
-	weston_layer_entry_insert(&compositor->fade_layer.view_list,
-				  &view->layer_link);
-	pixman_region32_init(&surface->input);
-	surface->is_mapped = true;
-	view->is_mapped = true;
-
-	return view;
-}
-
-static void
-shell_fade(struct desktop_shell *shell, enum fade_type type)
-{
-	float tint;
-	struct shell_output *shell_output;
-
-	switch (type) {
-	case FADE_IN:
-		tint = 0.0;
-		break;
-	case FADE_OUT:
-		tint = 1.0;
-		break;
-	default:
-		weston_log("shell: invalid fade type\n");
-		return;
-	}
-
-	/* Create a separate fade surface for each output */
-	wl_list_for_each(shell_output, &shell->output_list, link) {
-		shell_output->fade.type = type;
-
-		if (shell_output->fade.view == NULL) {
-			shell_output->fade.view = shell_fade_create_surface_for_output(shell, shell_output);
-			if (!shell_output->fade.view)
-				continue;
-
-			shell_output->fade.view->alpha = 1.0 - tint;
-			weston_view_update_transform(shell_output->fade.view);
-		}
-
-		if (shell_output->fade.view->output == NULL) {
-			/* If the black view gets a NULL output, we lost the
-			 * last output and we'll just cancel the fade.  This
-			 * happens when you close the last window under the
-			 * X11 or Wayland backends. */
-			shell->locked = false;
-			weston_surface_destroy(shell_output->fade.view->surface);
-			shell_output->fade.view = NULL;
-		} else if (shell_output->fade.animation) {
-			weston_fade_update(shell_output->fade.animation, tint);
-		} else {
-			shell_output->fade.animation =
-				weston_fade_run(shell_output->fade.view,
-						1.0 - tint, tint, 300.0,
-						shell_fade_done_for_output, shell_output);
-		}
-	}
-}
-
-static void
-idle_handler(struct wl_listener *listener, void *data)
-{
-	struct desktop_shell *shell =
-		container_of(listener, struct desktop_shell, idle_listener);
-
-	struct weston_seat *seat;
-
-	wl_list_for_each(seat, &shell->compositor->seat_list, link)
-		weston_seat_break_desktop_grabs(seat);
-
-	shell_fade(shell, FADE_OUT);
-	/* lock() is called from shell_fade_done_for_output() */
-}
-
-static void
-wake_handler(struct wl_listener *listener, void *data)
-{
-	struct desktop_shell *shell =
-		container_of(listener, struct desktop_shell, wake_listener);
-
-	unlock(shell);
-}
-
-static void
 center_on_output(struct weston_view *view, struct weston_output *output)
 {
 	int32_t surf_x, surf_y, width, height;
@@ -1583,8 +1395,6 @@ shell_destroy(struct wl_listener *listener, void *data)
 	shell->locked = false;
 
 	wl_list_remove(&shell->destroy_listener.link);
-	wl_list_remove(&shell->idle_listener.link);
-	wl_list_remove(&shell->wake_listener.link);
 
 	wl_list_for_each_safe(shell_output, tmp, &shell->output_list, link) {
 		wl_list_remove(&shell_output->destroy_listener.link);
@@ -1634,11 +1444,6 @@ desktop_shell_init(struct desktop_shell *shell,
 							 &shell->destroy_listener,
 							 shell_destroy))
 		return -1;
-
-	shell->idle_listener.notify = idle_handler;
-	wl_signal_add(&ec->idle_signal, &shell->idle_listener);
-	shell->wake_listener.notify = wake_handler;
-	wl_signal_add(&ec->wake_signal, &shell->wake_listener);
 
 	if (init_workspaces(shell) == -1) {
 		weston_log("init_workspaces failed\n");
