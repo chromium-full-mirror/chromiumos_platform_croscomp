@@ -109,34 +109,6 @@ get_default_output(struct weston_compositor *compositor)
 			    struct weston_output, link);
 }
 
-void
-move_view(struct weston_view *view, struct weston_pointer *pointer);
-
-int
-shell_surface_move(struct shell_surface *shsurf, struct weston_pointer *pointer,
-		   bool client_initiated)
-{
-	if (!shsurf)
-		return -1;
-
-	if (shsurf->grabbed || shsurf->state.fullscreen || shsurf->state.maximized)
-		return 0;
-
-	move_view(shsurf->view, pointer);
-
-	return 0;
-}
-
-int
-resize_view(struct weston_view *view, struct weston_pointer *pointer, uint32_t edges);
-
-int
-shell_surface_resize(struct shell_surface *shsurf,
-		     struct weston_pointer *pointer, uint32_t edges)
-{
-	return resize_view(shsurf->view, pointer, edges);
-}
-
 /*
  * Returns the bounding box of a surface and all its sub-surfaces,
  * in surface-local coordinates. */

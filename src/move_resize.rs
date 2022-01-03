@@ -9,7 +9,7 @@ use crate::ffi;
 use crate::input;
 use crate::Shell;
 
-struct MoveGrab {
+pub struct MoveGrab {
     view_destroy_listener: ffi::wl_listener,
     dx: ffi::wl_fixed_t,
     dy: ffi::wl_fixed_t,
@@ -84,7 +84,7 @@ impl input::KeyboardGrabHandler for MoveGrab {
 }
 
 impl MoveGrab {
-    fn start(pointer: *mut ffi::weston_pointer, view: *mut ffi::weston_view) {
+    pub fn start(pointer: *mut ffi::weston_pointer, view: *mut ffi::weston_view) {
         let pointer = unsafe { &mut *pointer };
         let view = unsafe { &mut *view };
         let seat = unsafe { &mut *pointer.seat };
@@ -111,7 +111,7 @@ impl MoveGrab {
     }
 }
 
-struct ResizeGrab {
+pub struct ResizeGrab {
     view_destroy_listener: ffi::wl_listener,
     edges: ffi::wl_shell_surface_resize,
     origin_x: f32,
@@ -216,7 +216,7 @@ impl input::KeyboardGrabHandler for ResizeGrab {
 }
 
 impl ResizeGrab {
-    fn start(
+    pub fn start(
         pointer: *mut ffi::weston_pointer,
         view: *mut ffi::weston_view,
         edges: ffi::wl_shell_surface_resize,
@@ -350,18 +350,4 @@ pub fn init(shell: &Rc<RefCell<Shell>>) {
             | ffi::weston_keyboard_modifier::MODIFIER_SHIFT,
         resize,
     );
-}
-
-#[no_mangle]
-pub extern "C" fn move_view(view: *mut ffi::weston_view, pointer: *mut ffi::weston_pointer) {
-    MoveGrab::start(pointer, view);
-}
-
-#[no_mangle]
-pub extern "C" fn resize_view(
-    view: *mut ffi::weston_view,
-    pointer: *mut ffi::weston_pointer,
-    edges: u32,
-) {
-    ResizeGrab::start(pointer, view, ffi::wl_shell_surface_resize(edges));
 }

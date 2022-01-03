@@ -10,6 +10,7 @@ use std::rc::Rc;
 use crate::exo;
 use crate::ffi;
 use crate::protocol;
+use crate::move_resize::{MoveGrab, ResizeGrab};
 use crate::remote_shell;
 use crate::server;
 use crate::Compositor;
@@ -613,16 +614,12 @@ impl Surface {
         unsafe { ffi::get_shell_surface(surface).as_mut() }
     }
 
-    pub fn r#move(&mut self, pointer: &mut ffi::weston_pointer, client_initiated: bool) {
-        unsafe {
-            ffi::shell_surface_move(self, pointer as *mut _, client_initiated);
-        }
+    pub fn r#move(&mut self, pointer: &mut ffi::weston_pointer, _client_initiated: bool) {
+        MoveGrab::start(pointer, self.view)
     }
 
     pub fn resize(&mut self, pointer: &mut ffi::weston_pointer, edges: u32) {
-        unsafe {
-            ffi::shell_surface_resize(self, pointer as *mut _, edges);
-        }
+        ResizeGrab::start(pointer, self.view, ffi::wl_shell_surface_resize(edges));
     }
 
     pub fn set_size(&mut self, width: i32, height: i32) {
