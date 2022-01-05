@@ -201,8 +201,7 @@ impl Toplevel {
             },
         ));
 
-        drop(toplevel);
-        toplevel_rc
+        Rc::clone(&toplevel_rc)
     }
 
     fn schedule_configure(&mut self, rc: Rc<RefCell<Toplevel>>) {
