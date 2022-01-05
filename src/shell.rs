@@ -76,10 +76,9 @@ impl Shell {
                     |data| unsafe {
                         let data = &*(data as *mut ffi::weston_surface_activation_data);
 
-                        data.surface
-                            .as_mut()
-                            .and_then(|surface| Surface::get(surface))
-                            .map(|shsurf| shsurf.borrow_mut().activate(data.seat));
+			if let Some(shsurf) = Surface::get(data.surface) {
+                            shsurf.borrow_mut().activate(data.seat)
+			}
                     },
                 ),
             }))
@@ -147,21 +146,17 @@ impl Shell {
         compositor.bind_touch(no_mods, touch_activate_binding);
 
         compositor.bind_key(KEY_M, mods_with_shift, move |keyboard, _, _| {
-            if let Some(surface) = unsafe { keyboard.focus.as_mut() } {
-                if let Some(shsurf) = Surface::get(surface) {
-		    let mut shsurf = shsurf.borrow_mut();
-		    let enable = !shsurf.state.maximized;
-                    shsurf.set_maximized(enable);
-                }
+            if let Some(shsurf) = Surface::get(keyboard.focus) {
+		let mut shsurf = shsurf.borrow_mut();
+		let enable = !shsurf.state.maximized;
+                shsurf.set_maximized(enable);
             }
         });
         compositor.bind_key(KEY_F, mods_with_shift, move |keyboard, _, _| {
-            if let Some(surface) = unsafe { keyboard.focus.as_mut() } {
-                if let Some(shsurf) = Surface::get(surface) {
-		    let mut shsurf = shsurf.borrow_mut();
-		    let enable = !shsurf.state.fullscreen;
-                    shsurf.set_fullscreen(enable, std::ptr::null_mut());
-                }
+            if let Some(shsurf) = Surface::get(keyboard.focus) {
+		let mut shsurf = shsurf.borrow_mut();
+		let enable = !shsurf.state.fullscreen;
+                shsurf.set_fullscreen(enable, std::ptr::null_mut());
             }
         });
 
@@ -444,9 +439,8 @@ impl Surface {
     pub fn shsurf_from_view<'a>(view: *mut ffi::weston_view) -> Rc<RefCell<Surface>> {
         let view = unsafe { &mut *view };
         let surface = unsafe { &mut *view.surface };
-        let surface = unsafe { &mut *surface.get_main_surface() };
 
-        Surface::get(surface).unwrap()
+        Surface::get(surface.get_main_surface()).unwrap()
     }
 
     pub fn emit_state_changed(&mut self) {
@@ -459,8 +453,8 @@ impl Surface {
         }
 
         if let Some(state) = unsafe { ffi::ensure_focus_state(self.shell, seat).as_mut() } {
-            let old_focus = unsafe { ffi::focus_state_set_focus(state, self.surface).as_mut() };
-            if let Some(shsurf) = old_focus.and_then(|surface| Surface::get(surface)) {
+            let old_focus = unsafe { ffi::focus_state_set_focus(state, self.surface) };
+            if let Some(shsurf) = Surface::get(old_focus) {
 		let mut shsurf = shsurf.borrow_mut();
                 shsurf.focus_count = shsurf.focus_count - 1;
                 if shsurf.focus_count == 0 {
@@ -619,8 +613,9 @@ impl Surface {
         unsafe { ffi::shell_surface_set_output(self, output) }
     }
 
-    pub fn get(surface: &ffi::weston_surface) -> Option<Rc<RefCell<Surface>>> {
+    pub fn get(surface: *mut ffi::weston_surface) -> Option<Rc<RefCell<Surface>>> {
 	unsafe {
+	    let surface = surface.as_mut().unwrap();
 	    if surface.committed == Some(Surface::committed) {
 		let ptr = surface.committed_private as *const _;
 		Rc::increment_strong_count(ptr);
@@ -728,8 +723,7 @@ impl Drop for Surface {
 }
 
 #[no_mangle]
-pub extern "C" fn get_shell_surface(surface: *const ffi::weston_surface) -> *mut ffi::shell_surface {
-    let surface = unsafe { &*surface };
+pub extern "C" fn get_shell_surface(surface: *mut ffi::weston_surface) -> *mut ffi::shell_surface {
     match Surface::get(surface) {
 	Some(rc) => rc.as_ptr(),
 	None => 0 as *mut _
