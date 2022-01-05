@@ -442,15 +442,6 @@ get_focused_output(struct weston_compositor *compositor)
 	return output;
 }
 
-struct shell_surface *
-get_shell_surface(struct weston_surface *surface)
-{
-	if (is_shell_surface(surface))
-		return surface->committed_private;
-
-	return NULL;
-}
-
 static void
 get_maximized_size(struct shell_surface *shsurf, int32_t *width, int32_t *height)
 {

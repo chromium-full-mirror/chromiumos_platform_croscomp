@@ -142,14 +142,9 @@ fn state_to_xdg_vec(state: &shell::SurfaceState) -> Vec<u8> {
 struct Toplevel {
     shell: Rc<RefCell<crate::Shell>>,
     surface: *mut ffi::weston_surface,
-    shsurf: Box<shell::Surface>,
+    shsurf: Rc<RefCell<shell::Surface>>,
     surface_resource: Resource<XdgSurface>,
     resource: Resource<XdgToplevel>,
-    title: String,
-    app_id: String,
-
-    next_max_size: ffi::weston_size,
-    next_min_size: ffi::weston_size,
 
     configured: bool,
 
@@ -160,7 +155,7 @@ struct Toplevel {
 
 impl Toplevel {
     fn new(surface: &Surface, resource: Resource<XdgToplevel>) -> Rc<RefCell<Self>> {
-        let shsurf = unsafe {
+        let shsurf_rc = unsafe {
             let view = ffi::weston_view_create(surface.surface);
 
             shell::Surface::new(
@@ -173,18 +168,11 @@ impl Toplevel {
         let toplevel_rc = Rc::new(RefCell::new(Toplevel {
             shell: Rc::clone(&surface.shell),
             surface: surface.surface,
-            shsurf,
+            shsurf: Rc::clone(&shsurf_rc),
             surface_resource: surface.resource.clone(),
             resource: resource.clone(),
-            title: String::new(),
-            app_id: String::new(),
-            next_max_size: ffi::weston_size { width: 0, height: 0 },
-            next_min_size: ffi::weston_size { width: 0, height: 0 },
-
             configured: false,
-
             commit_listener: None,
-
             state_change_listener: None,
         }));
 
@@ -200,9 +188,10 @@ impl Toplevel {
             }
         }));
 
+	let mut shsurf = shsurf_rc.borrow_mut();
         let weak = Rc::downgrade(&toplevel_rc);
         toplevel.state_change_listener = Some(ffi::WlListener::new(
-            &mut toplevel.shsurf.state_change_signal,
+            &mut shsurf.state_change_signal,
             move |_| {
                 debug!("state change signal fired");
                 if let Some(rc) = weak.upgrade() {
@@ -222,15 +211,16 @@ impl Toplevel {
         debug!("schedule configure!");
         compositor.server.event_loop.when_idle(move || {
             let toplevel = rc.borrow_mut();
+            let shsurf = toplevel.shsurf.borrow_mut();
             let configure = protocol::xdg_toplevel::Event::Configure {
-                width: toplevel.shsurf.pending_size.width,
-                height: toplevel.shsurf.pending_size.height,
-                states: state_to_xdg_vec(&toplevel.shsurf.pending_state),
+                width: shsurf.pending_size.width,
+                height: shsurf.pending_size.height,
+                states: state_to_xdg_vec(&shsurf.pending_state),
             };
 
             debug!(
                 "Sending configure, surface state: {:?}",
-                toplevel.shsurf.pending_state
+                shsurf.pending_state
             );
 
             toplevel.resource.send(configure);
@@ -249,13 +239,14 @@ fn handle_xdg_toplevel_request(
     use xdg_toplevel::Request::*;
 
     let rc = resource.user_data_rc::<RefCell<Toplevel>>();
-    let mut toplevel = rc.borrow_mut();
+    let shsurf_rc = Rc::clone(&rc.borrow().shsurf);
+    let mut shsurf = shsurf_rc.borrow_mut();
 
     match request {
         Destroy => (),
         SetParent { parent: _ } => (),
-        SetTitle { title } => toplevel.title = title.clone(),
-        SetAppId { app_id } => toplevel.app_id = app_id.clone(),
+        SetTitle { .. } => { },
+        SetAppId { .. } => { }
         ShowWindowMenu { seat: _, serial: _, x: _, y: _ } => (),
         Move { seat, serial } => {
             let seat = seat.as_ref().user_data::<ffi::weston_seat>();
@@ -267,7 +258,7 @@ fn handle_xdg_toplevel_request(
                     //let focus = &mut *pointer.focus;
                     //let focus = ffi::weston_surface_get_main_surface(focus.surface);
                     // if (focus == surface
-                    toplevel.shsurf.r#move(pointer, true);
+                    shsurf.r#move(pointer, true);
                 }
             }
             if let Some(touch) = seat.get_touch() {
@@ -282,26 +273,22 @@ fn handle_xdg_toplevel_request(
                     && pointer.grab_serial == *serial
                 {
                     // let focus = get main surf
-                    toplevel.shsurf.resize(pointer, edges.to_raw())
+                    shsurf.resize(pointer, edges.to_raw())
                 }
             }
         }
-        SetMaxSize { width, height } => {
-            toplevel.next_max_size = ffi::weston_size { width: *width, height: *height }
-        }
-        SetMinSize { width, height } => {
-            toplevel.next_min_size = ffi::weston_size { width: *width, height: *height }
-        }
-        SetMaximized => toplevel.shsurf.set_maximized(true),
-        UnsetMaximized => toplevel.shsurf.set_maximized(false),
-        SetFullscreen { output } => toplevel.shsurf.set_fullscreen(
+        SetMaxSize { .. } => { }
+        SetMinSize { .. } => { }
+        SetMaximized => shsurf.set_maximized(true),
+        UnsetMaximized => shsurf.set_maximized(false),
+        SetFullscreen { output } => shsurf.set_fullscreen(
             true,
             output
                 .as_ref()
                 .map_or(0 as *mut _, |output| output.as_ref().user_data()),
         ),
-        UnsetFullscreen => toplevel.shsurf.set_fullscreen(false, 0 as *mut _),
-        SetMinimized => toplevel.shsurf.set_minimized(),
+        UnsetFullscreen => shsurf.set_fullscreen(false, 0 as *mut _),
+        SetMinimized => shsurf.set_minimized(),
     }
 }
 
@@ -312,6 +299,8 @@ fn handle_xdg_toplevel_surface_request(
     use xdg_surface::Request::*;
     let rc = resource.user_data_rc::<RefCell<Toplevel>>();
     let mut toplevel = rc.borrow_mut();
+    let shsurf_rc = Rc::clone(&toplevel.shsurf);
+    let mut shsurf = shsurf_rc.borrow_mut();
 
     match request {
         Destroy => (),
@@ -323,7 +312,7 @@ fn handle_xdg_toplevel_surface_request(
             return;
         }
         SetWindowGeometry { x, y, width, height } => {
-            toplevel.shsurf.geometry = ffi::weston_geometry {
+            shsurf.geometry = ffi::weston_geometry {
                 x: *x,
                 y: *y,
                 width: *width,

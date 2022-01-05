@@ -8,6 +8,7 @@ use std::rc::Rc;
 use crate::ffi;
 use crate::input;
 use crate::Shell;
+use crate::shell;
 
 pub struct MoveGrab {
     view_destroy_listener: ffi::wl_listener,
@@ -158,8 +159,8 @@ impl input::PointerGrabHandler for ResizeGrab {
         // xxx check max/min sizes
 
         let surface = unsafe { &mut *(view.surface) };
-        if let Some(shsurf) = ffi::shell_surface::get(surface) {
-            shsurf.set_size(width, height);
+        if let Some(shsurf) = shell::Surface::get(surface) {
+	    shsurf.borrow_mut().set_size(width, height);
         }
     }
 
@@ -200,7 +201,7 @@ impl input::KeyboardGrabHandler for ResizeGrab {
             let surface = unsafe { &mut *(view.surface) };
             if let Some(shsurf) = ffi::shell_surface::get(surface) {
                 view.set_position(self.origin_x, self.origin_y);
-                shsurf.set_size(self.width, self.height);
+		shsurf.borrow_mut().set_size(self.width, self.height);
             }
 
             self.shutdown(pointer)
@@ -242,7 +243,7 @@ impl ResizeGrab {
         }
 
         let (width, height) = if let Some(shsurf) = ffi::shell_surface::get(surface) {
-            let geometry = shsurf.get_geometry();
+	    let geometry = shsurf.borrow_mut().get_geometry();
             (geometry.width, geometry.height)
         } else {
             (surface.width, surface.height)
@@ -260,7 +261,7 @@ impl ResizeGrab {
         });
 
         if let Some(shsurf) = ffi::shell_surface::get(surface) {
-            shsurf.set_resizing(edges);
+	    shsurf.borrow_mut().set_resizing(edges);
         }
 
         let p = handler.as_mut() as *mut Self;
@@ -275,7 +276,7 @@ impl ResizeGrab {
         use ffi::wl_shell_surface_resize as resize;
 
         if let Some(shsurf) = ffi::shell_surface::get(surface) {
-            shsurf.set_resizing(resize::WL_SHELL_SURFACE_RESIZE_NONE);
+	    shsurf.borrow_mut().set_resizing(resize::WL_SHELL_SURFACE_RESIZE_NONE);
         }
 
         // xxx unset shsurf resizing
