@@ -202,6 +202,46 @@ impl Shell {
         compositor.bind_key(KEY_BRIGHTNESSUP, no_mods, backlight_binding.clone());
         compositor.bind_key(KEY_F9, mods, backlight_binding.clone());
         compositor.bind_key(KEY_F10, mods, backlight_binding.clone());
+
+        compositor.bind_button(BTN_LEFT, mods, |pointer, _, _| {
+            Surface::from_view(pointer.focus)
+                .borrow_mut()
+                .r#move(pointer, false)
+        });
+
+        let resize_binding = |pointer: &mut ffi::weston_pointer, _, _| {
+            if !pointer.focus.is_null() {
+                let view = unsafe { &mut *pointer.focus };
+                let surface = unsafe { &mut *view.surface };
+                use ffi::wl_shell_surface_resize as resize;
+
+                let (x, y) = view.from_global::<_, f32>(pointer.grab_x, pointer.grab_y);
+
+                let (x, y) = (x as i32, y as i32);
+                let hmargin = surface.width / 3;
+                let vmargin = surface.height / 3;
+                let edges = if x < hmargin {
+                    resize::WL_SHELL_SURFACE_RESIZE_LEFT
+                } else if x < surface.width - hmargin {
+                    resize::WL_SHELL_SURFACE_RESIZE_NONE
+                } else {
+                    resize::WL_SHELL_SURFACE_RESIZE_RIGHT
+                } | if y < vmargin {
+                    resize::WL_SHELL_SURFACE_RESIZE_TOP
+                } else if y < surface.height - vmargin {
+                    resize::WL_SHELL_SURFACE_RESIZE_NONE
+                } else {
+                    resize::WL_SHELL_SURFACE_RESIZE_BOTTOM
+                };
+
+                Surface::from_view(pointer.focus)
+                    .borrow_mut()
+                    .resize(pointer, edges)
+            }
+        };
+
+        compositor.bind_button(BTN_RIGHT, mods, resize_binding);
+        compositor.bind_button(BTN_LEFT, mods_with_shift, resize_binding);
     }
 
     fn init(&mut self) {

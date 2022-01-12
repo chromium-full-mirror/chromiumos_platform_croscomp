@@ -329,8 +329,6 @@ fn main() -> std::io::Result<()> {
 
     switcher::init(&shell);
 
-    move_resize::init(&shell);
-
     rotate::init(&shell);
 
     aura_shell::init(&shell);
