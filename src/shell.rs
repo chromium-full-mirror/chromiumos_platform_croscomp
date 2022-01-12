@@ -615,7 +615,7 @@ impl Surface {
 
     pub fn get(surface: *mut ffi::weston_surface) -> Option<Rc<RefCell<Surface>>> {
 	unsafe {
-	    let surface = surface.as_mut().unwrap();
+	    let surface = surface.as_mut()?;
 	    if surface.committed == Some(Surface::committed) {
 		let ptr = surface.committed_private as *const _;
 		Rc::increment_strong_count(ptr);
