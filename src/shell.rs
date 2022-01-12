@@ -29,6 +29,7 @@ impl Shell {
     pub fn new(rc: &Rc<RefCell<Compositor>>) -> Rc<RefCell<Self>> {
         let rc = {
             let compositor = &mut rc.borrow_mut();
+	    let compositor_rc = Rc::clone(rc);
             Rc::new(RefCell::new(Shell {
                 native: ffi::desktop_shell {
                     compositor: &mut compositor.native as *mut _,
@@ -73,14 +74,16 @@ impl Shell {
                 }),
                 activate_listener: ffi::WlListener::new(
                     &mut compositor.native.activate_signal,
-                    |data| unsafe {
-                        let data = &*(data as *mut ffi::weston_surface_activation_data);
+                    move |data| unsafe {
+                        let data = *(data as *mut ffi::weston_surface_activation_data);
+			let mut compositor = compositor_rc.borrow_mut();
 
-			if let Some(shsurf) = Surface::get(data.surface) {
-                            shsurf.borrow_mut().activate(data.seat)
-			}
-                    },
-                ),
+			compositor.server.event_loop.when_idle(move || {
+			    if let Some(shsurf) = Surface::get(data.surface) {
+				shsurf.borrow_mut().activate(data.seat)
+			    }
+			})
+                    })
             }))
         };
 
