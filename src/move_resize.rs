@@ -7,8 +7,8 @@ use std::rc::Rc;
 
 use crate::ffi;
 use crate::input;
-use crate::Shell;
 use crate::shell;
+use crate::Shell;
 
 pub struct MoveGrab {
     view_destroy_listener: ffi::wl_listener,
@@ -85,9 +85,9 @@ impl input::KeyboardGrabHandler for MoveGrab {
 }
 
 impl MoveGrab {
-    pub fn start(pointer: *mut ffi::weston_pointer, view: *mut ffi::weston_view) {
+    pub fn start(pointer: *mut ffi::weston_pointer, shsurf: &shell::Surface) {
         let pointer = unsafe { &mut *pointer };
-        let view = unsafe { &mut *view };
+        let view = unsafe { &mut *shsurf.view };
         let seat = unsafe { &mut *pointer.seat };
         let keyboard = unsafe { &mut *seat.keyboard_state };
 
@@ -160,7 +160,7 @@ impl input::PointerGrabHandler for ResizeGrab {
 
         let surface = unsafe { &mut *(view.surface) };
         if let Some(shsurf) = shell::Surface::get(surface) {
-	    shsurf.borrow_mut().set_size(width, height);
+            shsurf.borrow_mut().set_size(width, height);
         }
     }
 
@@ -201,7 +201,7 @@ impl input::KeyboardGrabHandler for ResizeGrab {
             let surface = unsafe { &mut *(view.surface) };
             if let Some(shsurf) = ffi::shell_surface::get(surface) {
                 view.set_position(self.origin_x, self.origin_y);
-		shsurf.borrow_mut().set_size(self.width, self.height);
+                shsurf.borrow_mut().set_size(self.width, self.height);
             }
 
             self.shutdown(pointer)
@@ -219,14 +219,13 @@ impl input::KeyboardGrabHandler for ResizeGrab {
 impl ResizeGrab {
     pub fn start(
         pointer: *mut ffi::weston_pointer,
-        view: *mut ffi::weston_view,
+        shsurf: &mut shell::Surface,
         edges: ffi::wl_shell_surface_resize,
     ) {
         let pointer = unsafe { &mut *pointer };
         let seat = unsafe { &mut *pointer.seat };
         let keyboard = unsafe { &mut *seat.keyboard_state };
-        let view = unsafe { &mut *view };
-        let surface = unsafe { &mut *(view.surface) };
+        let view = unsafe { &mut *shsurf.view };
         use ffi::wl_shell_surface_resize as resize;
 
         // xxx reject if shsurf->grabbed or fullscreen or maximized.
@@ -242,27 +241,19 @@ impl ResizeGrab {
             return;
         }
 
-        let (width, height) = if let Some(shsurf) = ffi::shell_surface::get(surface) {
-	    let geometry = shsurf.borrow_mut().get_geometry();
-            (geometry.width, geometry.height)
-        } else {
-            (surface.width, surface.height)
-        };
-
+        let geometry = shsurf.get_geometry();
         let mut handler = Box::new(ResizeGrab {
             view_destroy_listener: ffi::wl_listener::new(view_destroy_notify),
             edges: edges,
             origin_x: view.geometry.x,
             origin_y: view.geometry.y,
-            width: width,
-            height: height,
+            width: geometry.width,
+            height: geometry.height,
             pointer_grab: input::PointerGrab::new(pointer),
             keyboard_grab: input::KeyboardGrab::new(keyboard),
         });
 
-        if let Some(shsurf) = ffi::shell_surface::get(surface) {
-	    shsurf.borrow_mut().set_resizing(edges);
-        }
+        shsurf.set_resizing(edges);
 
         let p = handler.as_mut() as *mut Self;
         handler.pointer_grab.start(p);
@@ -276,7 +267,9 @@ impl ResizeGrab {
         use ffi::wl_shell_surface_resize as resize;
 
         if let Some(shsurf) = ffi::shell_surface::get(surface) {
-	    shsurf.borrow_mut().set_resizing(resize::WL_SHELL_SURFACE_RESIZE_NONE);
+            shsurf
+                .borrow_mut()
+                .set_resizing(resize::WL_SHELL_SURFACE_RESIZE_NONE);
         }
 
         // xxx unset shsurf resizing
@@ -301,9 +294,7 @@ pub fn init(shell: &Rc<RefCell<Shell>>) {
         BTN_LEFT,
         ffi::weston_keyboard_modifier(shell.native.binding_modifier),
         |pointer, _, _| {
-            if !pointer.focus.is_null() {
-                MoveGrab::start(pointer, pointer.focus);
-            }
+	    shell::Surface::from_view(pointer.focus).borrow_mut().r#move(pointer, false)
         },
     );
 
@@ -332,11 +323,7 @@ pub fn init(shell: &Rc<RefCell<Shell>>) {
                 resize::WL_SHELL_SURFACE_RESIZE_BOTTOM
             };
 
-            ResizeGrab::start(
-                pointer,
-                pointer.focus,
-                edges as ffi::wl_shell_surface_resize,
-            )
+	    shell::Surface::from_view(pointer.focus).borrow_mut().resize(pointer, edges)
         }
     };
 

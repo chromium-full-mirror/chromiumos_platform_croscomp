@@ -439,7 +439,7 @@ impl Surface {
             .find(|shsurf| unsafe { shsurf.view.as_ref().map_or(false, |view| view.is_mapped()) })
     }
 
-    pub fn shsurf_from_view<'a>(view: *mut ffi::weston_view) -> Rc<RefCell<Surface>> {
+    pub fn from_view<'a>(view: *mut ffi::weston_view) -> Rc<RefCell<Surface>> {
         let view = unsafe { &mut *view };
         let surface = unsafe { &mut *view.surface };
 
@@ -634,11 +634,11 @@ impl Surface {
     }
 
     pub fn r#move(&mut self, pointer: &mut ffi::weston_pointer, _client_initiated: bool) {
-        MoveGrab::start(pointer, self.view)
+        MoveGrab::start(pointer, self)
     }
 
-    pub fn resize(&mut self, pointer: &mut ffi::weston_pointer, edges: u32) {
-        ResizeGrab::start(pointer, self.view, ffi::wl_shell_surface_resize(edges));
+    pub fn resize(&mut self, pointer: &mut ffi::weston_pointer, edges: ffi::wl_shell_surface_resize) {
+        ResizeGrab::start(pointer, self, edges);
     }
 
     pub fn set_size(&mut self, width: i32, height: i32) {

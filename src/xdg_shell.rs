@@ -272,7 +272,9 @@ fn handle_xdg_toplevel_request(
                     && pointer.grab_serial == *serial
                 {
                     // let focus = get main surf
-                    shsurf.resize(pointer, edges.to_raw())
+		    let edges = ffi::wl_shell_surface_resize(edges.to_raw());
+
+                    shsurf.resize(pointer, edges)
                 }
             }
         }
