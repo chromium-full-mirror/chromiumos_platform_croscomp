@@ -243,6 +243,11 @@ impl Shell {
 
         compositor.bind_button(BTN_RIGHT, mods, resize_binding);
         compositor.bind_button(BTN_LEFT, mods_with_shift, resize_binding);
+
+        unsafe {
+            ffi::weston_install_debug_key_binding(&mut compositor.native as *mut _, mods.0)
+        }
+
     }
 
     fn init(&mut self) {

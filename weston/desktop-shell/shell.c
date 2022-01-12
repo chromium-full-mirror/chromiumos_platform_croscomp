@@ -777,18 +777,6 @@ shell_destroy(struct wl_listener *listener, void *data)
 	free(shell);
 }
 
-static void
-shell_add_bindings(struct weston_compositor *ec, struct desktop_shell *shell)
-{
-	uint32_t mod;
-
-	mod = shell->binding_modifier;
-	if (!mod)
-		return;
-
-	weston_install_debug_key_binding(ec, mod);
-}
-
 int
 desktop_shell_init(struct desktop_shell *shell,
 		   struct weston_compositor *ec)
@@ -804,8 +792,6 @@ desktop_shell_init(struct desktop_shell *shell,
 	}
 
 	setup_output_destroy_handler(ec, shell);
-
-	shell_add_bindings(ec, shell);
 
 	clock_gettime(CLOCK_MONOTONIC, &shell->startup_time);
 
