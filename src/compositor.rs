@@ -2,13 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use log::debug;
-
-use nix::sys::signal::{sigprocmask, SigSet, SigmaskHow};
+use std::cell::RefCell;
 use std::os::unix::io::{AsRawFd, IntoRawFd, RawFd};
 use std::os::unix::net::UnixStream;
 use std::os::unix::process::CommandExt;
 use std::process::Command;
+use std::rc::Rc;
+
+use log::debug;
+use nix::sys::signal::{sigprocmask, SigSet, SigmaskHow};
 
 use crate::ffi;
 use crate::Server;
@@ -20,10 +22,10 @@ pub struct Compositor {
 }
 
 impl Compositor {
-    pub fn new(ctx: *mut ffi::weston_log_context) -> Self {
+    pub fn new(ctx: *mut ffi::weston_log_context) -> Rc<RefCell<Self>> {
         let server = Server::new();
         let display_native = server.native;
-        Compositor {
+        let rc = Rc::new(RefCell::new(Compositor {
             server: server,
             native: ffi::weston_compositor {
                 destroy_signal: ffi::wl_signal::zeroed(),
@@ -105,10 +107,15 @@ impl Compositor {
                 timeline: std::ptr::null_mut(),
                 content_protection: std::ptr::null_mut(),
             },
-        }
+        }));
+
+        let mut compositor = rc.borrow_mut();
+        compositor.init();
+
+        Rc::clone(&rc)
     }
 
-    pub fn init(&mut self) {
+    fn init(&mut self) {
         self.native.destroy_signal.init();
         self.native.create_surface_signal.init();
         self.native.activate_signal.init();

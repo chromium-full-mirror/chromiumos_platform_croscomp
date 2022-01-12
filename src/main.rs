@@ -269,8 +269,7 @@ fn main() -> std::io::Result<()> {
     env_logger::init();
     let ctx = unsafe { ffi::weston_log_ctx_create() };
 
-    let compositor = Rc::new(RefCell::new(Compositor::new(ctx)));
-    compositor.borrow_mut().init();
+    let compositor = Compositor::new(ctx);
 
     let mut rules = ffi::xkb_rule_names {
         rules: std::ptr::null(),
