@@ -448,6 +448,10 @@ impl Surface {
     }
 
     fn activate(&mut self, seat: *mut ffi::weston_seat) {
+	if self.state.activated || self.pending_state.activated {
+	    return
+	}
+
         if !self.output.is_null() {
             lower_fullscreen_layer(self.shell, self.output);
         }
