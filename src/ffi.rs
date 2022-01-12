@@ -409,10 +409,8 @@ where
     F: Fn(*mut std::os::raw::c_void),
 {
     pub fn new(signal: &wl_signal, f: F) -> Box<Self> {
-        extern "C" fn call_closure<F>(
-            listener: *mut wl_listener,
-            data: *mut ::std::os::raw::c_void,
-        ) where
+        extern "C" fn call_closure<F>(listener: *mut wl_listener, data: *mut ::std::os::raw::c_void)
+        where
             F: Fn(*mut std::os::raw::c_void),
         {
             let fbox = unsafe { &mut *container_of_mut!(listener, WlListener<F>, listener) };

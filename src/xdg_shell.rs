@@ -188,7 +188,7 @@ impl Toplevel {
             }
         }));
 
-	let mut shsurf = shsurf_rc.borrow_mut();
+        let mut shsurf = shsurf_rc.borrow_mut();
         let weak = Rc::downgrade(&toplevel_rc);
         toplevel.state_change_listener = Some(ffi::WlListener::new(
             &mut shsurf.state_change_signal,
@@ -244,8 +244,8 @@ fn handle_xdg_toplevel_request(
     match request {
         Destroy => (),
         SetParent { parent: _ } => (),
-        SetTitle { .. } => { },
-        SetAppId { .. } => { }
+        SetTitle { .. } => {}
+        SetAppId { .. } => {}
         ShowWindowMenu { seat: _, serial: _, x: _, y: _ } => (),
         Move { seat, serial } => {
             let seat = seat.as_ref().user_data::<ffi::weston_seat>();
@@ -272,14 +272,14 @@ fn handle_xdg_toplevel_request(
                     && pointer.grab_serial == *serial
                 {
                     // let focus = get main surf
-		    let edges = ffi::wl_shell_surface_resize(edges.to_raw());
+                    let edges = ffi::wl_shell_surface_resize(edges.to_raw());
 
                     shsurf.resize(pointer, edges)
                 }
             }
         }
-        SetMaxSize { .. } => { }
-        SetMinSize { .. } => { }
+        SetMaxSize { .. } => {}
+        SetMinSize { .. } => {}
         SetMaximized => shsurf.set_maximized(true),
         UnsetMaximized => shsurf.set_maximized(false),
         SetFullscreen { output } => shsurf.set_fullscreen(
