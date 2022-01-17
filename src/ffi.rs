@@ -526,6 +526,10 @@ impl weston_view {
         unsafe { weston_view_activate(self, seat, flags) }
     }
 
+    pub fn damage_below(&mut self) {
+        unsafe { weston_view_damage_below(self) }
+    }
+
     pub fn from_global<T: Into<f32>, U: From<f32>>(&mut self, x: T, y: T) -> (U, U) {
         let local = if self.transform.enabled {
             let global = weston_vector { f: [x.into(), y.into(), 0.0, 1.0] };

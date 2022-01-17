@@ -256,33 +256,6 @@ surface_keyboard_focus_lost(struct weston_surface *surface)
 	}
 }
 
-void
-shell_surface_set_minimized(struct shell_surface *shsurf)
-{
-	struct weston_surface *surface = shsurf->surface;
-	struct workspace *current_ws;
-	struct weston_view *view;
-
-	view = get_default_view(surface);
-	if (!view)
-		return;
-
-	assert(weston_surface_get_main_surface(view->surface) == view->surface);
-
-	shsurf = get_shell_surface(surface);
-	current_ws = get_current_workspace(shsurf->shell);
-
-	weston_layer_entry_remove(&view->layer_link);
-	weston_layer_entry_insert(&shsurf->shell->minimized_layer.view_list, &view->layer_link);
-
-	drop_focus_state(shsurf->shell, current_ws, view->surface);
-	surface_keyboard_focus_lost(surface);
-
-	shell_surface_update_child_surface_layers(shsurf);
-	weston_view_damage_below(view);
-}
-
-
 static struct desktop_shell *
 shell_surface_get_shell(struct shell_surface *shsurf)
 {

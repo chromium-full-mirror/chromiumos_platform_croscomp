@@ -184,9 +184,6 @@ struct weston_size
 shell_surface_set_fullscreen(struct shell_surface *shsurf, bool fullscreen,
 			     struct weston_output *output);
 
-void
-shell_surface_set_minimized(struct shell_surface *shsurf);
-
 struct shell_surface *
 get_shell_surface(struct weston_surface *surface);
 

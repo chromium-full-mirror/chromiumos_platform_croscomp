@@ -768,7 +768,30 @@ impl Surface {
     }
 
     pub fn set_minimized(&mut self) {
-        unsafe { ffi::shell_surface_set_minimized(self) }
+        let view = unsafe { &mut *self.view };
+        let shell = unsafe { &mut *self.shell };
+        let compositor = unsafe { &mut *shell.compositor };
+
+        unsafe {
+            ffi::weston_layer_entry_remove(&mut view.layer_link);
+
+            ffi::weston_layer_entry_insert(
+                &mut shell.minimized_layer.view_list,
+                &mut view.layer_link,
+            );
+
+            let current_ws = ffi::get_current_workspace(shell);
+            ffi::drop_focus_state(shell, current_ws, view.surface);
+
+        }
+
+        for keyboard in compositor.seat_iter_mut()
+            .filter_map(|seat| seat.get_keyboard())
+            .filter(|keyboard| keyboard.focus == self.surface) {
+                keyboard.set_focus(0 as *mut _)
+            }
+
+        view.damage_below();
     }
 }
 
