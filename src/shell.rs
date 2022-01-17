@@ -703,7 +703,7 @@ impl Surface {
         self.emit_state_changed()
     }
 
-    pub fn get_geometry(&mut self) -> ffi::weston_geometry {
+    pub fn get_geometry(&self) -> ffi::weston_geometry {
         self.geometry
     }
 
