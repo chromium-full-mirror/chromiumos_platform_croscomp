@@ -50,11 +50,6 @@
 #include "shared/timespec-util.h"
 #include "shared/os-compatibility.h"
 
-#define DEFAULT_NUM_WORKSPACES 1
-
-static struct desktop_shell *
-shell_surface_get_shell(struct shell_surface *shsurf);
-
 struct weston_view *
 get_default_view(struct weston_surface *surface)
 {
@@ -73,26 +68,6 @@ get_default_view(struct weston_surface *surface)
 			return view;
 
 	return container_of(surface->views.next, struct weston_view, surface_link);
-}
-
-void
-get_output_work_area(struct desktop_shell *shell,
-		     struct weston_output *output,
-		     pixman_rectangle32_t *area)
-{
-	if (!output) {
-		area->x = 0;
-		area->y = 0;
-		area->width = 0;
-		area->height = 0;
-
-		return;
-	}
-
-	area->x = output->x;
-	area->y = output->y;
-	area->width = output->width;
-	area->height = output->height;
 }
 
 static void
@@ -236,32 +211,6 @@ shell_surface_set_output(struct shell_surface *shsurf,
 		      &shsurf->output_destroy_listener);
 }
 
-static void
-surface_keyboard_focus_lost(struct weston_surface *surface)
-{
-	struct weston_compositor *compositor = surface->compositor;
-	struct weston_seat *seat;
-	struct weston_surface *focus;
-
-	wl_list_for_each(seat, &compositor->seat_list, link) {
-		struct weston_keyboard *keyboard =
-			weston_seat_get_keyboard(seat);
-
-		if (!keyboard)
-			continue;
-
-		focus = weston_surface_get_main_surface(keyboard->focus);
-		if (focus == surface)
-			weston_keyboard_set_focus(keyboard, NULL);
-	}
-}
-
-static struct desktop_shell *
-shell_surface_get_shell(struct shell_surface *shsurf)
-{
-	return shsurf->shell;
-}
-
 static int
 black_surface_get_label(struct weston_surface *surface, char *buf, size_t len)
 {
@@ -384,100 +333,6 @@ shell_configure_fullscreen(struct shell_surface *shsurf)
 		center_on_output(shsurf->view, shsurf->fullscreen_output);
 }
 
-static struct weston_output *
-get_focused_output(struct weston_compositor *compositor)
-{
-	struct weston_seat *seat;
-	struct weston_output *output = NULL;
-
-	wl_list_for_each(seat, &compositor->seat_list, link) {
-		struct weston_touch *touch = weston_seat_get_touch(seat);
-		struct weston_pointer *pointer = weston_seat_get_pointer(seat);
-		struct weston_keyboard *keyboard =
-			weston_seat_get_keyboard(seat);
-
-		/* Priority has touch focus, then pointer and
-		 * then keyboard focus. We should probably have
-		 * three for loops and check first for touch,
-		 * then for pointer, etc. but unless somebody has some
-		 * objections, I think this is sufficient. */
-		if (touch && touch->focus)
-			output = touch->focus->output;
-		else if (pointer && pointer->focus)
-			output = pointer->focus->output;
-		else if (keyboard && keyboard->focus)
-			output = keyboard->focus->output;
-
-		if (output)
-			break;
-	}
-
-	return output;
-}
-
-static void
-get_maximized_size(struct shell_surface *shsurf, int32_t *width, int32_t *height)
-{
-	struct desktop_shell *shell;
-	pixman_rectangle32_t area;
-
-	shell = shell_surface_get_shell(shsurf);
-	get_output_work_area(shell, shsurf->output, &area);
-
-	*width = area.width;
-	*height = area.height;
-}
-
-struct weston_size
-shell_surface_set_fullscreen(struct shell_surface *shsurf, bool fullscreen,
-			     struct weston_output *output)
-{
-	struct weston_surface *surface = shsurf->surface;
-	struct weston_size size = { 0, 0 };
-
-	if (fullscreen) {
-		/* handle clients launching in fullscreen */
-		if (output == NULL && !weston_surface_is_mapped(surface)) {
-			/* Set the output to the one that has focus currently. */
-			output = get_focused_output(surface->compositor);
-		}
-
-		shell_surface_set_output(shsurf, output);
-		shsurf->fullscreen_output = shsurf->output;
-
-		if (shsurf->output) {
-			size.width = shsurf->output->width;
-			size.height = shsurf->output->height;
-		}
-	} else if (shsurf->state.maximized) {
-		get_maximized_size(shsurf, &size.width, &size.height);
-	}
-
-	return size;
-}
-
-struct weston_size
-shell_surface_set_maximized(struct shell_surface *shsurf, bool maximized)
-{
-	struct weston_surface *surface = shsurf->surface;
-	struct weston_size size = { 0, 0 };
-
-	if (maximized) {
-		struct weston_output *output;
-
-		if (!weston_surface_is_mapped(surface))
-			output = get_focused_output(surface->compositor);
-		else
-			output = surface->output;
-
-		shell_surface_set_output(shsurf, output);
-
-		get_maximized_size(shsurf, &size.width, &size.height);
-	}
-
-	return size;
-}
-
 /* Move all fullscreen layers down to the current workspace and hide their
  * black views. The surfaces' state is set to both fullscreen and lowered,
  * and this is reversed when such a surface is re-configured, see
@@ -556,197 +411,15 @@ center_on_output(struct weston_view *view, struct weston_output *output)
 }
 
 static void
-shell_reposition_view_on_output_change(struct weston_view *view)
-{
-	struct weston_output *output, *first_output;
-	struct weston_compositor *ec = view->surface->compositor;
-	struct shell_surface *shsurf;
-	float x, y;
-	int visible;
-
-	if (wl_list_empty(&ec->output_list))
-		return;
-
-	x = view->geometry.x;
-	y = view->geometry.y;
-
-	/* At this point the destroyed output is not in the list anymore.
-	 * If the view is still visible somewhere, we leave where it is,
-	 * otherwise, move it to the first output. */
-	visible = 0;
-	wl_list_for_each(output, &ec->output_list, link) {
-		if (pixman_region32_contains_point(&output->region,
-						   x, y, NULL)) {
-			visible = 1;
-			break;
-		}
-	}
-
-	if (!visible) {
-		first_output = container_of(ec->output_list.next,
-					    struct weston_output, link);
-
-		x = first_output->x + first_output->width / 4;
-		y = first_output->y + first_output->height / 4;
-
-		weston_view_set_position(view, x, y);
-	} else {
-		weston_view_geometry_dirty(view);
-	}
-
-
-	shsurf = get_shell_surface(view->surface);
-	if (!shsurf)
-		return;
-
-	shsurf->saved_position_valid = false;
-	shell_surface_set_maximized(shsurf, false);
-	shell_surface_set_fullscreen(shsurf, false, NULL);
-}
-
-void
-shell_for_each_layer(struct desktop_shell *shell,
-		     shell_for_each_layer_func_t func, void *data)
-{
-	struct workspace **ws;
-
-	func(shell, &shell->fullscreen_layer, data);
-	func(shell, &shell->background_layer, data);
-
-	wl_array_for_each(ws, &shell->workspaces.array)
-		func(shell, &(*ws)->layer, data);
-}
-
-static void
-shell_output_changed_move_layer(struct desktop_shell *shell,
-				struct weston_layer *layer,
-				void *data)
-{
-	struct weston_view *view;
-
-	wl_list_for_each(view, &layer->view_list.link, layer_link.link)
-		shell_reposition_view_on_output_change(view);
-
-}
-
-static void
-handle_output_destroy(struct wl_listener *listener, void *data)
-{
-	struct shell_output *output_listener =
-		container_of(listener, struct shell_output, destroy_listener);
-	struct desktop_shell *shell = output_listener->shell;
-
-	shell_for_each_layer(shell, shell_output_changed_move_layer, NULL);
-
-	if (output_listener->panel_surface)
-		wl_list_remove(&output_listener->panel_surface_listener.link);
-	if (output_listener->background_surface)
-		wl_list_remove(&output_listener->background_surface_listener.link);
-	wl_list_remove(&output_listener->destroy_listener.link);
-	wl_list_remove(&output_listener->link);
-	free(output_listener);
-}
-
-static void
-create_shell_output(struct desktop_shell *shell,
-					struct weston_output *output)
-{
-	struct shell_output *shell_output;
-
-	shell_output = zalloc(sizeof *shell_output);
-	if (shell_output == NULL)
-		return;
-
-	shell_output->output = output;
-	shell_output->shell = shell;
-	shell_output->destroy_listener.notify = handle_output_destroy;
-	wl_signal_add(&output->destroy_signal,
-		      &shell_output->destroy_listener);
-	wl_list_insert(shell->output_list.prev, &shell_output->link);
-
-	if (wl_list_length(&shell->output_list) == 1)
-		shell_for_each_layer(shell,
-				     shell_output_changed_move_layer, NULL);
-}
-
-static void
-handle_output_create(struct wl_listener *listener, void *data)
-{
-	struct desktop_shell *shell =
-		container_of(listener, struct desktop_shell, output_create_listener);
-	struct weston_output *output = (struct weston_output *)data;
-
-	create_shell_output(shell, output);
-}
-
-static void
-handle_output_move_layer(struct desktop_shell *shell,
-			 struct weston_layer *layer, void *data)
-{
-	struct weston_output *output = data;
-	struct weston_view *view;
-	float x, y;
-
-	wl_list_for_each(view, &layer->view_list.link, layer_link.link) {
-		if (view->output != output)
-			continue;
-
-		x = view->geometry.x + output->move_x;
-		y = view->geometry.y + output->move_y;
-		weston_view_set_position(view, x, y);
-	}
-}
-
-static void
-handle_output_move(struct wl_listener *listener, void *data)
-{
-	struct desktop_shell *shell;
-
-	shell = container_of(listener, struct desktop_shell,
-			     output_move_listener);
-
-	shell_for_each_layer(shell, handle_output_move_layer, data);
-}
-
-static void
-setup_output_destroy_handler(struct weston_compositor *ec,
-							struct desktop_shell *shell)
-{
-	struct weston_output *output;
-
-	wl_list_init(&shell->output_list);
-	wl_list_for_each(output, &ec->output_list, link)
-		create_shell_output(shell, output);
-
-	shell->output_create_listener.notify = handle_output_create;
-	wl_signal_add(&ec->output_created_signal,
-				&shell->output_create_listener);
-
-	shell->output_move_listener.notify = handle_output_move;
-	wl_signal_add(&ec->output_moved_signal, &shell->output_move_listener);
-}
-
-static void
 shell_destroy(struct wl_listener *listener, void *data)
 {
 	struct desktop_shell *shell =
 		container_of(listener, struct desktop_shell, destroy_listener);
-	struct shell_output *shell_output, *tmp;
 
 	wl_list_remove(&shell->destroy_listener.link);
 
-	wl_list_for_each_safe(shell_output, tmp, &shell->output_list, link) {
-		wl_list_remove(&shell_output->destroy_listener.link);
-		wl_list_remove(&shell_output->link);
-		free(shell_output);
-	}
-
-	wl_list_remove(&shell->output_create_listener.link);
-	wl_list_remove(&shell->output_move_listener.link);
-
 	destroy_workspaces(shell);
 
-	free(shell->client);
 	free(shell);
 }
 
@@ -763,10 +436,6 @@ desktop_shell_init(struct desktop_shell *shell,
 		weston_log("init_workspaces failed\n");
 		return -1;
 	}
-
-	setup_output_destroy_handler(ec, shell);
-
-	clock_gettime(CLOCK_MONOTONIC, &shell->startup_time);
 
 	return 0;
 }

@@ -52,26 +52,6 @@ struct workspace {
 	struct weston_view_animation *focus_animation;
 };
 
-struct shell_output {
-	struct desktop_shell  *shell;
-	struct weston_output  *output;
-	struct wl_listener    destroy_listener;
-	struct wl_list        link;
-
-	struct weston_surface *panel_surface;
-	struct wl_listener panel_surface_listener;
-
-	struct weston_surface *background_surface;
-	struct wl_listener background_surface_listener;
-
-	struct {
-		struct weston_view *view;
-		struct weston_view_animation *animation;
-		enum fade_type type;
-		struct wl_event_source *startup_timer;
-	} fade;
-};
-
 enum shell_resize_edge {
 	RESIZE_EDGE_NONE = 0,
 	RESIZE_EDGE_TOP = 1,
@@ -155,16 +135,7 @@ struct desktop_shell {
 	} workspaces;
 
 	uint32_t binding_modifier;
-
 	struct weston_layer minimized_layer;
-
-	struct wl_listener output_create_listener;
-	struct wl_listener output_move_listener;
-	struct wl_list output_list;
-
-	char *client;
-
-	struct timespec startup_time;
 };
 
 struct weston_output *
@@ -177,22 +148,8 @@ void
 shell_surface_set_output(struct shell_surface *shsurf,
                          struct weston_output *output);
 
-struct weston_size
-shell_surface_set_maximized(struct shell_surface *shsurf, bool maximized);
-
-struct weston_size
-shell_surface_set_fullscreen(struct shell_surface *shsurf, bool fullscreen,
-			     struct weston_output *output);
-
 struct shell_surface *
 get_shell_surface(struct weston_surface *surface);
-
-int
-shell_surface_move(struct shell_surface *shsurf, struct weston_pointer *pointer,
-		   bool client_initiated);
-int
-shell_surface_resize(struct shell_surface *shsurf,
-		     struct weston_pointer *pointer, uint32_t edges);
 
 void
 shell_configure_fullscreen(struct shell_surface *shsurf);
@@ -232,46 +189,9 @@ void
 lower_fullscreen_layer(struct desktop_shell *shell,
 		       struct weston_output *lowering_output);
 
-int
-input_panel_setup(struct desktop_shell *shell);
-void
-input_panel_destroy(struct desktop_shell *shell);
-
-typedef void (*shell_for_each_layer_func_t)(struct desktop_shell *,
-					    struct weston_layer *, void *);
-
-void
-shell_for_each_layer(struct desktop_shell *shell,
-		     shell_for_each_layer_func_t func,
-		     void *data);
-
-static inline struct shell_output *
-find_shell_output_from_weston_output(struct desktop_shell *shell,
-				     struct weston_output *output)
-{
-	struct shell_output *shell_output;
-
-	wl_list_for_each(shell_output, &shell->output_list, link) {
-		if (shell_output->output == output)
-			return shell_output;
-	}
-
-	return NULL;
-}
-
 int desktop_shell_init(struct desktop_shell *shell,
 		       struct weston_compositor *ec);
 
-void
-weston_seat_break_desktop_grabs(struct weston_seat *seat);
-
-
-void
-shell_ping_timeout(struct desktop_shell *shell,
-		   struct wl_client *client);
-void
-shell_pong(struct desktop_shell *shell,
-	   struct wl_client *client);
 
 struct weston_desktop_seat *
 weston_desktop_seat_from_seat(struct weston_seat *wseat);

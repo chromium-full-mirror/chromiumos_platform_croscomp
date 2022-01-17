@@ -58,11 +58,6 @@ impl Shell {
 
                     binding_modifier: ffi::weston_keyboard_modifier::MODIFIER_SUPER.0,
                     minimized_layer: ffi::weston_layer::zeroed(),
-                    output_create_listener: ffi::wl_listener::zeroed(),
-                    output_move_listener: ffi::wl_listener::zeroed(),
-                    output_list: ffi::wl_list::zeroed(),
-                    client: std::ptr::null_mut(),
-                    startup_time: ffi::timespec { tv_sec: 0, tv_nsec: 0 },
                 },
                 compositor: Rc::clone(rc),
 
