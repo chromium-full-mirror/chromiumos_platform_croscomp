@@ -409,33 +409,3 @@ center_on_output(struct weston_view *view, struct weston_output *output)
 
 	weston_view_set_position(view, x, y);
 }
-
-static void
-shell_destroy(struct wl_listener *listener, void *data)
-{
-	struct desktop_shell *shell =
-		container_of(listener, struct desktop_shell, destroy_listener);
-
-	wl_list_remove(&shell->destroy_listener.link);
-
-	destroy_workspaces(shell);
-
-	free(shell);
-}
-
-int
-desktop_shell_init(struct desktop_shell *shell,
-		   struct weston_compositor *ec)
-{
-	if (!weston_compositor_add_destroy_listener_once(ec,
-							 &shell->destroy_listener,
-							 shell_destroy))
-		return -1;
-
-	if (init_workspaces(shell) == -1) {
-		weston_log("init_workspaces failed\n");
-		return -1;
-	}
-
-	return 0;
-}

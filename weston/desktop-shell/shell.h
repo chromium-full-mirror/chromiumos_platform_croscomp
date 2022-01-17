@@ -113,8 +113,6 @@ struct shell_surface {
 struct desktop_shell {
 	struct weston_compositor *compositor;
 
-	struct wl_listener destroy_listener;
-
 	struct weston_layer fullscreen_layer;
 	struct weston_layer background_layer;
 
@@ -188,10 +186,6 @@ get_output_work_area(struct desktop_shell *shell,
 void
 lower_fullscreen_layer(struct desktop_shell *shell,
 		       struct weston_output *lowering_output);
-
-int desktop_shell_init(struct desktop_shell *shell,
-		       struct weston_compositor *ec);
-
 
 struct weston_desktop_seat *
 weston_desktop_seat_from_seat(struct weston_seat *wseat);

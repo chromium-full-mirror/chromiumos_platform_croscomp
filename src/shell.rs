@@ -33,7 +33,6 @@ impl Shell {
             Rc::new(RefCell::new(Shell {
                 native: ffi::desktop_shell {
                     compositor: &mut compositor.native as *mut _,
-                    destroy_listener: ffi::wl_listener::zeroed(),
 
                     fullscreen_layer: ffi::weston_layer::zeroed(),
                     background_layer: ffi::weston_layer::zeroed(),
@@ -101,7 +100,7 @@ impl Shell {
 
         self.native.minimized_layer.init(compositor);
 
-        unsafe { ffi::desktop_shell_init(&mut self.native, compositor) };
+        unsafe { ffi::init_workspaces(&mut self.native) };
     }
 
     fn init_bindings(&mut self) {
@@ -290,7 +289,10 @@ impl Shell {
 
 impl Drop for Shell {
     fn drop(&mut self) {
-        debug!("-------------------- drop Shell")
+        debug!("-------------------- drop Shell");
+        unsafe {
+            ffi::destroy_workspaces(&mut self.native);
+        }
     }
 }
 
