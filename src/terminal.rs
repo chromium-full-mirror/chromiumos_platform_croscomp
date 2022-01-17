@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::shell;
 use crate::Shell;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -32,12 +33,10 @@ extern "C" fn client_destroy_notify(
 
 impl Terminal {
     fn hide(&mut self) {
-        if let Some(surface) = self.client_surface {
-            unsafe {
-                let shsurf = ffi::get_shell_surface(surface);
-                ffi::shell_surface_set_fullscreen(shsurf, false, 0 as *mut _);
-                ffi::shell_surface_set_minimized(shsurf);
-            }
+        if let Some(rc) = shell::Surface::get(self.client_surface.unwrap_or(0 as *mut _)) {
+            let mut shsurf = rc.borrow_mut();
+            shsurf.set_fullscreen(false, 0 as *mut _);
+            shsurf.set_minimized();
         }
     }
 
@@ -46,15 +45,17 @@ impl Terminal {
 
         match (self.client_surface, self.client) {
             (Some(surface), _) => unsafe {
-                let shsurf = ffi::get_shell_surface(surface);
-                let view = &mut *ffi::get_default_view(surface);
 
-                view.activate(
-                    keyboard.seat,
-                    ffi::weston_activate_flag::WESTON_ACTIVATE_FLAG_CONFIGURE.0,
-                );
+                if let Some(rc) = shell::Surface::get(self.client_surface.unwrap_or(0 as *mut _)) {
+                    let mut shsurf = rc.borrow_mut();
+                    let view = &mut *shsurf.view;
 
-                ffi::shell_surface_set_fullscreen(shsurf, true, (*surface).output);
+                    view.activate(
+                        keyboard.seat,
+                        ffi::weston_activate_flag::WESTON_ACTIVATE_FLAG_CONFIGURE.0,
+                    );
+                    shsurf.set_fullscreen(true, (*surface).output);
+                }
             },
             (None, None) => {
                 let terminal_client_path = "/usr/bin/croscomp-terminal\0";
