@@ -359,9 +359,28 @@ impl SurfaceState {
 }
 
 pub fn lower_fullscreen_layer(
-    _shell: *mut ffi::desktop_shell,
+    shell: *mut ffi::desktop_shell,
     _lowering_output: *mut ffi::weston_output,
 ) {
+    let shell = unsafe { &mut *shell };
+
+    let workspace = unsafe { &mut *ffi::get_current_workspace(shell) };
+
+    for view in wl_list_iter_mut!(&mut shell.fullscreen_layer.view_list.link, ffi::weston_view, layer_link.link) {
+        unsafe {
+            ffi::weston_layer_entry_remove(&mut view.layer_link);
+
+            ffi::weston_layer_entry_insert(
+                &mut workspace.layer.view_list,
+                &mut view.layer_link,
+            );
+
+	    view.damage_below();
+
+	    let surface = &mut *view.surface;
+	    surface.damage();
+	}
+    }
 }
 
 impl Surface {
@@ -424,7 +443,25 @@ impl Surface {
     }
 
     pub fn configure_fullscreen(&mut self) {
-        unsafe { ffi::shell_configure_fullscreen(self) };
+        let view = unsafe { &mut *self.view };
+        let shell = unsafe { &mut *self.shell };
+
+        unsafe {
+            ffi::weston_layer_entry_remove(&mut view.layer_link);
+
+            ffi::weston_layer_entry_insert(
+                &mut shell.fullscreen_layer.view_list,
+                &mut view.layer_link,
+            );
+        }
+
+        if let Some(output) = unsafe { self.fullscreen_output.as_mut() } {
+            let x = output.x + (output.width - self.geometry.width) / 2 - self.geometry.x;
+            let y = output.y + (output.height - self.geometry.height) / 2 - self.geometry.y;
+            view.set_position(x as f32, y as f32);
+        } else {
+            view.set_position(0.0, 0.0);
+        }
     }
 
     pub fn configure_maximized(&mut self) {
@@ -468,10 +505,6 @@ impl Surface {
         view.set_position(origin.0 + 20.0, origin.1 + 20.0);
     }
 
-    pub fn update_layer(&mut self) {
-        unsafe { ffi::shell_surface_update_layer(self) }
-    }
-
     pub fn child_iter_mut<'a>(&'a mut self) -> ffi::WlListIterMut<'a, Surface> {
         wl_list_iter_mut!(&mut self.children_list, Surface, children_link)
     }
@@ -491,6 +524,28 @@ impl Surface {
 
     pub fn emit_state_changed(&mut self) {
         self.state_change_signal.emit(&mut ())
+    }
+
+    fn raise_or_insert(&mut self) {
+        unsafe {
+            let shell = &mut *self.shell;
+	    let view = &mut *self.view;
+	    let workspace = &mut *ffi::get_current_workspace(shell);
+
+            ffi::weston_layer_entry_remove(&mut view.layer_link);
+
+	    if self.state.fullscreen {
+		ffi::weston_layer_entry_insert(
+                    &mut shell.fullscreen_layer.view_list,
+                    &mut view.layer_link,
+		);
+	    } else {
+		ffi::weston_layer_entry_insert(
+                    &mut workspace.layer.view_list,
+                    &mut view.layer_link,
+		);
+	    }
+	}
     }
 
     fn activate(&mut self, seat: *mut ffi::weston_seat) {
@@ -520,11 +575,7 @@ impl Surface {
             }
         }
 
-        if self.state.fullscreen {
-            self.configure_fullscreen()
-        }
-
-        self.update_layer();
+	self.raise_or_insert()
     }
 
     pub fn map(&mut self, _sx: i32, _sy: i32) {
@@ -540,7 +591,7 @@ impl Surface {
             self.set_initial_position()
         }
 
-        self.update_layer();
+	self.raise_or_insert();
 
         view.update_transform();
         view.is_mapped = true;

@@ -9,6 +9,7 @@ use crate::ffi;
 use crate::ffi::evdev::KEY_TAB;
 use crate::input;
 use crate::Shell;
+use crate::shell;
 
 struct Thumbnail {
     view: *mut ffi::weston_view,
@@ -42,9 +43,7 @@ impl Switcher {
 
         switcher.view_destroy_listener.link.init();
 
-        unsafe {
-            ffi::lower_fullscreen_layer(&mut switcher.shell.borrow_mut().native, 0 as *mut _);
-        }
+	shell::lower_fullscreen_layer(&mut switcher.shell.borrow_mut().native, 0 as *mut _);
 
         let output = unsafe { &(*(*keyboard.focus).output) };
         keyboard.set_focus(0 as *mut _);
