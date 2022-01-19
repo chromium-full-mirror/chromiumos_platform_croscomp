@@ -3,7 +3,6 @@ if get_option('shell-desktop')
 
 	srcs_shell_desktop = [
 		'shell.c',
-		'seat.c',
 	]
 	deps_shell_desktop = [
 		dep_libm,
