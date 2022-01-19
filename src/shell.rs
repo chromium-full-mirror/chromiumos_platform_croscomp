@@ -683,7 +683,13 @@ impl Surface {
     }
 
     pub fn set_output(&mut self, output: *mut ffi::weston_output) {
-        unsafe { ffi::shell_surface_set_output(self, output) }
+	// todo: We need to use weak references in places like this
+	// where the C code hooks the destroy listener.  We need to
+	// handle an output going away at a higher level and then move
+	// the surfaces, but each surface doesn't need to hook the
+	// output destroy signal.
+
+	self.output = output;
     }
 
     pub fn get(surface: *mut ffi::weston_surface) -> Option<Rc<RefCell<Surface>>> {
