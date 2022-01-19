@@ -84,11 +84,9 @@ impl Switcher {
         }
 
         {
-            let workspace = unsafe { &mut *ffi::get_current_workspace(&mut shell.native) };
-
             let mut x = 2 * margin;
             self.thumbnails = wl_list_iter_mut!(
-                &mut workspace.layer.view_list.link,
+                &mut shell.native.workspace_layer.view_list.link,
                 ffi::weston_view,
                 layer_link.link
             )

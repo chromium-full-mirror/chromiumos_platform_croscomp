@@ -1349,6 +1349,7 @@ struct weston_surface_state {
 struct weston_surface_activation_data {
 	struct weston_surface *surface;
 	struct weston_seat *seat;
+	struct weston_surface *prev_focus;
 };
 
 struct weston_pointer_constraint {

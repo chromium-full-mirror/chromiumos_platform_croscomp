@@ -33,28 +33,9 @@ impl Shell {
             Rc::new(RefCell::new(Shell {
                 native: ffi::desktop_shell {
                     compositor: &mut compositor.native as *mut _,
-
                     fullscreen_layer: ffi::weston_layer::zeroed(),
+                    workspace_layer: ffi::weston_layer::zeroed(),
                     background_layer: ffi::weston_layer::zeroed(),
-
-                    workspaces: ffi::desktop_shell__bindgen_ty_1 {
-                        array: ffi::wl_array::new(),
-                        current: 0,
-                        num: 2,
-                        client_list: ffi::wl_list::zeroed(),
-                        animation: ffi::weston_animation {
-                            frame: None,
-                            frame_counter: 0,
-                            link: ffi::wl_list::zeroed(),
-                        },
-                        anim_sticky_list: ffi::wl_list::zeroed(),
-                        anim_dir: 0,
-                        anim_timestamp: ffi::timespec { tv_sec: 0, tv_nsec: 0 },
-                        anim_current: 0.0,
-                        anim_from: std::ptr::null_mut(),
-                        anim_to: std::ptr::null_mut(),
-                    },
-
                     binding_modifier: ffi::weston_keyboard_modifier::MODIFIER_SUPER.0,
                     minimized_layer: ffi::weston_layer::zeroed(),
                 },
@@ -74,7 +55,7 @@ impl Shell {
 
                         compositor.server.event_loop.when_idle(move || {
                             if let Some(shsurf) = Surface::get(data.surface) {
-                                shsurf.borrow_mut().activate(data.seat)
+                                shsurf.borrow_mut().activate(data.seat, data.prev_focus)
                             }
                         })
                     },
@@ -93,14 +74,16 @@ impl Shell {
         self.native
             .fullscreen_layer
             .set_position(ffi::weston_layer_position::WESTON_LAYER_POSITION_FULLSCREEN);
+        self.native.workspace_layer.init(compositor);
+        self.native
+            .workspace_layer
+            .set_position(ffi::weston_layer_position::WESTON_LAYER_POSITION_FULLSCREEN);
         self.native.background_layer.init(compositor);
         self.native
             .background_layer
             .set_position(ffi::weston_layer_position::WESTON_LAYER_POSITION_BACKGROUND);
 
         self.native.minimized_layer.init(compositor);
-
-        unsafe { ffi::init_workspaces(&mut self.native) };
     }
 
     fn init_bindings(&mut self) {
@@ -245,8 +228,6 @@ impl Shell {
     }
 
     fn init(&mut self) {
-        self.native.workspaces.client_list.init();
-
         self.init_layers();
 
         self.init_bindings();
@@ -290,9 +271,6 @@ impl Shell {
 impl Drop for Shell {
     fn drop(&mut self) {
         debug!("-------------------- drop Shell");
-        unsafe {
-            ffi::destroy_workspaces(&mut self.native);
-        }
     }
 }
 
@@ -364,14 +342,12 @@ pub fn lower_fullscreen_layer(
 ) {
     let shell = unsafe { &mut *shell };
 
-    let workspace = unsafe { &mut *ffi::get_current_workspace(shell) };
-
     for view in wl_list_iter_mut!(&mut shell.fullscreen_layer.view_list.link, ffi::weston_view, layer_link.link) {
         unsafe {
             ffi::weston_layer_entry_remove(&mut view.layer_link);
 
             ffi::weston_layer_entry_insert(
-                &mut workspace.layer.view_list,
+                &mut shell.workspace_layer.view_list,
                 &mut view.layer_link,
             );
 
@@ -530,7 +506,6 @@ impl Surface {
         unsafe {
             let shell = &mut *self.shell;
 	    let view = &mut *self.view;
-	    let workspace = &mut *ffi::get_current_workspace(shell);
 
             ffi::weston_layer_entry_remove(&mut view.layer_link);
 
@@ -541,14 +516,14 @@ impl Surface {
 		);
 	    } else {
 		ffi::weston_layer_entry_insert(
-                    &mut workspace.layer.view_list,
+                    &mut shell.workspace_layer.view_list,
                     &mut view.layer_link,
 		);
 	    }
 	}
     }
 
-    fn activate(&mut self, seat: *mut ffi::weston_seat) {
+    fn activate(&mut self, _seat: *mut ffi::weston_seat, prev: *mut ffi::weston_surface) {
         if self.state.activated || self.pending_state.activated {
             return;
         }
@@ -557,22 +532,19 @@ impl Surface {
             lower_fullscreen_layer(self.shell, self.output);
         }
 
-        if let Some(state) = unsafe { ffi::ensure_focus_state(self.shell, seat).as_mut() } {
-            let old_focus = unsafe { ffi::focus_state_set_focus(state, self.surface) };
-            if let Some(shsurf) = Surface::get(old_focus) {
-                let mut shsurf = shsurf.borrow_mut();
-                shsurf.focus_count = shsurf.focus_count - 1;
-                if shsurf.focus_count == 0 {
-                    shsurf.pending_state.activated = false;
-                    shsurf.emit_state_changed();
-                }
+        if let Some(shsurf) = Surface::get(prev) {
+            let mut shsurf = shsurf.borrow_mut();
+            shsurf.focus_count = shsurf.focus_count - 1;
+            if shsurf.focus_count == 0 {
+                shsurf.pending_state.activated = false;
+                shsurf.emit_state_changed();
             }
+        }
 
-            self.focus_count = self.focus_count + 1;
-            if self.focus_count == 1 {
-                self.pending_state.activated = true;
-                self.emit_state_changed();
-            }
+        self.focus_count = self.focus_count + 1;
+        if self.focus_count == 1 {
+            self.pending_state.activated = true;
+            self.emit_state_changed();
         }
 
 	self.raise_or_insert()
@@ -827,10 +799,6 @@ impl Surface {
                 &mut shell.minimized_layer.view_list,
                 &mut view.layer_link,
             );
-
-            let current_ws = ffi::get_current_workspace(shell);
-            ffi::drop_focus_state(shell, current_ws, view.surface);
-
         }
 
         for keyboard in compositor.seat_iter_mut()

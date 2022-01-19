@@ -43,15 +43,6 @@ enum fade_type {
 	FADE_OUT
 };
 
-struct workspace {
-	struct weston_layer layer;
-
-	struct wl_list focus_list;
-	struct wl_listener seat_destroyed_listener;
-
-	struct weston_view_animation *focus_animation;
-};
-
 enum shell_resize_edge {
 	RESIZE_EDGE_NONE = 0,
 	RESIZE_EDGE_TOP = 1,
@@ -114,23 +105,8 @@ struct desktop_shell {
 	struct weston_compositor *compositor;
 
 	struct weston_layer fullscreen_layer;
+	struct weston_layer workspace_layer;
 	struct weston_layer background_layer;
-
-	struct {
-		struct wl_array array;
-		unsigned int current;
-		unsigned int num;
-
-		struct wl_list client_list;
-
-		struct weston_animation animation;
-		struct wl_list anim_sticky_list;
-		int anim_dir;
-		struct timespec anim_timestamp;
-		double anim_current;
-		struct workspace *anim_from;
-		struct workspace *anim_to;
-	} workspaces;
 
 	uint32_t binding_modifier;
 	struct weston_layer minimized_layer;

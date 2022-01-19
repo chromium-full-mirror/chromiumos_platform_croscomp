@@ -3618,7 +3618,9 @@ weston_seat_set_keyboard_focus(struct weston_seat *seat,
 	struct weston_compositor *compositor = seat->compositor;
 	struct weston_keyboard *keyboard = weston_seat_get_keyboard(seat);
 	struct weston_surface_activation_data activation_data;
+	struct weston_surface *prev;
 
+	prev = keyboard->focus;
 	if (keyboard && keyboard->focus != surface) {
 		weston_keyboard_set_focus(keyboard, surface);
 		wl_data_device_set_keyboard_focus(seat);
@@ -3629,6 +3631,7 @@ weston_seat_set_keyboard_focus(struct weston_seat *seat,
 	activation_data = (struct weston_surface_activation_data) {
 		.surface = surface,
 		.seat = seat,
+		.prev_focus = prev,
 	};
 	wl_signal_emit(&compositor->activate_signal, &activation_data);
 }
