@@ -18,8 +18,12 @@ use crate::Compositor;
 use nix::sys::signal;
 
 pub struct Shell {
-    pub native: ffi::desktop_shell,
     pub compositor: Rc<RefCell<Compositor>>,
+    pub fullscreen_layer: ffi::weston_layer,
+    pub workspace_layer: ffi::weston_layer,
+    pub background_layer: ffi::weston_layer,
+    pub binding_modifier: u32,
+    pub minimized_layer: ffi::weston_layer,
     idle_listener: Box<dyn Drop>,
     wake_listener: Box<dyn Drop>,
     activate_listener: Box<dyn Any>,
@@ -31,15 +35,13 @@ impl Shell {
             let compositor = &mut rc.borrow_mut();
             let compositor_rc = Rc::clone(rc);
             Rc::new(RefCell::new(Shell {
-                native: ffi::desktop_shell {
-                    compositor: &mut compositor.native as *mut _,
-                    fullscreen_layer: ffi::weston_layer::zeroed(),
-                    workspace_layer: ffi::weston_layer::zeroed(),
-                    background_layer: ffi::weston_layer::zeroed(),
-                    binding_modifier: ffi::weston_keyboard_modifier::MODIFIER_SUPER.0,
-                    minimized_layer: ffi::weston_layer::zeroed(),
-                },
                 compositor: Rc::clone(rc),
+
+                fullscreen_layer: ffi::weston_layer::zeroed(),
+                workspace_layer: ffi::weston_layer::zeroed(),
+                background_layer: ffi::weston_layer::zeroed(),
+                binding_modifier: ffi::weston_keyboard_modifier::MODIFIER_SUPER.0,
+                minimized_layer: ffi::weston_layer::zeroed(),
 
                 idle_listener: ffi::WlListener::new(&mut compositor.native.idle_signal, |_| {
                     debug!("-------------------- idle signal fired")
@@ -70,20 +72,17 @@ impl Shell {
     fn init_layers(&mut self) {
         let compositor = &mut self.compositor.borrow_mut().native as *mut _;
 
-        self.native.fullscreen_layer.init(compositor);
-        self.native
-            .fullscreen_layer
+        self.fullscreen_layer.init(compositor);
+        self.fullscreen_layer
             .set_position(ffi::weston_layer_position::WESTON_LAYER_POSITION_FULLSCREEN);
-        self.native.workspace_layer.init(compositor);
-        self.native
-            .workspace_layer
+        self.workspace_layer.init(compositor);
+        self.workspace_layer
             .set_position(ffi::weston_layer_position::WESTON_LAYER_POSITION_FULLSCREEN);
-        self.native.background_layer.init(compositor);
-        self.native
-            .background_layer
+        self.background_layer.init(compositor);
+        self.background_layer
             .set_position(ffi::weston_layer_position::WESTON_LAYER_POSITION_BACKGROUND);
 
-        self.native.minimized_layer.init(compositor);
+        self.minimized_layer.init(compositor);
     }
 
     fn init_bindings(&mut self) {
@@ -102,8 +101,8 @@ impl Shell {
         );
 
         let no_mods = ffi::weston_keyboard_modifier(0);
-        let mods = ffi::weston_keyboard_modifier(self.native.binding_modifier);
-        let mods_with_shift = ffi::weston_keyboard_modifier(self.native.binding_modifier)
+        let mods = ffi::weston_keyboard_modifier(self.binding_modifier);
+        let mods_with_shift = ffi::weston_keyboard_modifier(self.binding_modifier)
             | ffi::weston_keyboard_modifier::MODIFIER_SHIFT;
 
         let pointer_activate_binding = move |pointer: &mut ffi::weston_pointer, _, _| {
@@ -261,7 +260,7 @@ impl Shell {
 
         unsafe {
             ffi::weston_layer_entry_insert(
-                &mut self.native.background_layer.view_list,
+                &mut self.background_layer.view_list,
                 &mut view.layer_link,
             );
         }
@@ -287,10 +286,8 @@ fn get_work_area(output: *const ffi::weston_output) -> ffi::weston_geometry {
     }
 }
 
-fn get_focused_output(compositor: *mut ffi::weston_compositor) -> *mut ffi::weston_output {
-    let compositor = unsafe { compositor.as_mut().unwrap() };
-
-    for seat in compositor.seat_iter_mut() {
+fn get_focused_output(compositor: &mut Compositor) -> *mut ffi::weston_output {
+    for seat in compositor.native.seat_iter_mut() {
         unsafe {
             if let Some(touch) = seat.get_touch() {
                 if let Some(focus) = touch.focus.as_ref() {
@@ -321,9 +318,49 @@ fn get_focused_output(compositor: *mut ffi::weston_compositor) -> *mut ffi::west
     std::ptr::null_mut()
 }
 
-pub type Surface = ffi::shell_surface;
+#[derive(Debug, Copy, Clone)]
+pub struct SurfaceState {
+    pub fullscreen: bool,
+    pub maximized: bool,
+    pub lowered: bool,
+    pub activated: bool,
+}
 
-pub type SurfaceState = ffi::shell_surface_surface_state;
+#[derive(Debug, Copy, Clone)]
+pub struct ShellSurfaceFullscreen {
+    pub transform: ffi::weston_transform,
+    pub black_view: *mut ffi::weston_view,
+}
+
+#[derive(Debug)]
+pub struct Surface {
+    pub destroy_signal: ffi::wl_signal,
+    pub state_change_signal: ffi::wl_signal,
+    pub view: *mut ffi::weston_view,
+    pub surface: *mut ffi::weston_surface,
+    pub last_width: i32,
+    pub last_height: i32,
+    pub shell: *mut Shell,
+    pub children_list: ffi::wl_list,
+    pub children_link: ffi::wl_list,
+    pub saved_x: i32,
+    pub saved_y: i32,
+    pub saved_position_valid: bool,
+    pub unresponsive: bool,
+    pub grabbed: bool,
+    pub resize_edges: u32,
+    pub fullscreen: ShellSurfaceFullscreen,
+    pub workspace_transform: ffi::weston_transform,
+    pub fullscreen_output: *mut ffi::weston_output,
+    pub output: *mut ffi::weston_output,
+    pub output_destroy_listener: ffi::wl_listener,
+    pub pending_state: SurfaceState,
+    pub state: SurfaceState,
+    pub pending_size: ffi::weston_size,
+    pub geometry: ffi::weston_geometry,
+    pub focus_count: ::std::os::raw::c_int,
+    pub destroying: bool,
+}
 
 impl SurfaceState {
     pub fn new() -> SurfaceState {
@@ -337,11 +374,9 @@ impl SurfaceState {
 }
 
 pub fn lower_fullscreen_layer(
-    shell: *mut ffi::desktop_shell,
+    shell: &mut Shell,
     _lowering_output: *mut ffi::weston_output,
 ) {
-    let shell = unsafe { &mut *shell };
-
     for view in wl_list_iter_mut!(&mut shell.fullscreen_layer.view_list.link, ffi::weston_view, layer_link.link) {
         unsafe {
             ffi::weston_layer_entry_remove(&mut view.layer_link);
@@ -374,7 +409,7 @@ impl Surface {
             surface,
             last_width: 0,
             last_height: 0,
-            shell: &mut shell.native as *mut _,
+            shell: shell as *mut _,
             children_list: ffi::wl_list::zeroed(),
             children_link: ffi::wl_list::zeroed(),
             saved_x: 0,
@@ -383,7 +418,7 @@ impl Surface {
             unresponsive: false,
             grabbed: false,
             resize_edges: 0,
-            fullscreen: ffi::shell_surface__bindgen_ty_1 {
+            fullscreen: ShellSurfaceFullscreen {
                 transform: ffi::weston_transform::new(),
                 black_view: 0 as *mut _,
             },
@@ -470,7 +505,7 @@ impl Surface {
         let shell = unsafe { &mut *self.shell };
 
         let origin = unsafe {
-            get_focused_output(shell.compositor)
+            get_focused_output(&mut shell.compositor.borrow_mut())
                 .as_ref()
                 .map(|output| (output.x as f32, output.y as f32))
                 .unwrap_or((0.0, 0.0))
@@ -529,7 +564,8 @@ impl Surface {
         }
 
         if !self.output.is_null() {
-            lower_fullscreen_layer(self.shell, self.output);
+	    let shell = unsafe { &mut *self.shell };
+            lower_fullscreen_layer(shell, self.output);
         }
 
         if let Some(shsurf) = Surface::get(prev) {
@@ -572,8 +608,17 @@ impl Surface {
             view.set_output(self.output);
         }
 
-        let compositor = unsafe { &mut *shell.compositor };
-        for seat in compositor.seat_iter_mut() {
+	// This is terrible, but the problem was always here. Before
+	// we'd get away with it as we got a compositor reference form
+	// a pointer. Now that we're using the RefCell, we get an
+	// "already borrowed" as the activate callback tries to borrow
+	// the compositor again to schedule an idle callback.
+	//
+	// For now, map the seats into an array of seat pointers, then
+	// loop through that and call activate.
+	let seats: Vec<_> =
+            shell.compositor.borrow_mut().native.seat_iter_mut().map(|seat| seat as *mut _).collect();
+	for seat in seats {
             view.activate(seat, 0)
         }
     }
@@ -632,7 +677,8 @@ impl Surface {
         }
 
         if was_maximized {
-            shsurf.set_output(get_focused_output(surface.compositor));
+	    let shell = unsafe { &mut *shsurf.shell };
+            shsurf.set_output(get_focused_output(&mut shell.compositor.borrow_mut()));
             if shsurf.saved_position_valid {
                 view.set_position(shsurf.saved_x as f32, shsurf.saved_y as f32);
             } else {
@@ -751,7 +797,8 @@ impl Surface {
             let output = if surface.is_mapped() {
                 surface.output
             } else {
-                get_focused_output(surface.compositor)
+		let shell = unsafe { &mut *self.shell };
+                get_focused_output(&mut shell.compositor.borrow_mut())
             };
 
             self.set_output(output);
@@ -768,7 +815,8 @@ impl Surface {
         self.pending_size = if enable {
             let surface = unsafe { &mut *self.surface };
             let output = if output.is_null() && !surface.is_mapped() {
-                get_focused_output(surface.compositor)
+		let shell = unsafe { &mut *self.shell };
+                get_focused_output(&mut shell.compositor.borrow_mut())
             } else {
                 output
             };
@@ -796,7 +844,6 @@ impl Surface {
     pub fn set_minimized(&mut self) {
         let view = unsafe { &mut *self.view };
         let shell = unsafe { &mut *self.shell };
-        let compositor = unsafe { &mut *shell.compositor };
 
         unsafe {
             ffi::weston_layer_entry_remove(&mut view.layer_link);
@@ -807,7 +854,7 @@ impl Surface {
             );
         }
 
-        for keyboard in compositor.seat_iter_mut()
+        for keyboard in shell.compositor.borrow_mut().native.seat_iter_mut()
             .filter_map(|seat| seat.get_keyboard())
             .filter(|keyboard| keyboard.focus == self.surface) {
                 keyboard.set_focus(0 as *mut _)

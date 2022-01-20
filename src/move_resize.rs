@@ -195,7 +195,7 @@ impl input::KeyboardGrabHandler for ResizeGrab {
             let view = unsafe { &mut *pointer.focus };
 
             let surface = unsafe { &mut *(view.surface) };
-            if let Some(shsurf) = ffi::shell_surface::get(surface) {
+            if let Some(shsurf) = shell::Surface::get(surface) {
                 view.set_position(self.origin_x, self.origin_y);
                 shsurf.borrow_mut().set_size(self.width, self.height);
             }
@@ -262,7 +262,7 @@ impl ResizeGrab {
         let surface = unsafe { &mut *(view.surface) };
         use ffi::wl_shell_surface_resize as resize;
 
-        if let Some(shsurf) = ffi::shell_surface::get(surface) {
+        if let Some(shsurf) = shell::Surface::get(surface) {
             shsurf
                 .borrow_mut()
                 .set_resizing(resize::WL_SHELL_SURFACE_RESIZE_NONE);

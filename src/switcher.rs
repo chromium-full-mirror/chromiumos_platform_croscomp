@@ -43,7 +43,7 @@ impl Switcher {
 
         switcher.view_destroy_listener.link.init();
 
-	shell::lower_fullscreen_layer(&mut switcher.shell.borrow_mut().native, 0 as *mut _);
+	shell::lower_fullscreen_layer(&mut switcher.shell.borrow_mut(), 0 as *mut _);
 
         let output = unsafe { &(*(*keyboard.focus).output) };
         keyboard.set_focus(0 as *mut _);
@@ -86,7 +86,7 @@ impl Switcher {
         {
             let mut x = 2 * margin;
             self.thumbnails = wl_list_iter_mut!(
-                &mut shell.native.workspace_layer.view_list.link,
+                &mut shell.workspace_layer.view_list.link,
                 ffi::weston_view,
                 layer_link.link
             )
@@ -128,7 +128,7 @@ impl Switcher {
         for view in self.ui.iter() {
             unsafe {
                 ffi::weston_layer_entry_insert(
-                    &mut shell.native.fullscreen_layer.view_list,
+                    &mut shell.fullscreen_layer.view_list,
                     &mut (**view).layer_link,
                 );
             }
@@ -137,7 +137,7 @@ impl Switcher {
         for t in self.thumbnails.iter() {
             unsafe {
                 ffi::weston_layer_entry_insert(
-                    &mut shell.native.fullscreen_layer.view_list,
+                    &mut shell.fullscreen_layer.view_list,
                     &mut (*t.view).layer_link,
                 );
             }
