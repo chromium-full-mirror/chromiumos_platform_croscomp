@@ -14,6 +14,7 @@ use crate::protocol;
 use crate::remote_shell;
 use crate::server;
 use crate::Compositor;
+use crate::{Position, Size, Geometry};
 
 use nix::sys::signal;
 
@@ -273,12 +274,12 @@ impl Drop for Shell {
     }
 }
 
-fn get_work_area(output: *const ffi::weston_output) -> ffi::weston_geometry {
+fn get_work_area(output: *const ffi::weston_output) -> Geometry {
     // Should be accounting for panels here or other UI elements that
     // limit the maximized size.
 
     let output = unsafe { output.as_ref().unwrap() };
-    ffi::weston_geometry {
+    Geometry {
         x: output.x,
         y: output.y,
         width: output.width,
@@ -332,14 +333,11 @@ pub struct Surface {
     pub state_change_signal: ffi::wl_signal,
     pub view: *mut ffi::weston_view,
     pub surface: *mut ffi::weston_surface,
-    pub last_width: i32,
-    pub last_height: i32,
+    pub last_size: Size,
     pub shell: *mut Shell,
     pub children_list: ffi::wl_list,
     pub children_link: ffi::wl_list,
-    pub saved_x: i32,
-    pub saved_y: i32,
-    pub saved_position_valid: bool,
+    pub saved_position: Option<Position>,
     pub unresponsive: bool,
     pub grabbed: bool,
     pub resize_edges: u32,
@@ -348,9 +346,9 @@ pub struct Surface {
     pub output_destroy_listener: ffi::wl_listener,
     pub pending_state: SurfaceState,
     pub state: SurfaceState,
-    pub pending_size: ffi::weston_size,
-    pub geometry: ffi::weston_geometry,
-    pub focus_count: ::std::os::raw::c_int,
+    pub pending_size: Size,
+    pub geometry: Geometry,
+    pub focus_count: u32,
     pub destroying: bool,
 }
 
@@ -399,14 +397,11 @@ impl Surface {
 
             view,
             surface,
-            last_width: 0,
-            last_height: 0,
+            last_size: Size { width: 0, height: 0 },
             shell: shell as *mut _,
             children_list: ffi::wl_list::zeroed(),
             children_link: ffi::wl_list::zeroed(),
-            saved_x: 0,
-            saved_y: 0,
-            saved_position_valid: true,
+            saved_position: None,
             unresponsive: false,
             grabbed: false,
             resize_edges: 0,
@@ -415,8 +410,8 @@ impl Surface {
             output_destroy_listener: ffi::wl_listener::zeroed(),
             pending_state: SurfaceState::new(),
             state: SurfaceState::new(),
-            pending_size: ffi::weston_size { width: 0, height: 0 },
-            geometry: ffi::weston_geometry { x: 0, y: 0, width: 0, height: 0 },
+            pending_size: Size { width: 0, height: 0 },
+            geometry: Geometry { x: 0, y: 0, width: 0, height: 0 },
             focus_count: 0,
             destroying: false,
         }));
@@ -631,8 +626,8 @@ impl Surface {
 
         if sx == 0
             && sy == 0
-            && shsurf.last_width == surface.width
-            && shsurf.last_height == surface.height
+            && shsurf.last_size.width == surface.width
+            && shsurf.last_size.height == surface.height
             && was_fullscreen == shsurf.state.fullscreen
             && was_maximized == shsurf.state.maximized
         {
@@ -641,29 +636,28 @@ impl Surface {
 
         if was_fullscreen {
             let view = unsafe { &mut *shsurf.view };
-            if shsurf.saved_position_valid {
-                view.set_position(shsurf.saved_x as f32, shsurf.saved_y as f32);
+            if let Some(pos) = shsurf.saved_position.take() {
+                view.set_position(pos.x as f32, pos.y as f32);
             } else {
                 shsurf.set_initial_position();
             }
-            shsurf.saved_position_valid = false;
         }
 
         if was_maximized {
 	    let shell = unsafe { &mut *shsurf.shell };
             shsurf.set_output(get_focused_output(&mut shell.compositor.borrow_mut()));
-            if shsurf.saved_position_valid {
-                view.set_position(shsurf.saved_x as f32, shsurf.saved_y as f32);
+            if let Some(pos) = shsurf.saved_position.take() {
+                view.set_position(pos.x as f32, pos.y as f32);
             } else {
                 shsurf.set_initial_position();
             }
-            shsurf.saved_position_valid = false;
         }
 
-        if (shsurf.state.fullscreen || shsurf.state.maximized) && !shsurf.saved_position_valid {
-            shsurf.saved_x = view.geometry.x as i32;
-            shsurf.saved_y = view.geometry.y as i32;
-            shsurf.saved_position_valid = true;
+        if shsurf.state.fullscreen || shsurf.state.maximized {
+	    shsurf.saved_position.get_or_insert(Position {
+		x: view.geometry.x as i32,
+		y: view.geometry.y as i32
+	    });
         }
 
         if shsurf.state.fullscreen {
@@ -674,12 +668,12 @@ impl Surface {
         } else {
             use ffi::wl_shell_surface_resize as resize;
             let resize_dx = if shsurf.resize_edges & resize::WL_SHELL_SURFACE_RESIZE_LEFT.0 != 0 {
-                shsurf.last_width - surface.height
+                shsurf.last_size.width - surface.height
             } else {
                 0
             };
             let resize_dy = if shsurf.resize_edges & resize::WL_SHELL_SURFACE_RESIZE_TOP.0 != 0 {
-                shsurf.last_height - surface.height
+                shsurf.last_size.height - surface.height
             } else {
                 0
             };
@@ -691,8 +685,7 @@ impl Surface {
             view.set_position(x, y);
         }
 
-        shsurf.last_width = surface.width;
-        shsurf.last_height = surface.height;
+        shsurf.last_size = Size { width: surface.width, height: surface.height };
 
         if !surface.output.is_null() {
             for view in surface.view_iter_mut() {

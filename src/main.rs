@@ -41,6 +41,10 @@ use compositor::Compositor;
 use server::Server;
 use shell::Shell;
 
+pub type Position = ffi::weston_position;
+pub type Size = ffi::weston_size;
+pub type Geometry = ffi::weston_geometry;
+
 const SCALE: i32 = 2;
 
 struct Umask {
