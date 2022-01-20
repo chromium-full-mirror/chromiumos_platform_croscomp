@@ -823,11 +823,3 @@ impl Drop for Surface {
         self.children_link.remove();
     }
 }
-
-#[no_mangle]
-pub extern "C" fn get_shell_surface(surface: *mut ffi::weston_surface) -> *mut ffi::shell_surface {
-    match Surface::get(surface) {
-        Some(rc) => rc.as_ptr(),
-        None => 0 as *mut _,
-    }
-}

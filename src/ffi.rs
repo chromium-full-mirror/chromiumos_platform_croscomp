@@ -719,3 +719,58 @@ impl ops::Sub<wl_fixed_t> for wl_fixed_t {
 pub mod evdev {
     include!(concat!(env!("OUT_DIR"), "/input.rs"));
 }
+
+#[repr(C)]
+#[derive(Debug)]
+pub struct shell_surface {
+    pub destroy_signal: wl_signal,
+    pub state_change_signal: wl_signal,
+    pub view: *mut weston_view,
+    pub surface: *mut weston_surface,
+    pub last_width: i32,
+    pub last_height: i32,
+    pub shell: *mut desktop_shell,
+    pub children_list: wl_list,
+    pub children_link: wl_list,
+    pub saved_x: i32,
+    pub saved_y: i32,
+    pub saved_position_valid: bool,
+    pub unresponsive: bool,
+    pub grabbed: bool,
+    pub resize_edges: u32,
+    pub fullscreen: shell_surface__bindgen_ty_1,
+    pub workspace_transform: weston_transform,
+    pub fullscreen_output: *mut weston_output,
+    pub output: *mut weston_output,
+    pub output_destroy_listener: wl_listener,
+    pub pending_state: shell_surface_surface_state,
+    pub state: shell_surface_surface_state,
+    pub pending_size: weston_size,
+    pub geometry: weston_geometry,
+    pub focus_count: ::std::os::raw::c_int,
+    pub destroying: bool,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct shell_surface__bindgen_ty_1 {
+    pub transform: weston_transform,
+    pub black_view: *mut weston_view,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct shell_surface_surface_state {
+    pub fullscreen: bool,
+    pub maximized: bool,
+    pub lowered: bool,
+    pub activated: bool,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct desktop_shell {
+    pub compositor: *mut weston_compositor,
+    pub fullscreen_layer: weston_layer,
+    pub workspace_layer: weston_layer,
+    pub background_layer: weston_layer,
+    pub binding_modifier: u32,
+    pub minimized_layer: weston_layer,
+}

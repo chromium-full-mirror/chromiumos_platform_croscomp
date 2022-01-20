@@ -66,7 +66,7 @@ fn main() {
     run_bindgen("/usr/include/linux/input.h", "input.rs");
     run_bindgen("./weston/croscomp_weston.h", "croscomp_weston.rs");
 
-    let lib_paths = ["desktop-shell", "libweston"];
+    let lib_paths = ["libweston"];
 
     let build_dir =
         env::var("MESON_BUILD_DIR").unwrap_or(format!("{}/../../../weston", out_dir_str));
@@ -75,7 +75,6 @@ fn main() {
         println!("cargo:rustc-flags=-L{}/{}", build_dir, p);
     }
 
-    println!("cargo:rustc-link-lib=desktop-shell");
     println!("cargo:rustc-link-lib=weston-9");
     println!("cargo:rustc-link-lib=input");
     println!("cargo:rustc-link-lib=evdev");

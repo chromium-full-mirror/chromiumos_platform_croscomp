@@ -68,7 +68,6 @@ struct weston_point2d_device_normalized {
 
 struct weston_surface;
 struct weston_buffer;
-struct shell_surface;
 struct weston_seat;
 struct weston_output;
 struct input_method;
