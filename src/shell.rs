@@ -326,12 +326,6 @@ pub struct SurfaceState {
     pub activated: bool,
 }
 
-#[derive(Debug, Copy, Clone)]
-pub struct ShellSurfaceFullscreen {
-    pub transform: ffi::weston_transform,
-    pub black_view: *mut ffi::weston_view,
-}
-
 #[derive(Debug)]
 pub struct Surface {
     pub destroy_signal: ffi::wl_signal,
@@ -349,8 +343,6 @@ pub struct Surface {
     pub unresponsive: bool,
     pub grabbed: bool,
     pub resize_edges: u32,
-    pub fullscreen: ShellSurfaceFullscreen,
-    pub workspace_transform: ffi::weston_transform,
     pub fullscreen_output: *mut ffi::weston_output,
     pub output: *mut ffi::weston_output,
     pub output_destroy_listener: ffi::wl_listener,
@@ -418,11 +410,6 @@ impl Surface {
             unresponsive: false,
             grabbed: false,
             resize_edges: 0,
-            fullscreen: ShellSurfaceFullscreen {
-                transform: ffi::weston_transform::new(),
-                black_view: 0 as *mut _,
-            },
-            workspace_transform: ffi::weston_transform::new(),
             fullscreen_output: 0 as *mut _,
             output: 0 as *mut _,
             output_destroy_listener: ffi::wl_listener::zeroed(),
@@ -437,10 +424,8 @@ impl Surface {
         {
             let mut shsurf = shsurf.borrow_mut();
 
-            shsurf.fullscreen.transform.link.init();
             shsurf.destroy_signal.init();
             shsurf.state_change_signal.init();
-            shsurf.workspace_transform.link.init();
             shsurf.children_list.init();
             shsurf.children_link.init();
         }
@@ -655,18 +640,6 @@ impl Surface {
         }
 
         if was_fullscreen {
-            shsurf.fullscreen.transform.link.remove();
-            shsurf.fullscreen.transform.link.init();
-
-            if !shsurf.fullscreen.black_view.is_null() {
-                unsafe {
-                    let view = &mut *shsurf.fullscreen.black_view;
-
-                    ffi::weston_surface_destroy(view.surface);
-                }
-            }
-            shsurf.fullscreen.black_view = std::ptr::null_mut();
-
             let view = unsafe { &mut *shsurf.view };
             if shsurf.saved_position_valid {
                 view.set_position(shsurf.saved_x as f32, shsurf.saved_y as f32);
