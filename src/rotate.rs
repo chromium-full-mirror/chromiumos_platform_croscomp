@@ -7,7 +7,7 @@ use std::rc::Rc;
 
 use crate::ffi;
 use crate::ffi::evdev::{BTN_LEFT, KEY_ESC, KEY_F3};
-use crate::Shell;
+use crate::shell;
 
 // TODO:
 //
@@ -39,9 +39,10 @@ impl Drop for Rotation {
     }
 }
 
-fn key_rotate(surface: &mut ffi::weston_surface) {
-    let view = unsafe { &mut *ffi::get_default_view(surface as *mut _) };
-    let compositor = unsafe { &mut *(*view.surface).compositor };
+fn key_rotate(shsurf: &mut shell::Surface) {
+    let view = unsafe { &mut *shsurf.view };
+    let surface = unsafe { &mut *shsurf.surface };
+    let compositor = unsafe { &mut *(*shsurf.surface).compositor };
 
     let cx = surface.width as f32 * 0.5;
     let cy = surface.height as f32 * 0.5;
@@ -83,7 +84,7 @@ fn pointer_rotate(view: &mut ffi::weston_view) {
     println!("pointer rotate {:?}", view as *mut _)
 }
 
-pub fn init(shell: &Rc<RefCell<Shell>>) {
+pub fn init(shell: &Rc<RefCell<shell::Shell>>) {
     let shell = shell.borrow();
     let mut compositor = shell.compositor.borrow_mut();
 
@@ -92,19 +93,25 @@ pub fn init(shell: &Rc<RefCell<Shell>>) {
         | ffi::weston_keyboard_modifier::MODIFIER_SHIFT;
 
     compositor.bind_key(KEY_F3, mods, move |keyboard, _, _| {
-        let focus = unsafe { &mut *keyboard.focus };
+        if let Some(shsurf) = shell::Surface::get(keyboard.focus) {
+            let mut shsurf = shsurf.borrow_mut();
 
-        key_rotate(focus)
+            key_rotate(&mut shsurf)
+	}
     });
 
     compositor.bind_key(KEY_ESC, mods, move |keyboard, _, _| {
-        let view = unsafe { &mut *ffi::get_default_view(keyboard.focus as *mut _) };
-        let compositor = unsafe { &mut *(*view.surface).compositor };
+        if let Some(shsurf) = shell::Surface::get(keyboard.focus) {
+            let mut shsurf = shsurf.borrow_mut();
 
-        let _ = view.destroy_signal.remove::<Box<Rotation>>();
+            let view = unsafe { &mut *shsurf.view };
+            let compositor = unsafe { &mut *(*shsurf.surface).compositor };
 
-        view.geometry_dirty();
-        compositor.schedule_repaint();
+            let _ = view.destroy_signal.remove::<Box<Rotation>>();
+
+            view.geometry_dirty();
+            compositor.schedule_repaint();
+	}
     });
 
     compositor.bind_button(BTN_LEFT, mods, |pointer: &mut ffi::weston_pointer, _, _| {
