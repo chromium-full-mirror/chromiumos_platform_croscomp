@@ -496,10 +496,12 @@ impl Surface {
         view.set_position(origin.0 + 20.0, origin.1 + 20.0);
     }
 
+    #[allow(dead_code)]
     pub fn child_iter_mut<'a>(&'a mut self) -> ffi::WlListIterMut<'a, Surface> {
         wl_list_iter_mut!(&mut self.children_list, Surface, children_link)
     }
 
+    #[allow(dead_code)]
     pub fn get_last_child<'a>(&'a mut self) -> Option<&'a mut Surface> {
         self.child_iter_mut()
             .rev()

@@ -39,6 +39,7 @@ impl Positioner {
         }
     }
 
+    #[allow(dead_code)]
     fn get_geometry(&self) -> ffi::weston_geometry {
         use xdg_positioner::{Anchor, Gravity};
 
