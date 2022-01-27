@@ -7,7 +7,6 @@ use crate::input;
 use crate::shell;
 
 pub struct MoveGrab {
-    view_destroy_listener: ffi::wl_listener,
     dx: ffi::wl_fixed_t,
     dy: ffi::wl_fixed_t,
     pointer_grab: input::PointerGrab,
@@ -88,7 +87,6 @@ impl MoveGrab {
         let keyboard = unsafe { &mut *seat.keyboard_state };
 
         let mut handler = Box::new(MoveGrab {
-            view_destroy_listener: ffi::wl_listener::new(view_destroy_notify),
             dx: ffi::wl_fixed_t::from(view.geometry.x) - pointer.grab_x,
             dy: ffi::wl_fixed_t::from(view.geometry.y) - pointer.grab_y,
             pointer_grab: input::PointerGrab::new(pointer),
@@ -109,7 +107,6 @@ impl MoveGrab {
 }
 
 pub struct ResizeGrab {
-    view_destroy_listener: ffi::wl_listener,
     edges: ffi::wl_shell_surface_resize,
     origin_x: f32,
     origin_y: f32,
@@ -239,7 +236,6 @@ impl ResizeGrab {
 
         let geometry = shsurf.get_geometry();
         let mut handler = Box::new(ResizeGrab {
-            view_destroy_listener: ffi::wl_listener::new(view_destroy_notify),
             edges: edges,
             origin_x: view.geometry.x,
             origin_y: view.geometry.y,
@@ -271,11 +267,4 @@ impl ResizeGrab {
         // xxx unset shsurf resizing
         let _ = unsafe { Box::from_raw(self as *mut _) };
     }
-}
-
-extern "C" fn view_destroy_notify(
-    listener: *mut ffi::wl_listener,
-    _data: *mut ::std::os::raw::c_void,
-) {
-    let _grab = unsafe { &mut *container_of_mut!(listener, MoveGrab, view_destroy_listener) };
 }
