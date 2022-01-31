@@ -25,8 +25,17 @@ pub struct Shell {
     pub background_layer: ffi::weston_layer,
     pub binding_modifier: u32,
     pub minimized_layer: ffi::weston_layer,
-    idle_listener: Box<dyn Drop>,
-    wake_listener: Box<dyn Drop>,
+
+    // We never read these, but hold on to them so they'll get dropped
+    // when the Shell is dropped.  Silence the warning about never
+    // reading for now, but eventually we'll want signals to be a
+    // little more rust friendly.
+
+    #[allow(unused)]
+    idle_listener: Box<dyn Any>,
+    #[allow(unused)]
+    wake_listener: Box<dyn Any>,
+    #[allow(unused)]
     activate_listener: Box<dyn Any>,
 }
 
