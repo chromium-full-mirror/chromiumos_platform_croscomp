@@ -8,7 +8,6 @@ build = "build.rs"
 [dependencies]
 wayland-commons = { path = "third_party/wayland-commons" }
 wayland-sys = { path = "third_party/wayland-sys" }
-wayland-server = { path = "third_party/wayland-server", features = ["use_system_lib"] }
 bitflags = "1.0"
 nix = "*"
 log = "*"

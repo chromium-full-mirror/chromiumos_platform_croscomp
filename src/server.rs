@@ -6,7 +6,7 @@ use log::debug;
 use std::boxed::Box;
 use std::marker::PhantomData;
 use std::rc::Rc;
-use wayland_server::MessageGroup;
+use wayland_commons::MessageGroup;
 
 use crate::event_loop::EventLoop;
 use crate::ffi;
@@ -14,7 +14,7 @@ use crate::ffi;
 #[derive(Eq, PartialEq, Debug)]
 pub struct Resource<I>
 where
-    I: wayland_server::Interface,
+    I: wayland_commons::Interface,
 {
     native: *mut ffi::wl_resource,
     phantom: PhantomData<I>,
@@ -22,7 +22,7 @@ where
 
 impl<I> Clone for Resource<I>
 where
-    I: wayland_server::Interface,
+    I: wayland_commons::Interface,
 {
     fn clone(&self) -> Self {
         Self {
@@ -34,7 +34,7 @@ where
 
 impl<I> From<Main<I>> for Resource<I>
 where
-    I: wayland_server::Interface,
+    I: wayland_commons::Interface,
 {
     fn from(m: Main<I>) -> Self {
         Self {
@@ -46,11 +46,11 @@ where
 
 impl<I> Resource<I>
 where
-    I: wayland_server::Interface,
+    I: wayland_commons::Interface,
 {
     pub fn new<J>(&self, id: u32) -> Resource<J>
     where
-        J: wayland_server::Interface + From<Resource<J>> + AsRef<Resource<J>>,
+        J: wayland_commons::Interface + From<Resource<J>> + AsRef<Resource<J>>,
     {
         unsafe {
             let client = ffi::wl_resource_get_client(self.native);
@@ -75,7 +75,7 @@ where
 
     pub unsafe fn make_child_for<J>(&self, id: u32) -> Option<Main<J>>
     where
-        J: wayland_server::Interface + From<Resource<J>> + AsRef<Resource<J>>,
+        J: wayland_commons::Interface + From<Resource<J>> + AsRef<Resource<J>>,
     {
         Some(Main::<J> { resource: self.new(id) })
     }
@@ -195,10 +195,10 @@ where
             args: *mut ffi::wl_argument,
         ) -> ::std::os::raw::c_int
         where
-            I: wayland_server::Interface,
+            I: wayland_commons::Interface,
             F: 'static + Fn(&mut Resource<I>, &I::Request),
         {
-            let request = <I::Request as wayland_server::MessageGroup>::from_raw_c(
+            let request = <I::Request as wayland_commons::MessageGroup>::from_raw_c(
                 object,
                 opcode,
                 args as *const wayland_sys::common::wl_argument,
@@ -237,14 +237,14 @@ where
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct Main<I>
 where
-    I: wayland_server::Interface,
+    I: wayland_commons::Interface,
 {
     resource: Resource<I>,
 }
 
 impl<I> Main<I>
 where
-    I: wayland_server::Interface,
+    I: wayland_commons::Interface,
 {
     pub fn on_request<F>(&self, f: F) -> &Self
     where
@@ -268,19 +268,19 @@ pub struct ResourceMap {}
 impl ResourceMap {
     pub fn get_new<I>(&mut self, _id: u32) -> Option<Main<I>>
     where
-        I: wayland_server::Interface,
+        I: wayland_commons::Interface,
     {
         panic!("ResourceMap::get_new called");
     }
 
-    pub fn get<I: wayland_server::Interface>(&mut self, _id: u32) -> Option<Resource<I>> {
+    pub fn get<I: wayland_commons::Interface>(&mut self, _id: u32) -> Option<Resource<I>> {
         panic!("ResourceMap::get called");
     }
 }
 
 struct GlobalHandlers<I>
 where
-    I: wayland_server::Interface,
+    I: wayland_commons::Interface,
 {
     handle_bind: Option<Box<dyn Fn(&mut Resource<I>) -> bool>>,
     dispatcher: Option<Box<dyn Fn(&mut Resource<I>, &I::Request)>>,
@@ -289,7 +289,7 @@ where
 
 pub struct Global<I>
 where
-    I: wayland_server::Interface,
+    I: wayland_commons::Interface,
 {
     native: *mut ffi::wl_global,
     handlers: Box<GlobalHandlers<I>>,
@@ -297,14 +297,14 @@ where
 
 impl<I> Drop for Global<I>
 where
-    I: wayland_server::Interface,
+    I: wayland_commons::Interface,
 {
     fn drop(&mut self) {
         debug!("drop global");
     }
 }
 
-impl<I: wayland_server::Interface> Global<I> {
+impl<I: wayland_commons::Interface> Global<I> {
     pub fn on_bind<F>(mut self, f: F) -> Self
     where
         F: 'static + Fn(&mut Resource<I>) -> bool,
@@ -359,7 +359,7 @@ impl Server {
 
     pub fn create_global<I>(&mut self, version: u32) -> Global<I>
     where
-        I: wayland_server::Interface,
+        I: wayland_commons::Interface,
     {
         unsafe extern "C" fn call_dispatcher<I>(
             data: *const ::std::ffi::c_void,
@@ -369,9 +369,9 @@ impl Server {
             args: *mut ffi::wl_argument,
         ) -> ::std::os::raw::c_int
         where
-            I: wayland_server::Interface,
+            I: wayland_commons::Interface,
         {
-            let request = <I::Request as wayland_server::MessageGroup>::from_raw_c(
+            let request = <I::Request as wayland_commons::MessageGroup>::from_raw_c(
                 object,
                 opcode,
                 args as *const wayland_sys::common::wl_argument,
@@ -392,7 +392,7 @@ impl Server {
 
         unsafe extern "C" fn call_destroy_closure<I>(native: *mut ffi::wl_resource)
         where
-            I: wayland_server::Interface,
+            I: wayland_commons::Interface,
         {
             let b =
                 &*(ffi::wl_resource_get_user_data(native) as *mut Box<dyn Fn(&mut Resource<I>)>);
@@ -408,7 +408,7 @@ impl Server {
             version: u32,
             id: u32,
         ) where
-            I: wayland_server::Interface,
+            I: wayland_commons::Interface,
         {
             let client = &mut *client;
 

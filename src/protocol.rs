@@ -12,8 +12,58 @@ use crate::server::{Main, Resource, ResourceMap};
 pub(crate) use wayland_commons::map::*;
 pub(crate) use wayland_commons::wire::*;
 pub(crate) use wayland_commons::*;
-pub(crate) use wayland_server::sys;
-pub(crate) use wayland_server::AnonymousObject;
+
+pub(crate) use wayland_sys as sys;
+
+pub use anonymous_object::AnonymousObject;
+
+mod anonymous_object {
+    use super::{Interface, NoMessage, Resource};
+    use std::fmt::{self, Debug, Formatter};
+
+    /// Anonymous interface
+    ///
+    /// A special Interface implementation representing an
+    /// handle to an object for which the interface is not known.
+    #[derive(Clone, Eq, PartialEq)]
+    pub struct AnonymousObject(Resource<AnonymousObject>);
+
+    impl Interface for AnonymousObject {
+        type Request = NoMessage;
+        type Event = NoMessage;
+        const NAME: &'static str = "<anonymous>";
+        const VERSION: u32 = 0;
+        fn c_interface() -> *const ::wayland_sys::common::wl_interface {
+            ::std::ptr::null()
+        }
+    }
+
+    impl AsRef<Resource<AnonymousObject>> for AnonymousObject {
+        #[inline]
+        fn as_ref(&self) -> &Resource<Self> {
+            &self.0
+        }
+    }
+    impl From<Resource<AnonymousObject>> for AnonymousObject {
+        #[inline]
+        fn from(resource: Resource<Self>) -> Self {
+            AnonymousObject(resource)
+        }
+    }
+    impl From<AnonymousObject> for Resource<AnonymousObject> {
+        #[inline]
+        fn from(value: AnonymousObject) -> Self {
+            value.0
+        }
+    }
+    impl Debug for AnonymousObject {
+        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+            f.write_fmt(format_args!("{:?}", self.0))
+        }
+    }
+}
+
+
 
 include!(concat!(env!("OUT_DIR"), "/wayland.rs"));
 include!(concat!(env!("OUT_DIR"), "/weston-screenshooter.rs"));
