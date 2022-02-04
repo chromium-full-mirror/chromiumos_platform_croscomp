@@ -37,10 +37,27 @@ extern "C" {
 #include <pixman.h>
 #include <xkbcommon/xkbcommon.h>
 
-#define WL_HIDE_DEPRECATED
-#include <wayland-server.h>
+#include <wayland-server-core.h>
 
 #include <libweston/matrix.h>
+
+#ifndef WL_KEYBOARD_KEY_STATE_ENUM
+#define WL_KEYBOARD_KEY_STATE_ENUM
+enum wl_keyboard_key_state {
+	WL_KEYBOARD_KEY_STATE_RELEASED = 0,
+	WL_KEYBOARD_KEY_STATE_PRESSED = 1,
+};
+#endif /* WL_KEYBOARD_KEY_STATE_ENUM */
+
+#ifndef WL_DATA_DEVICE_MANAGER_DND_ACTION_ENUM
+#define WL_DATA_DEVICE_MANAGER_DND_ACTION_ENUM
+enum wl_data_device_manager_dnd_action {
+	WL_DATA_DEVICE_MANAGER_DND_ACTION_NONE = 0,
+	WL_DATA_DEVICE_MANAGER_DND_ACTION_COPY = 1,
+	WL_DATA_DEVICE_MANAGER_DND_ACTION_MOVE = 2,
+	WL_DATA_DEVICE_MANAGER_DND_ACTION_ASK = 4,
+};
+#endif /* WL_DATA_DEVICE_MANAGER_DND_ACTION_ENUM */
 
 struct weston_geometry {
 	int32_t x, y;

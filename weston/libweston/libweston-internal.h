@@ -28,6 +28,8 @@
 #ifndef LIBWESTON_INTERNAL_H
 #define LIBWESTON_INTERNAL_H
 
+#include "wayland-server-protocol.h"
+
 /*
  * This is the internal (private) part of libweston. All symbols found here
  * are, and should be only (with a few exceptions) used within the internal

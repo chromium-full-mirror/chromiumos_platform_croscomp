@@ -32,6 +32,8 @@
 #ifndef LIBWESTON_BACKEND_INTERNAL_H
 #define LIBWESTON_BACKEND_INTERNAL_H
 
+#include "wayland-server-protocol.h"
+
 struct weston_backend {
 	void (*destroy)(struct weston_compositor *compositor);
 
