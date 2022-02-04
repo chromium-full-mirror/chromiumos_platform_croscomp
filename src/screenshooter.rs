@@ -81,7 +81,7 @@ pub fn init(shell: &Rc<RefCell<Shell>>) {
                 }
                 _ => {
                     resource.post_error(
-                        ffi::wl_display_error::WL_DISPLAY_ERROR_INVALID_OBJECT as u32,
+                        protocol::wl_display::Error::InvalidObject as u32,
                         "screenshooter failed: permission denied",
                     );
                     false

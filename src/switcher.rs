@@ -11,6 +11,8 @@ use crate::input;
 use crate::Shell;
 use crate::shell;
 
+use crate::protocol::wl_keyboard::KeyState;
+
 struct Thumbnail {
     view: *mut ffi::weston_view,
     transform: ffi::weston_transform,
@@ -194,15 +196,14 @@ impl input::KeyboardGrabHandler for Switcher {
         keyboard: &mut ffi::weston_keyboard,
         _time: &ffi::timespec,
         key: u32,
-        state: u32,
+        state: KeyState
     ) {
-        use ffi::wl_keyboard_key_state::*;
         const SHIFT: ffi::weston_keyboard_modifier = ffi::weston_keyboard_modifier::MODIFIER_SHIFT;
 
         let seat = unsafe { &mut *(*keyboard).seat };
         let forwards = !seat.modifier_state.is_set(SHIFT);
 
-        if key == KEY_TAB && state == WL_KEYBOARD_KEY_STATE_PRESSED as u32 {
+        if key == KEY_TAB && state == KeyState::Pressed {
             self.pick(forwards);
         }
     }

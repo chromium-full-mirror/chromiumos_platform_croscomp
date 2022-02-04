@@ -2,8 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::ffi;
 use std::ptr::NonNull;
+
+use crate::ffi;
+use crate::protocol::wl_pointer::ButtonState;
+use crate::protocol::wl_keyboard::KeyState;
 
 pub trait PointerGrabHandler {
     fn focus(&mut self, _pointer: &mut ffi::weston_pointer) {}
@@ -21,7 +24,7 @@ pub trait PointerGrabHandler {
         _pointer: &mut ffi::weston_pointer,
         _time: &ffi::timespec,
         _button: u32,
-        _state: u32,
+        _state: ButtonState,
     ) {
     }
 
@@ -87,7 +90,7 @@ impl PointerGrab {
         let (pointer, handler) = Self::cast(grab);
         let time = unsafe { &*time };
 
-        handler.button(pointer, time, button, state)
+        handler.button(pointer, time, button, ButtonState::from_raw(state).unwrap() )
     }
 
     extern "C" fn axis(
@@ -156,7 +159,7 @@ pub trait KeyboardGrabHandler {
         _keyboard: &mut ffi::weston_keyboard,
         _time: &ffi::timespec,
         _key: u32,
-        _state: u32,
+        _state: KeyState,
     ) {
     }
 
@@ -203,7 +206,7 @@ impl KeyboardGrab {
     ) {
         let (keyboard, handler) = Self::cast(grab);
         let time = unsafe { &*time };
-        handler.key(keyboard, time, key, state);
+        handler.key(keyboard, time, key, KeyState::from_raw(state).unwrap());
     }
 
     extern "C" fn modifiers(

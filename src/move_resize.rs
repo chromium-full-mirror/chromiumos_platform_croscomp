@@ -6,6 +6,9 @@ use crate::ffi;
 use crate::input;
 use crate::shell;
 
+use crate::protocol::wl_pointer::ButtonState;
+use crate::protocol::wl_keyboard::KeyState;
+
 pub struct MoveGrab {
     dx: ffi::wl_fixed_t,
     dy: ffi::wl_fixed_t,
@@ -33,11 +36,9 @@ impl input::PointerGrabHandler for MoveGrab {
         pointer: &mut ffi::weston_pointer,
         _time: &ffi::timespec,
         _button: u32,
-        state: u32,
+        state: ButtonState
     ) {
-        if pointer.button_count == 0
-            && state == ffi::wl_pointer_button_state::WL_POINTER_BUTTON_STATE_RELEASED as u32
-        {
+        if pointer.button_count == 0 && state == ButtonState::Released {
             self.shutdown()
         }
     }
@@ -53,12 +54,11 @@ impl input::KeyboardGrabHandler for MoveGrab {
         keyboard: &mut ffi::weston_keyboard,
         _time: &ffi::timespec,
         key: u32,
-        state: u32,
+        state: KeyState,
     ) {
         use crate::ffi::evdev::KEY_ESC;
-        use ffi::wl_keyboard_key_state::*;
 
-        if key == KEY_ESC && state == WL_KEYBOARD_KEY_STATE_PRESSED as u32 {
+        if key == KEY_ESC && state == KeyState::Pressed {
             let seat = unsafe { &mut *keyboard.seat };
             let pointer = unsafe { &mut *seat.pointer_state };
             let view = unsafe { &mut *pointer.focus };
@@ -161,11 +161,9 @@ impl input::PointerGrabHandler for ResizeGrab {
         pointer: &mut ffi::weston_pointer,
         _time: &ffi::timespec,
         _button: u32,
-        state: u32,
+        state: ButtonState,
     ) {
-        if pointer.button_count == 0
-            && state == ffi::wl_pointer_button_state::WL_POINTER_BUTTON_STATE_RELEASED as u32
-        {
+        if pointer.button_count == 0 && state == ButtonState::Released {
             self.shutdown(pointer);
         }
     }
@@ -180,12 +178,11 @@ impl input::KeyboardGrabHandler for ResizeGrab {
         keyboard: &mut ffi::weston_keyboard,
         _time: &ffi::timespec,
         key: u32,
-        state: u32,
+        state: KeyState
     ) {
         use crate::ffi::evdev::KEY_ESC;
-        use ffi::wl_keyboard_key_state::*;
 
-        if key == KEY_ESC && state == WL_KEYBOARD_KEY_STATE_PRESSED as u32 {
+        if key == KEY_ESC && state == KeyState::Pressed {
             let seat = unsafe { &mut *keyboard.seat };
             let pointer = unsafe { &mut *seat.pointer_state };
             let view = unsafe { &mut *pointer.focus };

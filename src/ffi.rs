@@ -492,7 +492,7 @@ impl weston_output {
         unsafe { weston_output_set_scale(self, scale) }
     }
 
-    pub fn set_transform(&mut self, transform: wl_output_transform) {
+    pub fn set_transform(&mut self, transform: u32) {
         unsafe { weston_output_set_transform(self, transform as u32) }
     }
 

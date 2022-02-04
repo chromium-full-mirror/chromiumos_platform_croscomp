@@ -97,6 +97,8 @@ fn bind_socket(name: &str) -> UnixListener {
 }
 
 extern "C" fn drm_head_notify(_listener: *mut ffi::wl_listener, data: *mut ::std::os::raw::c_void) {
+    use protocol::wl_output::Transform;
+
     let native = unsafe { &mut *(data as *mut ffi::weston_compositor) };
     let compositor = unsafe { &mut *container_of_mut!(native as *mut _, Compositor, native) };
 
@@ -122,8 +124,7 @@ extern "C" fn drm_head_notify(_listener: *mut ffi::wl_listener, data: *mut ::std
             );
             output.set_scale(SCALE);
 
-            use ffi::wl_output_transform::*;
-            output.set_transform(WL_OUTPUT_TRANSFORM_NORMAL);
+            output.set_transform(Transform::Normal as u32);
             let set_gbm_format = (*api).set_gbm_format.unwrap();
             set_gbm_format(output, std::ptr::null());
 
@@ -141,6 +142,8 @@ extern "C" fn wayland_head_notify(
     _listener: *mut ffi::wl_listener,
     data: *mut ::std::os::raw::c_void,
 ) {
+    use protocol::wl_output::Transform;
+
     let native = unsafe { &mut *(data as *mut ffi::weston_compositor) };
     let compositor = unsafe { &mut *container_of_mut!(native as *mut _, Compositor, native) };
 
@@ -159,8 +162,7 @@ extern "C" fn wayland_head_notify(
 
             output.set_scale(1);
 
-            use ffi::wl_output_transform::*;
-            output.set_transform(WL_OUTPUT_TRANSFORM_NORMAL);
+            output.set_transform(Transform::Normal as u32);
 
             let set_size = (*api).output_set_size.unwrap();
             set_size(output, 1024, 600);
