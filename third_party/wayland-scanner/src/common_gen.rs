@@ -468,7 +468,15 @@ pub(crate) fn gen_messagegroup(
                             }
                             Type::NewId => {
                                 let map_lookup = quote!(map.get_new(val).ok_or(())?);
-                                if arg.allow_null {
+
+                                if arg.interface.is_none() {
+                                    quote! {
+                                        {
+                                            let resource: Resource<AnonymousObject> = #map_lookup.into();
+                                            (String::new(), 0, resource.into())
+                                        }
+                                    }
+                                } else if arg.allow_null {
                                     quote!(if val == 0 { None } else { Some(#map_lookup) })
                                 } else {
                                     map_lookup

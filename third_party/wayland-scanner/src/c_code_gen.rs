@@ -100,8 +100,6 @@ pub(crate) fn generate_protocol_server(protocol: Protocol) -> TokenStream {
     let modules = protocol
         .interfaces
         .iter()
-        // display and registry are handled specially
-        .filter(|iface| iface.name != "wl_display" && iface.name != "wl_registry")
         .map(|iface| {
             let doc_attr = iface.description.as_ref().map(description_to_doc_attr);
             let mod_name = Ident::new(&iface.name, Span::call_site());
@@ -303,7 +301,13 @@ fn messagegroup_c_addon(
                                     }
                                 } else {
                                     // bind-like function
-                                    quote!(panic!("Cannot unserialize anonymous new id."))
+                                    quote! {
+                                        {
+                                            let me = Resource::<#parent_iface>::from_c_ptr(obj as *mut _);
+                                            let resource: Resource<AnonymousObject> = me.make_child_for(0).unwrap().into();
+                                            (String::new(), 0, resource.into())
+                                        }
+                                    }
                                 };
 
                                 if arg.allow_null {
