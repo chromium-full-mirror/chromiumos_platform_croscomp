@@ -107,7 +107,7 @@ impl MoveGrab {
 }
 
 pub struct ResizeGrab {
-    edges: ffi::wl_shell_surface_resize,
+    edges: shell::ResizeEdge,
     origin_x: f32,
     origin_y: f32,
     width: i32,
@@ -124,7 +124,6 @@ impl input::PointerGrabHandler for ResizeGrab {
         event: *mut ffi::weston_pointer_motion_event,
     ) {
         let view = unsafe { &mut *pointer.focus };
-        use ffi::wl_shell_surface_resize as resize;
 
         pointer.r#move(event);
 
@@ -133,17 +132,17 @@ impl input::PointerGrabHandler for ResizeGrab {
         let (to_x, to_y): (ffi::wl_fixed_t, _) = view.from_global(pointer.x, pointer.y);
 
         let width = self.width
-            + if self.edges.has(resize::WL_SHELL_SURFACE_RESIZE_LEFT) {
+            + if self.edges.left {
                 (from_x - to_x).into()
-            } else if self.edges.has(resize::WL_SHELL_SURFACE_RESIZE_RIGHT) {
+            } else if self.edges.right {
                 (to_x - from_x).into()
             } else {
                 0
             };
         let height = self.height
-            + if self.edges.has(resize::WL_SHELL_SURFACE_RESIZE_TOP) {
+            + if self.edges.top {
                 (from_y - to_y).into()
-            } else if self.edges.has(resize::WL_SHELL_SURFACE_RESIZE_BOTTOM) {
+            } else if self.edges.bottom {
                 (to_y - from_y).into()
             } else {
                 0
@@ -213,26 +212,14 @@ impl ResizeGrab {
     pub fn start(
         pointer: *mut ffi::weston_pointer,
         shsurf: &mut shell::Surface,
-        edges: ffi::wl_shell_surface_resize,
+        edges: shell::ResizeEdge,
     ) {
         let pointer = unsafe { &mut *pointer };
         let seat = unsafe { &mut *pointer.seat };
         let keyboard = unsafe { &mut *seat.keyboard_state };
         let view = unsafe { &mut *shsurf.view };
-        use ffi::wl_shell_surface_resize as resize;
 
         // xxx reject if shsurf->grabbed or fullscreen or maximized.
-
-        const LEFT_RIGHT: resize = resize(1 | 2);
-        const TOP_BOTTOM: resize = resize(4 | 8);
-
-        if edges == resize::WL_SHELL_SURFACE_RESIZE_NONE
-            || edges & TOP_BOTTOM == TOP_BOTTOM
-            || edges & LEFT_RIGHT == LEFT_RIGHT
-        {
-            // Invalid edges, fail silently
-            return;
-        }
 
         let geometry = shsurf.get_geometry();
         let mut handler = Box::new(ResizeGrab {
@@ -256,12 +243,11 @@ impl ResizeGrab {
     fn shutdown(&mut self, pointer: &mut ffi::weston_pointer) {
         let view = unsafe { &mut *pointer.focus };
         let surface = unsafe { &mut *(view.surface) };
-        use ffi::wl_shell_surface_resize as resize;
 
         if let Some(shsurf) = shell::Surface::get(surface) {
             shsurf
                 .borrow_mut()
-                .set_resizing(resize::WL_SHELL_SURFACE_RESIZE_NONE);
+                .set_resizing(shell::ResizeEdge::none());
         }
 
         // xxx unset shsurf resizing

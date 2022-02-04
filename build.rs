@@ -18,7 +18,6 @@ fn run_bindgen(header: &str, output: &str) {
         .args(&["--new-type-alias", "wl_fixed_t"])
         .args(&["--default-enum-style", "rust_non_exhaustive"])
         .args(&["--bitfield-enum", "weston_keyboard_modifier"])
-        .args(&["--bitfield-enum", "wl_shell_surface_resize"])
         .args(&["--bitfield-enum", "weston_activate_flag"])
         .args(&["--no-copy", "shell_surface"])
         .arg(header)

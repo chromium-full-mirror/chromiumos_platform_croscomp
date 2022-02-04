@@ -273,9 +273,11 @@ fn handle_xdg_toplevel_request(
                     && pointer.grab_serial == *serial
                 {
                     // let focus = get main surf
-                    let edges = ffi::wl_shell_surface_resize(edges.to_raw());
-
-                    shsurf.resize(pointer, edges)
+                    if let Some(edges) = shell::ResizeEdge::from_u32(edges.to_raw()) {
+                        shsurf.resize(pointer, edges)
+                    } else {
+                        todo!("post error or silently ignore?")
+                    }
                 }
             }
         }

@@ -200,25 +200,17 @@ impl Shell {
             if !pointer.focus.is_null() {
                 let view = unsafe { &mut *pointer.focus };
                 let surface = unsafe { &mut *view.surface };
-                use ffi::wl_shell_surface_resize as resize;
 
                 let (x, y) = view.from_global::<_, f32>(pointer.grab_x, pointer.grab_y);
 
                 let (x, y) = (x as i32, y as i32);
                 let hmargin = surface.width / 3;
                 let vmargin = surface.height / 3;
-                let edges = if x < hmargin {
-                    resize::WL_SHELL_SURFACE_RESIZE_LEFT
-                } else if x < surface.width - hmargin {
-                    resize::WL_SHELL_SURFACE_RESIZE_NONE
-                } else {
-                    resize::WL_SHELL_SURFACE_RESIZE_RIGHT
-                } | if y < vmargin {
-                    resize::WL_SHELL_SURFACE_RESIZE_TOP
-                } else if y < surface.height - vmargin {
-                    resize::WL_SHELL_SURFACE_RESIZE_NONE
-                } else {
-                    resize::WL_SHELL_SURFACE_RESIZE_BOTTOM
+                let edges = ResizeEdge {
+                    left: x < hmargin,
+                    right: x > surface.width - hmargin,
+                    top: y < vmargin,
+                    bottom: y > surface.height - vmargin
                 };
 
                 Surface::from_view(pointer.focus)
@@ -336,6 +328,43 @@ pub struct SurfaceState {
     pub activated: bool,
 }
 
+#[derive(Debug, Copy, Clone)]
+pub struct ResizeEdge {
+    // Only one of top/bottom and left/right can be true, but both can
+    // be false, if we're not resizing in that direction.
+    pub top: bool,
+    pub bottom: bool,
+    pub left: bool,
+    pub right: bool,
+}
+
+impl ResizeEdge {
+    pub fn none() -> ResizeEdge {
+        ResizeEdge { top: false, bottom: false, left: false, right: false }
+    }
+
+    pub fn from_u32(bits: u32) -> Option<ResizeEdge> {
+        pub const LEFT: u32 = 1;
+        pub const RIGHT: u32 = 2;
+        pub const TOP: u32 = 4;
+        pub const BOTTOM: u32 = 8;
+
+        if bits == 0
+            || bits & (TOP | BOTTOM) == (TOP | BOTTOM)
+            || bits & (LEFT | RIGHT) == (LEFT | RIGHT)
+        {
+            None
+        } else {
+            Some(ResizeEdge {
+                left: (bits & LEFT) != 0,
+                right: (bits & RIGHT) != 0,
+                top: (bits & TOP) != 0,
+                bottom: (bits & BOTTOM) != 0,
+            })
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Surface {
     pub destroy_signal: ffi::wl_signal,
@@ -349,7 +378,7 @@ pub struct Surface {
     pub saved_position: Option<Position>,
     pub unresponsive: bool,
     pub grabbed: bool,
-    pub resize_edges: u32,
+    pub resize_edges: ResizeEdge,
     pub fullscreen_output: *mut ffi::weston_output,
     pub output: *mut ffi::weston_output,
     pub output_destroy_listener: ffi::wl_listener,
@@ -413,7 +442,7 @@ impl Surface {
             saved_position: None,
             unresponsive: false,
             grabbed: false,
-            resize_edges: 0,
+            resize_edges: ResizeEdge::none(),
             fullscreen_output: 0 as *mut _,
             output: 0 as *mut _,
             output_destroy_listener: ffi::wl_listener::zeroed(),
@@ -677,13 +706,12 @@ impl Surface {
             shsurf.configure_maximized();
             surface.output = shsurf.output;
         } else {
-            use ffi::wl_shell_surface_resize as resize;
-            let resize_dx = if shsurf.resize_edges & resize::WL_SHELL_SURFACE_RESIZE_LEFT.0 != 0 {
+            let resize_dx = if shsurf.resize_edges.left {
                 shsurf.last_size.width - surface.height
             } else {
                 0
             };
-            let resize_dy = if shsurf.resize_edges & resize::WL_SHELL_SURFACE_RESIZE_TOP.0 != 0 {
+            let resize_dy = if shsurf.resize_edges.top {
                 shsurf.last_size.height - surface.height
             } else {
                 0
@@ -735,7 +763,7 @@ impl Surface {
     pub fn resize(
         &mut self,
         pointer: &mut ffi::weston_pointer,
-        edges: ffi::wl_shell_surface_resize,
+        edges: ResizeEdge,
     ) {
         ResizeGrab::start(pointer, self, edges);
     }
@@ -745,10 +773,8 @@ impl Surface {
         self.emit_state_changed()
     }
 
-    pub fn set_resizing(&mut self, edges: ffi::wl_shell_surface_resize) {
-        self.resize_edges = edges.0;
-        //self.pending_state.resizing =
-        //	    edges != ffi::wl_shell_surface_resize::WL_SHELL_SURFACE_RESIZE_NONE;
+    pub fn set_resizing(&mut self, edges: ResizeEdge) {
+        self.resize_edges = edges;
         self.emit_state_changed()
     }
 

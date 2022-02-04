@@ -556,12 +556,6 @@ impl weston_view {
     }
 }
 
-impl wl_shell_surface_resize {
-    pub fn has(&self, bit: wl_shell_surface_resize) -> bool {
-        *self & bit == bit
-    }
-}
-
 impl weston_seat {
     pub fn get_keyboard(&mut self) -> Option<&mut weston_keyboard> {
         if self.keyboard_device_count > 0 {
