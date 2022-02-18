@@ -5,6 +5,11 @@ authors = ["Kristian H. Kristensen <hoegsberg@google.com>"]
 edition = "2018"
 build = "build.rs"
 
+[features]
+default = ["drm-backend"]
+wayland-backend = []
+drm-backend = []
+
 [dependencies]
 wayland-commons = { path = "third_party/wayland-commons" }
 wayland-sys = { path = "third_party/wayland-sys" }
@@ -16,3 +21,6 @@ structopt = "0.3"
 
 [build-dependencies]
 wayland-scanner = { path = "third_party/wayland-scanner" }
+cc = { version = "1.0", features = ["parallel"] }
+pkg-config = "0.3"
+rayon = "*"

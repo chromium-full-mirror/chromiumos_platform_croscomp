@@ -2072,6 +2072,14 @@ weston_timeline_refresh_subscription_objects(struct weston_compositor *wc,
 void
 weston_set_log_handler(void (*handler)(const char *));
 
+int
+weston_backend_wayland_init(struct weston_compositor *compositor,
+                            struct weston_backend_config *config_base);
+
+int
+weston_backend_drm_init(struct weston_compositor *compositor,
+                        struct weston_backend_config *config_base);
+
 #ifdef  __cplusplus
 }
 #endif

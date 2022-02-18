@@ -96,6 +96,7 @@ fn bind_socket(name: &str) -> UnixListener {
     }
 }
 
+#[cfg(feature = "drm-backend")]
 extern "C" fn drm_head_notify(_listener: *mut ffi::wl_listener, data: *mut ::std::os::raw::c_void) {
     use protocol::wl_output::Transform;
 
@@ -138,6 +139,7 @@ extern "C" fn drm_head_notify(_listener: *mut ffi::wl_listener, data: *mut ::std
     }
 }
 
+#[cfg(feature = "wayland-backend")]
 extern "C" fn wayland_head_notify(
     _listener: *mut ffi::wl_listener,
     data: *mut ::std::os::raw::c_void,
@@ -185,6 +187,7 @@ extern "C" fn weston_log_bridge(msg: *const ::std::os::raw::c_char) {
     }
 }
 
+#[cfg(feature = "drm-backend")]
 fn load_drm_backend(compositor: Rc<RefCell<Compositor>>) -> Result<ffi::wl_listener, ()> {
     let mut config = ffi::weston_drm_backend_config {
         base: ffi::weston_backend_config {
@@ -203,9 +206,8 @@ fn load_drm_backend(compositor: Rc<RefCell<Compositor>>) -> Result<ffi::wl_liste
     };
 
     let _ret = unsafe {
-        ffi::weston_compositor_load_backend(
+        ffi::weston_backend_drm_init(
             &mut compositor.borrow_mut().native,
-            ffi::weston_compositor_backend::WESTON_BACKEND_DRM,
             &mut config.base,
         )
     };
@@ -213,6 +215,13 @@ fn load_drm_backend(compositor: Rc<RefCell<Compositor>>) -> Result<ffi::wl_liste
     Ok(ffi::wl_listener::new(drm_head_notify))
 }
 
+#[cfg(not(feature = "drm-backend"))]
+fn load_drm_backend(_compositor: Rc<RefCell<Compositor>>) -> Result<ffi::wl_listener, ()> {
+    Err(())
+}
+
+
+#[cfg(feature = "wayland-backend")]
 fn load_wayland_backend(compositor: Rc<RefCell<Compositor>>) -> Result<ffi::wl_listener, ()> {
     let mut config = ffi::weston_wayland_backend_config {
         base: ffi::weston_backend_config {
@@ -230,11 +239,7 @@ fn load_wayland_backend(compositor: Rc<RefCell<Compositor>>) -> Result<ffi::wl_l
     let native = &mut compositor.borrow_mut().native;
 
     unsafe {
-        let res = ffi::weston_compositor_load_backend(
-            native,
-            ffi::weston_compositor_backend::WESTON_BACKEND_WAYLAND,
-            &mut config.base,
-        );
+        let res = ffi::weston_backend_wayland_init(native, &mut config.base);
         if res == -1 {
             return Err(());
         };
@@ -250,6 +255,11 @@ fn load_wayland_backend(compositor: Rc<RefCell<Compositor>>) -> Result<ffi::wl_l
     }
 
     Ok(ffi::wl_listener::new(wayland_head_notify))
+}
+
+#[cfg(not(feature = "wayland-backend"))]
+fn load_wayland_backend(_compositor: Rc<RefCell<Compositor>>) -> Result<ffi::wl_listener, ()> {
+    Err(())
 }
 
 #[derive(StructOpt, Debug)]

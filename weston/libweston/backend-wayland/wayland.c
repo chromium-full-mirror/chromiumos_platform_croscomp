@@ -2872,8 +2872,8 @@ config_init_to_defaults(struct weston_wayland_backend_config *config)
 }
 
 WL_EXPORT int
-weston_backend_init(struct weston_compositor *compositor,
-		    struct weston_backend_config *config_base)
+weston_backend_wayland_init(struct weston_compositor *compositor,
+                            struct weston_backend_config *config_base)
 {
 	struct wayland_backend *b;
 	struct wayland_parent_output *poutput;
