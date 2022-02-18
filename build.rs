@@ -28,6 +28,7 @@ fn run_bindgen(header: &str, output: &str) {
         .arg(header)
         .arg("--")
         .arg(format!("--sysroot={}", sysroot))
+        .arg("-I./wayland-server")
         .arg("-I/usr/include/pixman-1")
         .arg("-I./weston/include")
         .arg("-I./bindgen/block")
@@ -72,6 +73,7 @@ impl ConfigHeader {
 fn generate_header_files(config: &Config) {
     ConfigHeader::new()
         .define("HAVE_ACCEPT4", 1)
+        .define("HAVE_MEMFD_CREATE", 1)
         .define_escaped("LIBWESTON_MODULEDIR", "/dev/null")
         .define_escaped("DATADIR", &config.data_dir)
         .define("_GNU_SOURCE", 1)
@@ -149,6 +151,7 @@ fn generate_protocol_code(config: &Config) -> Vec<String> {
     ];
 
     let internal = [
+        "wayland",
         "weston-content-protection",
         "weston-touch-calibration",
         "weston-debug",
@@ -214,7 +217,7 @@ fn build_libweston(config: &Config) {
 
     let mut builder = cc::Build::new();
 
-    let mut deps = vec!["libdrm", "pixman-1", "xkbcommon", "wayland-server"];
+    let mut deps = vec!["libdrm", "pixman-1", "xkbcommon", "libffi"];
 
     builder
         .cargo_metadata(false)
@@ -263,6 +266,19 @@ fn build_libweston(config: &Config) {
         .include("weston/libweston")
         .include("weston")
         .include(&config.out_path);
+
+    // Internal wayland-server
+    builder.files(subdir(
+        "wayland-server",
+        [
+            "wayland-server.c",
+            "wayland-shm.c",
+            "event-loop.c",
+            "connection.c",
+            "wayland-os.c",
+            "wayland-util.c",
+        ],
+    ));
 
     #[cfg(feature = "wayland-backend")]
     {
