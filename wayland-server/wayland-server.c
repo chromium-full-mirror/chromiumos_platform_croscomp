@@ -67,7 +67,6 @@ struct wl_client {
 
 struct wl_display {
 	struct wl_event_loop *loop;
-	int run;
 
 	uint32_t id;
 	uint32_t serial;
@@ -84,9 +83,6 @@ struct wl_display {
 
 	wl_display_global_filter_func_t global_filter;
 	void *global_filter_data;
-
-	int terminate_efd;
-	struct wl_event_source *term_source;
 };
 
 struct wl_global {
@@ -1012,16 +1008,6 @@ bind_display(struct wl_client *client, struct wl_display *display)
 	return 0;
 }
 
-static int
-handle_display_terminate(int fd, uint32_t mask, void *data) {
-	uint64_t term_event;
-
-	if (read(fd, &term_event, sizeof(term_event)) < 0 && errno != EAGAIN)
-		return -1;
-
-	return 0;
-}
-
 /** Create Wayland display object.
  *
  * \return The Wayland display object. Null if failed to create
@@ -1050,19 +1036,6 @@ wl_display_create(void)
 		return NULL;
 	}
 
-	display->terminate_efd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
-	if (display->terminate_efd < 0)
-		goto err_eventfd;
-
-	display->term_source = wl_event_loop_add_fd(display->loop,
-						    display->terminate_efd,
-						    WL_EVENT_READABLE,
-						    handle_display_terminate,
-						    NULL);
-
-	if (display->term_source == NULL)
-		goto err_term_source;
-
 	wl_list_init(&display->global_list);
 	wl_list_init(&display->client_list);
 	wl_list_init(&display->registry_resource_list);
@@ -1080,13 +1053,6 @@ wl_display_create(void)
 	wl_array_init(&display->additional_shm_formats);
 
 	return display;
-
-err_term_source:
-	close(display->terminate_efd);
-err_eventfd:
-	wl_event_loop_destroy(display->loop);
-	free(display);
-	return NULL;
 }
 
 /** Destroy Wayland display object.
@@ -1109,9 +1075,6 @@ wl_display_destroy(struct wl_display *display)
 	struct wl_global *global, *gnext;
 
 	wl_priv_signal_final_emit(&display->destroy_signal, display);
-
-	close(display->terminate_efd);
-	wl_event_source_remove(display->term_source);
 
 	wl_event_loop_destroy(display->loop);
 
@@ -1324,29 +1287,6 @@ WL_EXPORT struct wl_event_loop *
 wl_display_get_event_loop(struct wl_display *display)
 {
 	return display->loop;
-}
-
-WL_EXPORT void
-wl_display_terminate(struct wl_display *display)
-{
-	int ret;
-	uint64_t terminate = 1;
-
-	display->run = 0;
-
-	ret = write(display->terminate_efd, &terminate, sizeof(terminate));
-	assert (ret >= 0 || errno == EAGAIN);
-}
-
-WL_EXPORT void
-wl_display_run(struct wl_display *display)
-{
-	display->run = 1;
-
-	while (display->run) {
-		wl_display_flush_clients(display);
-		wl_event_loop_dispatch(display->loop, -1);
-	}
 }
 
 WL_EXPORT void

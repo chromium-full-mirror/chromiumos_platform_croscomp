@@ -18,6 +18,7 @@ use crate::Server;
 #[derive(Debug)]
 pub struct Compositor {
     pub server: Server,
+    pub terminate: bool,
     pub native: ffi::weston_compositor,
 }
 
@@ -27,6 +28,7 @@ impl Compositor {
         let display_native = server.native;
         let rc = Rc::new(RefCell::new(Compositor {
             server: server,
+            terminate: false,
             native: ffi::weston_compositor {
                 destroy_signal: ffi::wl_signal::zeroed(),
                 wl_display: display_native,

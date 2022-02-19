@@ -354,7 +354,7 @@ impl Server {
     }
 
     pub fn terminate(&mut self) {
-        unsafe { ffi::wl_display_terminate(self.native) }
+        todo!("terminate")
     }
 
     pub fn create_global<I>(&mut self, version: u32) -> Global<I>

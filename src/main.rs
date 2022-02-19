@@ -357,7 +357,12 @@ fn main() -> std::io::Result<()> {
 
     unsafe {
         let display = compositor.borrow_mut().server.native;
-        ffi::wl_display_run(display)
+        let event_loop = ffi::wl_display_get_event_loop(display);
+
+        while !compositor.borrow().terminate {
+	    ffi::wl_display_flush_clients(display);
+	    ffi::wl_event_loop_dispatch(event_loop, -1);
+        }
     }
 
     debug!(
