@@ -5,6 +5,7 @@
 use log::debug;
 use std::boxed::Box;
 use std::marker::PhantomData;
+use std::os::unix::io::RawFd;
 use std::rc::Rc;
 use wayland_commons::MessageGroup;
 
@@ -351,6 +352,10 @@ impl Server {
             native: native_display,
             event_loop: EventLoop::new(native_event_loop),
         }
+    }
+
+    pub fn create_client(&mut self, fd: RawFd) -> *mut ffi::wl_client {
+        unsafe { ffi::wl_client_create(self.native, fd) }
     }
 
     pub fn terminate(&mut self) {

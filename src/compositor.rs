@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use std::cell::RefCell;
-use std::os::unix::io::{AsRawFd, IntoRawFd, RawFd};
+use std::os::unix::io::{AsRawFd, IntoRawFd};
 use std::os::unix::net::UnixStream;
 use std::os::unix::process::CommandExt;
 use std::process::Command;
@@ -253,10 +253,6 @@ impl Compositor {
         };
     }
 
-    pub fn create_client(&self, fd: RawFd) -> *mut ffi::wl_client {
-        unsafe { ffi::wl_client_create(self.server.native, fd) }
-    }
-
     pub fn launch_client(&mut self, path: &str) -> std::io::Result<*mut ffi::wl_client> {
         let (client_stream, server_stream) = UnixStream::pair()?;
         let fd = client_stream.as_raw_fd();
@@ -277,7 +273,7 @@ impl Compositor {
                 .spawn()?;
         }
 
-        Ok(self.create_client(server_stream.into_raw_fd()))
+        Ok(self.server.create_client(server_stream.into_raw_fd()))
     }
 
     pub fn wake(&mut self) {

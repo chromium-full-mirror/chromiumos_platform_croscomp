@@ -329,8 +329,8 @@ fn main() -> std::io::Result<()> {
         .server
         .event_loop
         .on_connect(sock, move |fd, _| {
-            let compositor = rc.borrow_mut();
-            compositor.create_client(fd);
+            let mut compositor = rc.borrow_mut();
+            compositor.server.create_client(fd);
         });
 
     let shell = Shell::new(&compositor);
