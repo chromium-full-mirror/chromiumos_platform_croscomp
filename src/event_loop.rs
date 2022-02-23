@@ -64,22 +64,16 @@ impl EventLoop {
         }
     }
 
-    pub fn on_connect<F>(&mut self, listener: UnixListener, f: F)
+    pub fn on_ready<F>(&mut self, fd: RawFd, mask: ffi::wl_event_mask, f: F)
     where
-        F: Fn(RawFd, SocketAddr),
+        F: Fn(RawFd),
     {
-        extern "C" fn call_closure<F>(fd: i32, _: u32, data: *mut ::std::os::raw::c_void) -> i32
+        extern "C" fn call_closure<F>(fd: RawFd, _: u32, data: *mut ::std::os::raw::c_void) -> i32
         where
-            F: Fn(RawFd, SocketAddr),
+            F: Fn(RawFd),
         {
-            let listener = unsafe { UnixListener::from_raw_fd(fd) };
             let f = unsafe { &*(data as *mut F) };
-            match listener.accept() {
-                Ok((socket, addr)) => f(socket.into_raw_fd(), addr),
-                Err(_) => (),
-            }
-
-            listener.into_raw_fd();
+            f(fd);
 
             1
         }
@@ -89,11 +83,27 @@ impl EventLoop {
         unsafe {
             ffi::wl_event_loop_add_fd(
                 self.native,
-                listener.into_raw_fd(),
-                ffi::WL_EVENT_READABLE as u32,
+                fd,
+                mask.0,
                 Some(call_closure::<F>),
                 p as *mut _,
             );
         }
+    }
+
+    pub fn on_connect<F>(&mut self, listener: UnixListener, f: F)
+    where
+        F: Fn(RawFd, SocketAddr),
+    {
+        self.on_ready(listener.into_raw_fd(), ffi::wl_event_mask::WL_EVENT_READABLE, move |fd| {
+            let listener = unsafe { UnixListener::from_raw_fd(fd) };
+
+            match listener.accept() {
+                Ok((socket, addr)) => f(socket.into_raw_fd(), addr),
+                Err(_) => (),
+            }
+
+            listener.into_raw_fd();
+        });
     }
 }

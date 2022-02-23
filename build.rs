@@ -24,6 +24,7 @@ fn run_bindgen(header: &str, output: &str) {
         .args(&["--default-enum-style", "rust_non_exhaustive"])
         .args(&["--bitfield-enum", "weston_keyboard_modifier"])
         .args(&["--bitfield-enum", "weston_activate_flag"])
+        .args(&["--bitfield-enum", "wl_event_mask"])
         .args(&["--no-copy", "shell_surface"])
         .arg(header)
         .arg("--")
