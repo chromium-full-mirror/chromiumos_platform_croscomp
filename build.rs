@@ -205,10 +205,26 @@ fn generate_protocol_code(config: &Config) -> Vec<String> {
         .collect()
 }
 
-fn subdir<A: std::fmt::Display>(prefix: &str, iter: impl IntoIterator<Item = A>) -> Vec<String> {
-    iter.into_iter()
-        .map(|f| format!("{}/{}", prefix, f))
-        .collect()
+struct Files {
+    files: Vec<String>
+}
+
+impl Files {
+    fn new() -> Files {
+        Files { files: Vec::new() }
+    }
+
+    fn subdir<A: std::fmt::Display>(&mut self, prefix: &str, iter: impl IntoIterator<Item = A>) {
+        self.files.extend(
+            iter.into_iter()
+                .map(|f| format!("{}/{}", prefix, f)));
+    }
+
+    fn metadata(&self) {
+        for f in &self.files {
+            println!("cargo:rerun-if-changed={}", f);
+        }
+    }
 }
 
 fn build_libweston(config: &Config) {
@@ -218,58 +234,49 @@ fn build_libweston(config: &Config) {
 
     let mut builder = cc::Build::new();
 
+    let mut files = Files::new();
+
     let mut deps = vec!["libdrm", "pixman-1", "xkbcommon", "libffi"];
 
-    builder
-        .cargo_metadata(false)
-        .files(subdir(
-            "weston/libweston",
-            [
-                "animation.c",
-                "bindings.c",
-                "clipboard.c",
-                "compositor.c",
-                "content-protection.c",
-                "data-device.c",
-                "input.c",
-                "linux-dmabuf.c",
-                "linux-explicit-synchronization.c",
-                "linux-sync-file.c",
-                "log.c",
-                "noop-renderer.c",
-                "pixel-formats.c",
-                "pixman-renderer.c",
-                "plugin-registry.c",
-                "screenshooter.c",
-                "timeline.c",
-                "touch-calibration.c",
-                "weston-log-wayland.c",
-                "weston-log-file.c",
-                "weston-log-flight-rec.c",
-                "weston-log.c",
-                "weston-direct-display.c",
-                "zoom.c",
-            ],
-        ))
-        .files(subdir(
-            "weston/shared",
-            [
-                "file-util.c",
-                "image-loader.c",
-                "matrix.c",
-                "os-compatibility.c",
-            ],
-        ))
-        .files(protocol_c_files)
-        .extra_warnings(false)
-        .flag("-std=gnu99")
-        .include("weston/include")
-        .include("weston/libweston")
-        .include("weston")
-        .include(&config.out_path);
+    files.subdir(
+        "weston/libweston",
+        [
+            "animation.c",
+            "bindings.c",
+            "clipboard.c",
+            "compositor.c",
+            "content-protection.c",
+            "data-device.c",
+            "input.c",
+            "linux-dmabuf.c",
+            "linux-explicit-synchronization.c",
+            "linux-sync-file.c",
+            "log.c",
+            "noop-renderer.c",
+            "pixel-formats.c",
+            "pixman-renderer.c",
+            "plugin-registry.c",
+            "screenshooter.c",
+            "timeline.c",
+            "touch-calibration.c",
+            "weston-log-wayland.c",
+            "weston-log-file.c",
+            "weston-log-flight-rec.c",
+            "weston-log.c",
+            "weston-direct-display.c",
+            "zoom.c",
+        ]);
+    files.subdir(
+        "weston/shared",
+        [
+            "file-util.c",
+            "image-loader.c",
+            "matrix.c",
+            "os-compatibility.c",
+        ]);
 
     // Internal wayland-server
-    builder.files(subdir(
+    files.subdir(
         "wayland-server",
         [
             "wayland-server.c",
@@ -278,46 +285,53 @@ fn build_libweston(config: &Config) {
             "connection.c",
             "wayland-os.c",
             "wayland-util.c",
-        ],
-    ));
+        ]);
 
     #[cfg(feature = "wayland-backend")]
     {
-        builder
-            .files(subdir("weston/libweston/backend-wayland", ["wayland.c"]))
-            .files(subdir("weston/shared", ["frame.c", "cairo-util.c"]));
-
+        files.subdir("weston/libweston/backend-wayland", ["wayland.c"]);
+        files.subdir("weston/shared", ["frame.c", "cairo-util.c"]);
         deps.extend(["wayland-client", "wayland-cursor", "cairo", "libpng"])
     }
 
     #[cfg(feature = "drm-backend")]
     {
-        builder
-            .files(subdir(
-                "weston/libweston/backend-drm",
-                &[
-                    "drm.c",
-                    "fb.c",
-                    "modes.c",
-                    "kms.c",
-                    "state-helpers.c",
-                    "state-propose.c",
-                    "libbacklight.c",
-                ],
-            ))
-            .files(subdir(
-                "weston/libweston",
-                &[
-                    "launcher-direct.c",
-                    "launcher-util.c",
-                    "launcher-weston-launch.c",
-                    "libinput-device.c",
-                    "libinput-seat.c",
-                ],
-            ));
+        files.subdir(
+            "weston/libweston/backend-drm",
+            &[
+                "drm.c",
+                "fb.c",
+                "modes.c",
+                "kms.c",
+                "state-helpers.c",
+                "state-propose.c",
+                "libbacklight.c",
+            ]);
+        files.subdir(
+            "weston/libweston",
+            &[
+                "launcher-direct.c",
+                "launcher-util.c",
+                "launcher-weston-launch.c",
+                "libinput-device.c",
+                "libinput-seat.c",
+            ]);
 
         deps.extend(["libinput", "libevdev", "libudev"]);
     }
+
+    files.metadata();
+
+    builder
+        .cargo_metadata(false)
+        .files(files.files)
+        .files(protocol_c_files)
+        .extra_warnings(false)
+        .flag("-std=gnu99")
+        .include("weston/include")
+        .include("weston/libweston")
+        .include("weston")
+        .include(&config.out_path);
 
     // builder.compile() normally prints these, but we need to list
     // them now so that croscomp-libweston will appear before the
