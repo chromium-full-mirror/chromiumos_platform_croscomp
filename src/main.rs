@@ -45,8 +45,6 @@ pub type Position = ffi::weston_position;
 pub type Size = ffi::weston_size;
 pub type Geometry = ffi::weston_geometry;
 
-const SCALE: i32 = 2;
-
 struct Umask {
     old_mode: Mode,
 }
@@ -99,6 +97,8 @@ fn bind_socket(name: &str) -> UnixListener {
 #[cfg(feature = "drm-backend")]
 extern "C" fn drm_head_notify(_listener: *mut ffi::wl_listener, data: *mut ::std::os::raw::c_void) {
     use protocol::wl_output::Transform;
+
+    const SCALE: i32 = 2;
 
     let native = unsafe { &mut *(data as *mut ffi::weston_compositor) };
     let compositor = unsafe { &mut *container_of_mut!(native as *mut _, Compositor, native) };
