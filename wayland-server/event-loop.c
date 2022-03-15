@@ -36,6 +36,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/epoll.h>
+#include <sys/eventfd.h>
 #include <sys/signalfd.h>
 #include <sys/timerfd.h>
 #include <unistd.h>
@@ -76,6 +77,11 @@ struct wl_event_loop {
 	struct wl_signal destroy_signal;
 
 	struct wl_timer_heap timers;
+
+        /* When we schedule idle callbacks from a tokio async task we need to
+         * wake up the epoll so it can process it. */
+        int wake_fd;
+        struct wl_event_source *wake_source;
 };
 
 struct wl_event_source_interface {
@@ -788,6 +794,9 @@ wl_event_loop_add_idle(struct wl_event_loop *loop,
 
 	wl_list_insert(loop->idle_list.prev, &source->base.link);
 
+        uint64_t val = 1;
+        write(loop->wake_fd, &val, sizeof(val));
+
 	return &source->base;
 }
 
@@ -866,6 +875,15 @@ wl_event_loop_process_destroy_list(struct wl_event_loop *loop)
 	wl_list_init(&loop->destroy_list);
 }
 
+static int wake_dispatch(int fd, uint32_t mask, void *data)
+{
+        uint64_t val;
+
+        read(fd, &val, sizeof(val));
+
+        return 0;
+}
+
 /** Create a new event loop context
  *
  * \return A new event loop context object.
@@ -894,6 +912,16 @@ wl_event_loop_create(void)
 		free(loop);
 		return NULL;
 	}
+
+        loop->wake_fd = eventfd(0, EFD_CLOEXEC);
+        if (loop->wake_fd == -1)
+                return NULL;
+	loop->wake_source =
+                wl_event_loop_add_fd(loop, loop->wake_fd,
+                                     WL_EVENT_READABLE, wake_dispatch, NULL);
+        if (loop->wake_source == NULL)
+                return NULL;
+
 	wl_list_init(&loop->check_list);
 	wl_list_init(&loop->idle_list);
 	wl_list_init(&loop->destroy_list);
