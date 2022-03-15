@@ -43,7 +43,6 @@ impl Shell {
     pub fn new(rc: &Rc<RefCell<Compositor>>) -> Rc<RefCell<Self>> {
         let rc = {
             let compositor = &mut rc.borrow_mut();
-            let compositor_rc = Rc::clone(rc);
             Rc::new(RefCell::new(Shell {
                 compositor: Rc::clone(rc),
 
@@ -63,13 +62,12 @@ impl Shell {
                     &mut compositor.native.activate_signal,
                     move |data| unsafe {
                         let data = *(data as *mut ffi::weston_surface_activation_data);
-                        let mut compositor = compositor_rc.borrow_mut();
 
-                        compositor.server.event_loop.when_idle(move || {
+                        tokio::task::spawn_local(async move {
                             if let Some(shsurf) = Surface::get(data.surface) {
                                 shsurf.borrow_mut().activate(data.seat, data.prev_focus)
                             }
-                        })
+                        });
                     },
                 ),
             }))

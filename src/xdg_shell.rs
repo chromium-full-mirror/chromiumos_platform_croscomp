@@ -141,7 +141,6 @@ fn state_to_xdg_vec(state: &shell::SurfaceState) -> Vec<u8> {
 }
 
 struct Toplevel {
-    shell: Rc<RefCell<crate::Shell>>,
     surface: *mut ffi::weston_surface,
     shsurf: Rc<RefCell<shell::Surface>>,
     surface_resource: Resource<XdgSurface>,
@@ -167,7 +166,6 @@ impl Toplevel {
         };
 
         let toplevel_rc = Rc::new(RefCell::new(Toplevel {
-            shell: Rc::clone(&surface.shell),
             surface: surface.surface,
             shsurf: Rc::clone(&shsurf_rc),
             surface_resource: surface.resource.clone(),
@@ -206,10 +204,9 @@ impl Toplevel {
     }
 
     fn schedule_configure(&mut self, rc: Rc<RefCell<Toplevel>>) {
-        let shell = self.shell.borrow_mut();
-        let mut compositor = shell.compositor.borrow_mut();
         debug!("schedule configure!");
-        compositor.server.event_loop.when_idle(move || {
+
+        tokio::task::spawn_local(async move {
             let toplevel = rc.borrow_mut();
             let shsurf = toplevel.shsurf.borrow_mut();
             let configure = protocol::xdg_toplevel::Event::Configure {

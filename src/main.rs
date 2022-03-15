@@ -26,7 +26,6 @@ mod ffi;
 mod aura_shell;
 mod compositor;
 mod display;
-mod event_loop;
 mod exo;
 mod input;
 mod move_resize;

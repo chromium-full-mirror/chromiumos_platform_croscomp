@@ -9,7 +9,6 @@ use std::os::unix::io::RawFd;
 use std::rc::Rc;
 use wayland_commons::MessageGroup;
 
-use crate::event_loop::EventLoop;
 use crate::ffi;
 
 #[derive(Eq, PartialEq, Debug)]
@@ -340,17 +339,14 @@ impl<I: wayland_commons::Interface> Global<I> {
 #[derive(Debug)]
 pub struct Server {
     pub native: *mut ffi::wl_display,
-    pub event_loop: EventLoop,
 }
 
 impl Server {
     pub fn new() -> Self {
         let native_display = unsafe { ffi::wl_display_create() };
-        let native_event_loop = unsafe { &mut *ffi::wl_display_get_event_loop(native_display) };
 
         Server {
             native: native_display,
-            event_loop: EventLoop::new(native_event_loop),
         }
     }
 
