@@ -279,21 +279,6 @@ wl_global_set_user_data(struct wl_global *global, void *data);
 struct wl_client *
 wl_client_create(struct wl_display *display, int fd);
 
-struct wl_list *
-wl_display_get_client_list(struct wl_display *display);
-
-struct wl_list *
-wl_client_get_link(struct wl_client *client);
-
-struct wl_client *
-wl_client_from_link(struct wl_list *link);
-
-/** Iterate over a list of clients. */
-#define wl_client_for_each(client, list)				\
-	for (client = wl_client_from_link((list)->next);	\
-	     wl_client_get_link(client) != (list);			\
-	     client = wl_client_from_link(wl_client_get_link(client)->next))
-
 void
 wl_client_destroy(struct wl_client *client);
 

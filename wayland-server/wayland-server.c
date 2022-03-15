@@ -54,7 +54,6 @@ struct wl_client {
 	struct wl_connection *connection;
 	struct wl_display *display;
 	struct wl_resource *display_resource;
-	struct wl_list link;
 	struct wl_map objects;
 	struct wl_priv_signal destroy_signal;
 	pid_t pid;
@@ -71,7 +70,6 @@ struct wl_display {
 
 	struct wl_list registry_resource_list;
 	struct wl_list global_list;
-	struct wl_list client_list;
 	struct wl_list protocol_loggers;
 
 	struct wl_priv_signal destroy_signal;
@@ -515,8 +513,6 @@ wl_client_create(struct wl_display *display, int fd)
 	if (bind_display(client, display) < 0)
 		goto err_map;
 
-	wl_list_insert(display->client_list.prev, &client->link);
-
 	wl_priv_signal_emit(&display->create_client_signal, client);
 
 	return client;
@@ -849,7 +845,6 @@ wl_client_destroy(struct wl_client *client)
 	wl_map_for_each(&client->objects, destroy_resource, &serial);
 	wl_map_release(&client->objects);
 	close(wl_connection_destroy(client->connection));
-	wl_list_remove(&client->link);
 	wl_list_remove(&client->resource_created_signal.listener_list);
 	free(client);
 }
@@ -1019,7 +1014,6 @@ wl_display_create(void)
 		return NULL;
 
 	wl_list_init(&display->global_list);
-	wl_list_init(&display->client_list);
 	wl_list_init(&display->registry_resource_list);
 	wl_list_init(&display->protocol_loggers);
 
@@ -1263,44 +1257,6 @@ wl_display_next_serial(struct wl_display *display)
 	return display->serial;
 }
 
-/** Destroy all clients connected to the display
- *
- * \param display The display object
- *
- * This function should be called right before wl_display_destroy() to ensure
- * all client resources are closed properly. Destroying a client from within
- * wl_display_destroy_clients() is safe, but creating one will leak resources
- * and raise a warning.
- *
- * \memberof wl_display
- */
-WL_EXPORT void
-wl_display_destroy_clients(struct wl_display *display)
-{
-	struct wl_list tmp_client_list, *pos;
-	struct wl_client *client;
-
-	/* Move the whole client list to a temporary head because some new clients
-	 * might be added to the original head. */
-	wl_list_init(&tmp_client_list);
-	wl_list_insert_list(&tmp_client_list, &display->client_list);
-	wl_list_init(&display->client_list);
-
-	/* wl_list_for_each_safe isn't enough here: it fails if the next client is
-	 * destroyed by the destroy handler of the current one. */
-	while (!wl_list_empty(&tmp_client_list)) {
-		pos = tmp_client_list.next;
-		client = wl_container_of(pos, client, link);
-
-		wl_client_destroy(client);
-	}
-
-	if (!wl_list_empty(&display->client_list)) {
-		wl_log("wl_display_destroy_clients: cannot destroy all clients because "
-			   "new ones were created by destroy callbacks\n");
-	}
-}
-
 WL_EXPORT void
 wl_display_add_destroy_listener(struct wl_display *display,
 				struct wl_listener *listener)
@@ -1521,62 +1477,6 @@ struct wl_array *
 wl_display_get_additional_shm_formats(struct wl_display *display)
 {
 	return &display->additional_shm_formats;
-}
-
-/** Get the list of currently connected clients
- *
- * \param display The display object
- *
- * This function returns a pointer to the list of clients currently
- * connected to the display. You can iterate on the list by using
- * the \a wl_client_for_each macro.
- * The returned value is valid for the lifetime of the \a display.
- * You must not modify the returned list, but only access it.
- *
- * \sa wl_client_for_each()
- * \sa wl_client_get_link()
- * \sa wl_client_from_link()
- *
- * \memberof wl_display
- */
-WL_EXPORT struct wl_list *
-wl_display_get_client_list(struct wl_display *display)
-{
-	return &display->client_list;
-}
-
-/** Get the link by which a client is inserted in the client list
- *
- * \param client The client object
- *
- * \sa wl_client_for_each()
- * \sa wl_display_get_client_list()
- * \sa wl_client_from_link()
- *
- * \memberof wl_client
- */
-WL_EXPORT struct wl_list *
-wl_client_get_link(struct wl_client *client)
-{
-	return &client->link;
-}
-
-/** Get a wl_client by its link
- *
- * \param link The link of a wl_client
- *
- * \sa wl_client_for_each()
- * \sa wl_display_get_client_list()
- * \sa wl_client_get_link()
- *
- * \memberof wl_client
- */
-WL_EXPORT struct wl_client *
-wl_client_from_link(struct wl_list *link)
-{
-	struct wl_client *client;
-
-	return wl_container_of(link, client, link);
 }
 
 /** Add a listener for the client's resource creation signal
