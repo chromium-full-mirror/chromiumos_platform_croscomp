@@ -193,9 +193,6 @@ wl_display_create(void);
 void
 wl_display_destroy(struct wl_display *display);
 
-struct wl_event_loop *
-wl_display_get_event_loop(struct wl_display *display);
-
 void
 wl_display_terminate(struct wl_display *display);
 

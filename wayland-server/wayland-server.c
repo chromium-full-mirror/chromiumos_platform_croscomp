@@ -66,8 +66,6 @@ struct wl_client {
 };
 
 struct wl_display {
-	struct wl_event_loop *loop;
-
 	uint32_t id;
 	uint32_t serial;
 
@@ -1020,12 +1018,6 @@ wl_display_create(void)
 	if (display == NULL)
 		return NULL;
 
-	display->loop = wl_event_loop_create();
-	if (display->loop == NULL) {
-		free(display);
-		return NULL;
-	}
-
 	wl_list_init(&display->global_list);
 	wl_list_init(&display->client_list);
 	wl_list_init(&display->registry_resource_list);
@@ -1065,8 +1057,6 @@ wl_display_destroy(struct wl_display *display)
 	struct wl_global *global, *gnext;
 
 	wl_priv_signal_final_emit(&display->destroy_signal, display);
-
-	wl_event_loop_destroy(display->loop);
 
 	wl_list_for_each_safe(global, gnext, &display->global_list, link)
 		free(global);
@@ -1271,12 +1261,6 @@ wl_display_next_serial(struct wl_display *display)
 	display->serial++;
 
 	return display->serial;
-}
-
-WL_EXPORT struct wl_event_loop *
-wl_display_get_event_loop(struct wl_display *display)
-{
-	return display->loop;
 }
 
 /** Destroy all clients connected to the display

@@ -32,7 +32,7 @@ impl Compositor {
             native: ffi::weston_compositor {
                 destroy_signal: ffi::wl_signal::zeroed(),
                 wl_display: display_native,
-                event_loop: unsafe { ffi::wl_display_get_event_loop(display_native) },
+                event_loop: unsafe { ffi::wl_event_loop_create() },
                 create_surface_signal: ffi::wl_signal::zeroed(),
                 activate_signal: ffi::wl_signal::zeroed(),
                 transform_signal: ffi::wl_signal::zeroed(),
@@ -319,6 +319,9 @@ impl Compositor {
 impl Drop for Compositor {
     fn drop(&mut self) {
         debug!("drop compositor");
-        unsafe { ffi::weston_compositor_deinit(&mut self.native) }
+        unsafe {
+            ffi::weston_compositor_deinit(&mut self.native);
+            ffi::wl_event_loop_destroy(self.native.event_loop);
+        }
     }
 }
