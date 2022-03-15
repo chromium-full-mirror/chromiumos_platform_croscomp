@@ -169,7 +169,7 @@ drm_output_pageflip_timer_create(struct drm_output *output)
 	struct wl_event_loop *loop = NULL;
 	struct weston_compositor *ec = output->base.compositor;
 
-	loop = wl_display_get_event_loop(ec->wl_display);
+	loop = ec->event_loop;
 	assert(loop);
 	output->pageflip_timer = wl_event_loop_add_timer(loop,
 	                                                 pageflip_timeout,
@@ -2836,7 +2836,7 @@ drm_init_input(struct weston_compositor *compositor)
 	}
 
 	return 0;
-}	
+}
 
 static const struct weston_drm_output_api api = {
 	drm_output_set_mode,
@@ -2969,7 +2969,7 @@ drm_backend_create(struct weston_compositor *compositor,
 	if (!b->cursors_are_broken)
 		compositor->capabilities |= WESTON_CAP_CURSOR_PLANE;
 
-	loop = wl_display_get_event_loop(compositor->wl_display);
+	loop = compositor->event_loop;
 	b->drm_source =
 		wl_event_loop_add_fd(loop, b->drm.fd,
 				     WL_EVENT_READABLE, on_drm_input, b);

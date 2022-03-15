@@ -1057,7 +1057,7 @@ x11_output_enable(struct weston_output *base)
 	output->base.set_dpms = NULL;
 	output->base.switch_mode = x11_output_switch_mode;
 
-	loop = wl_display_get_event_loop(b->compositor->wl_display);
+	loop = b->compositor->event_loop;
 	output->finish_frame_timer =
 		wl_event_loop_add_timer(loop, finish_frame_handler, output);
 
@@ -1608,7 +1608,7 @@ x11_backend_handle_event(int fd, uint32_t mask, void *data)
 				}
 				data->backend = b;
 				data->window = window;
-				loop = wl_display_get_event_loop(b->compositor->wl_display);
+				loop = b->compositor->event_loop;
 				wl_event_loop_add_idle(loop, delete_cb, data);
 			}
 			break;
@@ -1886,7 +1886,7 @@ x11_backend_create(struct weston_compositor *compositor,
 		goto err_renderer;
 	}
 
-	loop = wl_display_get_event_loop(compositor->wl_display);
+	loop = compositor->event_loop;
 	b->xcb_source =
 		wl_event_loop_add_fd(loop,
 				     xcb_get_file_descriptor(b->conn),

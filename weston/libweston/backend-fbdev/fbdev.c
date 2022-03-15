@@ -552,7 +552,7 @@ fbdev_output_enable(struct weston_output *base)
 	if (pixman_renderer_output_create(&output->base, &options) < 0)
 		goto out_hw_surface;
 
-	loop = wl_display_get_event_loop(backend->compositor->wl_display);
+	loop = backend->compositor->event_loop;
 	output->finish_frame_timer =
 		wl_event_loop_add_timer(loop, finish_frame_handler, output);
 

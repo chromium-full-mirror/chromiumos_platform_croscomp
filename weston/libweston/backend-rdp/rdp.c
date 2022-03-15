@@ -588,7 +588,7 @@ rdp_output_enable(struct weston_output *base)
 		return -1;
 	}
 
-	loop = wl_display_get_event_loop(b->compositor->wl_display);
+	loop = b->compositor->event_loop;
 	output->finish_frame_timer = wl_event_loop_add_timer(loop, finish_frame_handler, output);
 
 	b->output = output;
@@ -729,7 +729,7 @@ int rdp_implant_listener(struct rdp_backend *b, freerdp_listener* instance)
 		return -1;
 	}
 
-	loop = wl_display_get_event_loop(b->compositor->wl_display);
+	loop = b->compositor->event_loop;
 	for (i = 0; i < rcount; i++) {
 		fd = (int)(long)(rfds[i]);
 		b->listener_events[i] = wl_event_loop_add_fd(loop, fd, WL_EVENT_READABLE,
@@ -1338,7 +1338,7 @@ rdp_peer_init(freerdp_peer *client, struct rdp_backend *b)
 		goto error_initialize;
 	}
 
-	loop = wl_display_get_event_loop(b->compositor->wl_display);
+	loop = b->compositor->event_loop;
 	for (i = 0; i < rcount; i++) {
 		fd = (int)(long)(rfds[i]);
 

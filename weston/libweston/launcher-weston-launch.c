@@ -290,7 +290,7 @@ launcher_weston_launch_connect(struct weston_launcher **out, struct weston_compo
 		 * in case we have to clean if weston-launch dies. */
 		launcher->kb_mode = K_UNICODE;
 
-		loop = wl_display_get_event_loop(compositor->wl_display);
+		loop = compositor->event_loop;
 		launcher->source = wl_event_loop_add_fd(loop, launcher->fd,
 							WL_EVENT_READABLE,
 							launcher_weston_launch_data,

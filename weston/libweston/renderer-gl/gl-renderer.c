@@ -316,7 +316,7 @@ timeline_submit_render_sync(struct gl_renderer *gr,
 		return;
 
 	go = get_output_state(output);
-	loop = wl_display_get_event_loop(ec->wl_display);
+	loop = ec->event_loop;
 
 	fd = gr->dup_native_fence_fd(gr->egl_display, sync);
 	if (fd == EGL_NO_NATIVE_FENCE_FD_ANDROID)

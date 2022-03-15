@@ -1163,7 +1163,7 @@ weston_schedule_surface_protection_update(struct weston_compositor *compositor)
 
 	if (!cp || cp->surface_protection_update)
 		return;
-	loop = wl_display_get_event_loop(compositor->wl_display);
+	loop = compositor->event_loop;
 	cp->surface_protection_update = wl_event_loop_add_idle(loop,
 					       notify_surface_protection_change,
 					       compositor);
@@ -3193,7 +3193,7 @@ weston_output_schedule_repaint(struct weston_output *output)
 	if (!output->repaint_needed)
 		TL_POINT(compositor, "core_repaint_req", TLP_OUTPUT(output), TLP_END);
 
-	loop = wl_display_get_event_loop(compositor->wl_display);
+	loop = compositor->event_loop;
 	output->repaint_needed = true;
 
 	/* If we already have a repaint scheduled for our idle handler,
@@ -5118,7 +5118,7 @@ weston_compositor_schedule_heads_changed(struct weston_compositor *compositor)
 	if (compositor->heads_changed_source)
 		return;
 
-	loop = wl_display_get_event_loop(compositor->wl_display);
+	loop = compositor->event_loop;
 	compositor->heads_changed_source = wl_event_loop_add_idle(loop,
 			weston_compositor_call_heads_changed, compositor);
 }
@@ -7319,8 +7319,6 @@ debug_scene_graph_cb(struct weston_log_subscription *sub, void *data)
 WL_EXPORT int
 weston_compositor_init(struct weston_compositor *ec)
 {
-	struct wl_event_loop *loop;
-
 	if (!wl_global_create(ec->wl_display, &wl_compositor_interface, 4,
 			      ec, compositor_bind))
 		return 1;
@@ -7351,10 +7349,9 @@ weston_compositor_init(struct weston_compositor *ec)
 
 	wl_display_init_shm(ec->wl_display);
 
-	loop = wl_display_get_event_loop(ec->wl_display);
-	ec->idle_source = wl_event_loop_add_timer(loop, idle_handler, ec);
+	ec->idle_source = wl_event_loop_add_timer(ec->event_loop, idle_handler, ec);
 	ec->repaint_timer =
-		wl_event_loop_add_timer(loop, output_repaint_timer_handler,
+		wl_event_loop_add_timer(ec->event_loop, output_repaint_timer_handler,
 					ec);
 
 	ec->debug_scene =

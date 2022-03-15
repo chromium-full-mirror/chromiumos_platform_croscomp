@@ -139,8 +139,7 @@ static struct clipboard_source *
 clipboard_source_create(struct clipboard *clipboard,
 			const char *mime_type, uint32_t serial, int fd)
 {
-	struct wl_display *display = clipboard->seat->compositor->wl_display;
-	struct wl_event_loop *loop = wl_display_get_event_loop(display);
+        struct wl_event_loop *loop = clipboard->seat->compositor->event_loop;
 	struct clipboard_source *source;
 	char **s;
 
@@ -219,8 +218,7 @@ clipboard_client_create(struct clipboard_source *source, int fd)
 {
 	struct weston_seat *seat = source->clipboard->seat;
 	struct clipboard_client *client;
-	struct wl_event_loop *loop =
-		wl_display_get_event_loop(seat->compositor->wl_display);
+	struct wl_event_loop *loop = seat->compositor->event_loop;
 
 	client = zalloc(sizeof *client);
 	if (client == NULL)

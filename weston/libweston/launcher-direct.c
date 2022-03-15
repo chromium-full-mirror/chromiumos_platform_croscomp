@@ -207,7 +207,7 @@ setup_tty(struct launcher_direct *launcher, int tty)
 		goto err_close;
 	}
 
-	loop = wl_display_get_event_loop(launcher->compositor->wl_display);
+	loop = launcher->compositor->event_loop;
 	launcher->vt_source =
 		wl_event_loop_add_signal(loop, SIGRTMIN, vt_handler, launcher);
 	if (!launcher->vt_source)

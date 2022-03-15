@@ -1022,6 +1022,7 @@ struct weston_compositor {
 	struct wl_signal destroy_signal;
 
 	struct wl_display *wl_display;
+	struct wl_event_loop *event_loop;
 
 	/* surface signals */
 	struct wl_signal create_surface_signal;

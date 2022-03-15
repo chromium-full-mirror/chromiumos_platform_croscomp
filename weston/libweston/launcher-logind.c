@@ -782,7 +782,7 @@ launcher_logind_connect(struct weston_launcher **out, struct weston_compositor *
 		}
 	}
 
-	loop = wl_display_get_event_loop(compositor->wl_display);
+	loop = compositor->event_loop;
 	r = weston_dbus_open(loop, DBUS_BUS_SYSTEM, &wl->dbus, &wl->dbus_ctx);
 	if (r < 0) {
 		weston_log("logind: cannot connect to system dbus\n");

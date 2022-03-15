@@ -2820,7 +2820,7 @@ wayland_backend_create(struct weston_compositor *compositor,
 	b->base.destroy = wayland_destroy;
 	b->base.create_output = wayland_output_create;
 
-	loop = wl_display_get_event_loop(compositor->wl_display);
+	loop = compositor->event_loop;
 
 	fd = wl_display_get_fd(b->parent.wl_display);
 	b->parent.wl_source =

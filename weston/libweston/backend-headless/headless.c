@@ -252,7 +252,7 @@ headless_output_enable(struct weston_output *base)
 	struct wl_event_loop *loop;
 	int ret = 0;
 
-	loop = wl_display_get_event_loop(b->compositor->wl_display);
+	loop = b->compositor->event_loop;
 	output->finish_frame_timer =
 		wl_event_loop_add_timer(loop, finish_frame_handler, output);
 

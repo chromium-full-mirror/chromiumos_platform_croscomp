@@ -250,7 +250,7 @@ weston_view_animation_create(struct weston_view *view,
 			       &animation->animation.link);
 	} else {
 		wl_list_init(&animation->animation.link);
-		loop = wl_display_get_event_loop(ec->wl_display);
+		loop = ec->event_loop;
 		wl_event_loop_add_idle(loop, idle_animation_destroy, animation);
 	}
 

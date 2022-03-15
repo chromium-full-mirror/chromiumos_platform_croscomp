@@ -266,7 +266,7 @@ udev_input_enable(struct udev_input *input)
 	struct udev_seat *seat;
 	int devices_found = 0;
 
-	loop = wl_display_get_event_loop(c->wl_display);
+	loop = c->event_loop;
 	fd = libinput_get_fd(input->libinput);
 	input->libinput_source =
 		wl_event_loop_add_fd(loop, fd, WL_EVENT_READABLE,
