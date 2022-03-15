@@ -14,10 +14,11 @@ use nix::sys::wait::{waitpid, WaitPidFlag};
 use std::cell::RefCell;
 use std::env;
 use std::io::ErrorKind;
-use std::os::unix::io::RawFd;
-use std::os::unix::net::{UnixListener, UnixStream};
+use std::os::unix::io::{IntoRawFd, RawFd};
+use std::os::unix::net::UnixStream;
 use std::rc::Rc;
 
+use tokio::net::UnixListener;
 use tokio::signal::unix::{signal, SignalKind};
 
 #[macro_use]
@@ -330,15 +331,24 @@ async fn main() -> std::io::Result<()> {
     };
     let sock = bind_socket(socket_name);
 
-    let rc = Rc::clone(&compositor);
-    compositor
-        .borrow_mut()
-        .server
-        .event_loop
-        .on_connect(sock, move |fd, _| {
-            let mut compositor = rc.borrow_mut();
-            compositor.server.create_client(fd);
-        });
+    local.spawn_local({
+        let compositor = Rc::clone(&compositor);
+
+        async move {
+            loop {
+                match sock.accept().await {
+                    Ok((stream, _addr)) => {
+                        let fd = stream.into_std().unwrap().into_raw_fd();
+                        compositor.borrow_mut().server.create_client(fd);
+                    }
+                    Err(_) => {
+                        warn!("accept failed");
+                        break;
+                    }
+                }
+            }
+        }
+    });
 
     let shell = Shell::new(&compositor);
 
