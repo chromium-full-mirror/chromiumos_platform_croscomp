@@ -122,6 +122,9 @@ wl_connection_flush(struct wl_connection *connection);
 uint32_t
 wl_connection_pending_input(struct wl_connection *connection);
 
+uint32_t
+wl_connection_pending_output(struct wl_connection *connection);
+
 int
 wl_connection_read(struct wl_connection *connection);
 

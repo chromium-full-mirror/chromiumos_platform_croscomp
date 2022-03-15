@@ -63,6 +63,7 @@ struct wl_client {
 	gid_t gid;
 	int error;
 	struct wl_priv_signal resource_created_signal;
+	bool needs_flush;
 };
 
 struct wl_display {
@@ -180,8 +181,7 @@ verify_objects(struct wl_resource *resource, uint32_t opcode,
 
 static void
 handle_array(struct wl_resource *resource, uint32_t opcode,
-	     union wl_argument *args,
-	     int (*send_func)(struct wl_closure *, struct wl_connection *))
+	     union wl_argument *args)
 {
 	struct wl_closure *closure;
 	struct wl_object *object = &resource->object;
@@ -204,7 +204,7 @@ handle_array(struct wl_resource *resource, uint32_t opcode,
 
 	log_closure(resource, closure, true);
 
-	if (send_func(closure, resource->client->connection))
+	if (wl_closure_send(closure, resource->client->connection))
 		resource->client->error = 1;
 
 	wl_closure_destroy(closure);
@@ -214,7 +214,11 @@ WL_EXPORT void
 wl_resource_post_event_array(struct wl_resource *resource, uint32_t opcode,
 			     union wl_argument *args)
 {
-	handle_array(resource, opcode, args, wl_closure_send);
+	struct wl_client *client = resource->client;
+
+	handle_array(resource, opcode, args);
+
+	client->needs_flush = true;
 }
 
 WL_EXPORT void
@@ -237,7 +241,7 @@ WL_EXPORT void
 wl_resource_queue_event_array(struct wl_resource *resource, uint32_t opcode,
 			      union wl_argument *args)
 {
-	handle_array(resource, opcode, args, wl_closure_queue);
+	handle_array(resource, opcode, args);
 }
 
 WL_EXPORT void
@@ -323,7 +327,7 @@ wl_client_connection_data(int fd, uint32_t mask, void *data)
 	}
 
 	if (mask & WL_EVENT_WRITABLE) {
-		len = wl_connection_flush(connection);
+		len = wl_client_flush(client);
 		if (len < 0 && errno != EAGAIN) {
 			destroy_client_with_error(
 			    client, "failed to flush client connection");
@@ -442,10 +446,19 @@ wl_client_connection_data(int fd, uint32_t mask, void *data)
  *
  * \memberof wl_client
  */
-WL_EXPORT void
+WL_EXPORT int
 wl_client_flush(struct wl_client *client)
 {
-	wl_connection_flush(client->connection);
+	int ret;
+
+        ret = wl_connection_flush(client->connection);
+	if (ret < 0)
+		return ret;
+
+	if (wl_connection_pending_output(client->connection) == 0)
+		client->needs_flush = false;
+
+	return ret;
 }
 
 /** Get the display object for the given client
@@ -1296,7 +1309,9 @@ wl_display_flush_clients(struct wl_display *display)
 	int ret;
 
 	wl_list_for_each_safe(client, next, &display->client_list, link) {
-		ret = wl_connection_flush(client->connection);
+		if (!client->needs_flush)
+			continue;
+		ret = wl_client_flush(client);
 		if (ret < 0 && errno == EAGAIN) {
 			wl_event_source_fd_update(client->source,
 						  WL_EVENT_WRITABLE |

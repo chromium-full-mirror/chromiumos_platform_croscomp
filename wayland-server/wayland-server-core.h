@@ -300,7 +300,7 @@ wl_client_from_link(struct wl_list *link);
 void
 wl_client_destroy(struct wl_client *client);
 
-void
+int
 wl_client_flush(struct wl_client *client);
 
 void

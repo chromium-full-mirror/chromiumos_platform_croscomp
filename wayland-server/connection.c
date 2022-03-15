@@ -68,7 +68,6 @@ struct wl_connection {
 	struct wl_ring_buffer in, out;
 	struct wl_ring_buffer fds_in, fds_out;
 	int fd;
-	int want_flush;
 };
 
 static int
@@ -294,9 +293,6 @@ wl_connection_flush(struct wl_connection *connection)
 	int len = 0, count, clen;
 	uint32_t tail;
 
-	if (!connection->want_flush)
-		return 0;
-
 	tail = connection->out.tail;
 	while (connection->out.head - connection->out.tail > 0) {
 		ring_buffer_get_iov(&connection->out, iov, &count);
@@ -324,8 +320,6 @@ wl_connection_flush(struct wl_connection *connection)
 		connection->out.tail += len;
 	}
 
-	connection->want_flush = 0;
-
 	return connection->out.head - tail;
 }
 
@@ -333,6 +327,12 @@ uint32_t
 wl_connection_pending_input(struct wl_connection *connection)
 {
 	return ring_buffer_size(&connection->in);
+}
+
+uint32_t
+wl_connection_pending_output(struct wl_connection *connection)
+{
+	return ring_buffer_size(&connection->out);
 }
 
 int
@@ -380,26 +380,6 @@ wl_connection_write(struct wl_connection *connection,
 {
 	if (connection->out.head - connection->out.tail +
 	    count > ARRAY_LENGTH(connection->out.data)) {
-		connection->want_flush = 1;
-		if (wl_connection_flush(connection) < 0)
-			return -1;
-	}
-
-	if (ring_buffer_put(&connection->out, data, count) < 0)
-		return -1;
-
-	connection->want_flush = 1;
-
-	return 0;
-}
-
-int
-wl_connection_queue(struct wl_connection *connection,
-		    const void *data, size_t count)
-{
-	if (connection->out.head - connection->out.tail +
-	    count > ARRAY_LENGTH(connection->out.data)) {
-		connection->want_flush = 1;
 		if (wl_connection_flush(connection) < 0)
 			return -1;
 	}
@@ -430,7 +410,6 @@ static int
 wl_connection_put_fd(struct wl_connection *connection, int32_t fd)
 {
 	if (ring_buffer_size(&connection->fds_out) == MAX_FDS_OUT * sizeof fd) {
-		connection->want_flush = 1;
 		if (wl_connection_flush(connection) < 0)
 			return -1;
 	}
@@ -1229,34 +1208,6 @@ wl_closure_send(struct wl_closure *closure, struct wl_connection *connection)
 	}
 
 	result = wl_connection_write(connection, buffer, size);
-	free(buffer);
-
-	return result;
-}
-
-int
-wl_closure_queue(struct wl_closure *closure, struct wl_connection *connection)
-{
-	int size;
-	uint32_t buffer_size;
-	uint32_t *buffer;
-	int result;
-
-	if (copy_fds_to_connection(closure, connection))
-		return -1;
-
-	buffer_size = buffer_size_for_closure(closure);
-	buffer = malloc(buffer_size * sizeof buffer[0]);
-	if (buffer == NULL)
-		return -1;
-
-	size = serialize_closure(closure, buffer, buffer_size);
-	if (size < 0) {
-		free(buffer);
-		return -1;
-	}
-
-	result = wl_connection_queue(connection, buffer, size);
 	free(buffer);
 
 	return result;
