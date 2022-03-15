@@ -14,6 +14,7 @@ use nix::sys::wait::{waitpid, WaitPidFlag};
 use std::cell::RefCell;
 use std::env;
 use std::io::ErrorKind;
+use std::os::unix::io::RawFd;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::rc::Rc;
 
@@ -278,7 +279,8 @@ struct Opt {
     socket: Option<String>,
 }
 
-fn main() -> std::io::Result<()> {
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> std::io::Result<()> {
     let opt = Opt::from_args();
 
     unsafe { ffi::weston_set_log_handler(Some(weston_log_bridge)) };
@@ -308,6 +310,8 @@ fn main() -> std::io::Result<()> {
         .add_heads_changed_listener(&mut listener);
 
     compositor.borrow_mut().flush_heads_changed();
+
+    let local = tokio::task::LocalSet::new();
 
     compositor.borrow_mut().server.event_loop.on_signal(
         nix::sys::signal::SIGCHLD as i32,
@@ -355,15 +359,30 @@ fn main() -> std::io::Result<()> {
 
     compositor.borrow_mut().wake();
 
-    unsafe {
-        let display = compositor.borrow_mut().server.native;
-        let event_loop = ffi::wl_display_get_event_loop(display);
+    local
+        .run_until({
+            let compositor = Rc::clone(&compositor);
+            let event_loop = compositor.borrow_mut().native.event_loop;
+            let display = compositor.borrow_mut().server.native;
 
-        while !compositor.borrow().terminate {
-	    ffi::wl_display_flush_clients(display);
-	    ffi::wl_event_loop_dispatch(event_loop, -1);
-        }
-    }
+            async move {
+                while !compositor.borrow().terminate {
+                    unsafe {
+                        ffi::wl_display_flush_clients(display);
+
+                        let fd: RawFd = ffi::wl_event_loop_get_fd(event_loop);
+                        let fd = tokio::io::unix::AsyncFd::new(fd).unwrap();
+
+                        let mut guard = fd.readable().await.unwrap();
+
+                        ffi::wl_event_loop_dispatch(event_loop, 0);
+
+                        guard.clear_ready();
+                    }
+                }
+            }
+        })
+        .await;
 
     debug!(
         "# exit from main: shell strong count {}",
