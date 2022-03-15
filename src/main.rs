@@ -18,6 +18,8 @@ use std::os::unix::io::RawFd;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::rc::Rc;
 
+use tokio::signal::unix::{signal, SignalKind};
+
 #[macro_use]
 mod ffi;
 mod aura_shell;
@@ -313,12 +315,13 @@ async fn main() -> std::io::Result<()> {
 
     let local = tokio::task::LocalSet::new();
 
-    compositor.borrow_mut().server.event_loop.on_signal(
-        nix::sys::signal::SIGCHLD as i32,
-        move |_sig| {
-            let _ = waitpid(None, Some(WaitPidFlag::WNOHANG));
-        },
-    );
+    local.spawn_local(async move {
+        let mut stream = signal(SignalKind::child()).unwrap();
+        loop {
+            stream.recv().await;
+            waitpid(None, Some(WaitPidFlag::WNOHANG)).unwrap();
+        }
+    });
 
     let socket_name = match (&opt.socket, opt.use_wayland) {
         (None, true) => "wayland-10",

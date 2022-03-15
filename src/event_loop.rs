@@ -17,33 +17,6 @@ impl EventLoop {
         Self { native }
     }
 
-    pub fn on_signal<F>(&mut self, signal: i32, f: F)
-    where
-        F: Fn(i32),
-    {
-        extern "C" fn call_closure<F>(signal: i32, data: *mut ::std::os::raw::c_void) -> i32
-        where
-            F: Fn(i32),
-        {
-            let f = unsafe { &*(data as *mut F) };
-
-            f(signal);
-
-            1
-        }
-
-        let p = Box::into_raw(Box::new(f));
-
-        unsafe {
-            ffi::wl_event_loop_add_signal(
-                self.native,
-                signal,
-                Some(call_closure::<F>),
-                p as *mut _,
-            );
-        }
-    }
-
     pub fn when_idle<F>(&mut self, f: F)
     where
         F: FnOnce(),
