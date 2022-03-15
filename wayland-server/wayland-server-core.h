@@ -303,6 +303,12 @@ wl_client_destroy(struct wl_client *client);
 int
 wl_client_flush(struct wl_client *client);
 
+bool
+wl_client_needs_flush(struct wl_client *client);
+
+int
+wl_client_read(struct wl_client *client);
+
 void
 wl_client_get_credentials(struct wl_client *client,
 			  pid_t *pid, uid_t *uid, gid_t *gid);

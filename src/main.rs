@@ -15,10 +15,9 @@ use std::cell::RefCell;
 use std::env;
 use std::io::ErrorKind;
 use std::os::unix::io::{IntoRawFd, RawFd};
-use std::os::unix::net::UnixStream;
 use std::rc::Rc;
 
-use tokio::net::UnixListener;
+use tokio::net::{UnixListener, UnixStream};
 use tokio::signal::unix::{signal, SignalKind};
 
 #[macro_use]
@@ -77,7 +76,7 @@ fn bind_socket(name: &str) -> UnixListener {
         return sock;
     }
 
-    match UnixStream::connect(&socket_path) {
+    match std::os::unix::net::UnixStream::connect(&socket_path) {
         Ok(_) => panic!("croscomp already running"),
         Err(error) if error.kind() == ErrorKind::ConnectionRefused => {
             let _ = std::fs::remove_file(&socket_path);
@@ -95,6 +94,41 @@ fn bind_socket(name: &str) -> UnixListener {
             }
         }
     }
+}
+
+#[no_mangle]
+extern "C" fn flush_client(client: *mut ffi::wl_client) {
+    tokio::task::spawn_local(async move {
+        unsafe {
+            ffi::wl_client_flush(client);
+            while ffi::wl_client_needs_flush(client) {
+                let fd = ffi::wl_client_get_fd(client);
+                let fd = tokio::io::unix::AsyncFd::new(fd).unwrap();
+                let mut guard = fd.writable().await.unwrap();
+                ffi::wl_client_flush(client);
+                guard.clear_ready();
+            }
+        }
+    });
+}
+
+fn serve_client(display: *mut ffi::wl_display, stream: UnixStream) {
+    let fd = stream.into_std().unwrap().into_raw_fd();
+
+    let client = unsafe { ffi::wl_client_create(display, fd) };
+
+    tokio::task::spawn_local(async move {
+        loop {
+            let fd = tokio::io::unix::AsyncFd::new(fd).unwrap();
+            let mut guard = fd.readable().await.unwrap();
+
+            unsafe {
+                ffi::wl_client_read(client);
+            }
+
+            guard.clear_ready();
+        }
+    });
 }
 
 #[cfg(feature = "drm-backend")]
@@ -331,14 +365,13 @@ async fn main() -> std::io::Result<()> {
     let sock = bind_socket(socket_name);
 
     local.spawn_local({
-        let compositor = Rc::clone(&compositor);
+        let display = compositor.borrow_mut().server.native;
 
         async move {
             loop {
                 match sock.accept().await {
                     Ok((stream, _addr)) => {
-                        let fd = stream.into_std().unwrap().into_raw_fd();
-                        compositor.borrow_mut().server.create_client(fd);
+                        serve_client(display, stream)
                     }
                     Err(_) => {
                         warn!("accept failed");
@@ -375,13 +408,10 @@ async fn main() -> std::io::Result<()> {
         .run_until({
             let compositor = Rc::clone(&compositor);
             let event_loop = compositor.borrow_mut().native.event_loop;
-            let display = compositor.borrow_mut().server.native;
 
             async move {
                 while !compositor.borrow().terminate {
                     unsafe {
-                        ffi::wl_display_flush_clients(display);
-
                         let fd: RawFd = ffi::wl_event_loop_get_fd(event_loop);
                         let fd = tokio::io::unix::AsyncFd::new(fd).unwrap();
 

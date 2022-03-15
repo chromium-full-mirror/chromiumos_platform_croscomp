@@ -52,7 +52,6 @@
 
 struct wl_client {
 	struct wl_connection *connection;
-	struct wl_event_source *source;
 	struct wl_display *display;
 	struct wl_resource *display_resource;
 	struct wl_list link;
@@ -210,6 +209,8 @@ handle_array(struct wl_resource *resource, uint32_t opcode,
 	wl_closure_destroy(closure);
 }
 
+extern void flush_client(struct wl_client *client);
+
 WL_EXPORT void
 wl_resource_post_event_array(struct wl_resource *resource, uint32_t opcode,
 			     union wl_argument *args)
@@ -218,7 +219,10 @@ wl_resource_post_event_array(struct wl_resource *resource, uint32_t opcode,
 
 	handle_array(resource, opcode, args);
 
-	client->needs_flush = true;
+	if (!client->needs_flush) {
+		client->needs_flush = true;
+		flush_client(client);
+	}
 }
 
 WL_EXPORT void
@@ -302,10 +306,9 @@ destroy_client_with_error(struct wl_client *client, const char *reason)
 	wl_client_destroy(client);
 }
 
-static int
-wl_client_connection_data(int fd, uint32_t mask, void *data)
+int
+wl_client_read(struct wl_client *client)
 {
-	struct wl_client *client = data;
 	struct wl_connection *connection = client->connection;
 	struct wl_resource *resource;
 	struct wl_object *object;
@@ -316,36 +319,12 @@ wl_client_connection_data(int fd, uint32_t mask, void *data)
 	int opcode, size, since;
 	int len;
 
-	if (mask & WL_EVENT_HANGUP) {
-		wl_client_destroy(client);
-		return 1;
-	}
-
-	if (mask & WL_EVENT_ERROR) {
-		destroy_client_with_error(client, "socket error");
-		return 1;
-	}
-
-	if (mask & WL_EVENT_WRITABLE) {
-		len = wl_client_flush(client);
-		if (len < 0 && errno != EAGAIN) {
-			destroy_client_with_error(
-			    client, "failed to flush client connection");
-			return 1;
-		} else if (len >= 0) {
-			wl_event_source_fd_update(client->source,
-						  WL_EVENT_READABLE);
-		}
-	}
-
 	len = 0;
-	if (mask & WL_EVENT_READABLE) {
-		len = wl_connection_read(connection);
-		if (len == 0 || (len < 0 && errno != EAGAIN)) {
-			destroy_client_with_error(
-			    client, "failed to read client connection");
-			return 1;
-		}
+	len = wl_connection_read(connection);
+	if (len == 0 || (len < 0 && errno != EAGAIN)) {
+		destroy_client_with_error(
+		    client, "failed to read client connection");
+		return -1;
 	}
 
 	while (len >= 0 && (size_t) len >= sizeof p) {
@@ -430,9 +409,10 @@ wl_client_connection_data(int fd, uint32_t mask, void *data)
 	if (client->error) {
 		destroy_client_with_error(client,
 					  "error in client communication");
+		return -1;
 	}
 
-	return 1;
+	return 0;
 }
 
 /** Flush pending events to the client
@@ -459,6 +439,12 @@ wl_client_flush(struct wl_client *client)
 		client->needs_flush = false;
 
 	return ret;
+}
+
+WL_EXPORT bool
+wl_client_needs_flush(struct wl_client *client)
+{
+	return client->needs_flush;
 }
 
 /** Get the display object for the given client
@@ -513,20 +499,14 @@ wl_client_create(struct wl_display *display, int fd)
 
 	wl_priv_signal_init(&client->resource_created_signal);
 	client->display = display;
-	client->source = wl_event_loop_add_fd(display->loop, fd,
-					      WL_EVENT_READABLE,
-					      wl_client_connection_data, client);
-
-	if (!client->source)
-		goto err_client;
 
 	if (wl_os_socket_peercred(fd, &client->uid, &client->gid,
 				  &client->pid) != 0)
-		goto err_source;
+		goto err_client;
 
 	client->connection = wl_connection_create(fd);
 	if (client->connection == NULL)
-		goto err_source;
+		goto err_client;
 
 	wl_map_init(&client->objects, WL_MAP_SERVER_SIDE);
 
@@ -546,8 +526,6 @@ wl_client_create(struct wl_display *display, int fd)
 err_map:
 	wl_map_release(&client->objects);
 	wl_connection_destroy(client->connection);
-err_source:
-	wl_event_source_remove(client->source);
 err_client:
 	free(client);
 	return NULL;
@@ -872,7 +850,6 @@ wl_client_destroy(struct wl_client *client)
 	wl_client_flush(client);
 	wl_map_for_each(&client->objects, destroy_resource, &serial);
 	wl_map_release(&client->objects);
-	wl_event_source_remove(client->source);
 	close(wl_connection_destroy(client->connection));
 	wl_list_remove(&client->link);
 	wl_list_remove(&client->resource_created_signal.listener_list);
@@ -1300,26 +1277,6 @@ WL_EXPORT struct wl_event_loop *
 wl_display_get_event_loop(struct wl_display *display)
 {
 	return display->loop;
-}
-
-WL_EXPORT void
-wl_display_flush_clients(struct wl_display *display)
-{
-	struct wl_client *client, *next;
-	int ret;
-
-	wl_list_for_each_safe(client, next, &display->client_list, link) {
-		if (!client->needs_flush)
-			continue;
-		ret = wl_client_flush(client);
-		if (ret < 0 && errno == EAGAIN) {
-			wl_event_source_fd_update(client->source,
-						  WL_EVENT_WRITABLE |
-						  WL_EVENT_READABLE);
-		} else if (ret < 0) {
-			wl_client_destroy(client);
-		}
-	}
 }
 
 /** Destroy all clients connected to the display
