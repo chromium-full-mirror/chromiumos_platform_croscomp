@@ -98,9 +98,11 @@ drm_backend_create_gl_renderer(struct drm_backend *b)
 		fallback_format_for(b->gbm_format),
 		0,
 	};
+
+	// TODO(b/228365773): platform should be GBM and display b->gbm
 	struct gl_renderer_display_options options = {
 		.egl_platform = EGL_PLATFORM_SURFACELESS_MESA,
-		.egl_native_display = b->gbm,
+		.egl_native_display = EGL_DEFAULT_DISPLAY,
 		.egl_surface_type = EGL_WINDOW_BIT,
 		.drm_formats = format,
 		.drm_formats_count = 2,
