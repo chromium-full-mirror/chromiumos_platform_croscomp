@@ -786,8 +786,8 @@ impl Surface {
         let work_area = get_work_area(output);
 
         ffi::weston_size {
-            width: work_area.height,
-            height: work_area.width,
+            width: work_area.width,
+            height: work_area.height,
         }
     }
 
