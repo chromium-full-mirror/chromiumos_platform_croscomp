@@ -76,11 +76,4 @@ pub fn init(rc: &Rc<RefCell<crate::Shell>>) {
         .on_destroy(move |_resource| super::Shell::finish_init(&rc));
 
     Box::into_raw(Box::new(global));
-
-    let rc = Rc::clone(&shell.compositor);
-    tokio::task::spawn_local(async move {
-        let path = "/usr/bin/weston-simple-splash";
-        let mut compositor = rc.borrow_mut();
-        compositor.launch_client(path).unwrap();
-    });
 }

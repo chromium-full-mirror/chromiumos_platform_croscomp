@@ -8,8 +8,8 @@ use std::rc::Rc;
 use crate::ffi;
 use crate::ffi::evdev::KEY_TAB;
 use crate::input;
-use crate::Shell;
 use crate::shell;
+use crate::Shell;
 
 use crate::protocol::wl_keyboard::KeyState;
 
@@ -45,7 +45,7 @@ impl Switcher {
 
         switcher.view_destroy_listener.link.init();
 
-	shell::lower_fullscreen_layer(&mut switcher.shell.borrow_mut(), 0 as *mut _);
+        shell::lower_fullscreen_layer(&mut switcher.shell.borrow_mut(), 0 as *mut _);
 
         let output = unsafe { &(*(*keyboard.focus).output) };
         keyboard.set_focus(0 as *mut _);
@@ -196,7 +196,7 @@ impl input::KeyboardGrabHandler for Switcher {
         keyboard: &mut ffi::weston_keyboard,
         _time: &ffi::timespec,
         key: u32,
-        state: KeyState
+        state: KeyState,
     ) {
         const SHIFT: ffi::weston_keyboard_modifier = ffi::weston_keyboard_modifier::MODIFIER_SHIFT;
 

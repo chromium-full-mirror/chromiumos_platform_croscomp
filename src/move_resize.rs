@@ -6,8 +6,8 @@ use crate::ffi;
 use crate::input;
 use crate::shell;
 
-use crate::protocol::wl_pointer::ButtonState;
 use crate::protocol::wl_keyboard::KeyState;
+use crate::protocol::wl_pointer::ButtonState;
 
 pub struct MoveGrab {
     dx: ffi::wl_fixed_t,
@@ -36,7 +36,7 @@ impl input::PointerGrabHandler for MoveGrab {
         pointer: &mut ffi::weston_pointer,
         _time: &ffi::timespec,
         _button: u32,
-        state: ButtonState
+        state: ButtonState,
     ) {
         if pointer.button_count == 0 && state == ButtonState::Released {
             self.shutdown()
@@ -178,7 +178,7 @@ impl input::KeyboardGrabHandler for ResizeGrab {
         keyboard: &mut ffi::weston_keyboard,
         _time: &ffi::timespec,
         key: u32,
-        state: KeyState
+        state: KeyState,
     ) {
         use crate::ffi::evdev::KEY_ESC;
 
@@ -242,9 +242,7 @@ impl ResizeGrab {
         let surface = unsafe { &mut *(view.surface) };
 
         if let Some(shsurf) = shell::Surface::get(surface) {
-            shsurf
-                .borrow_mut()
-                .set_resizing(shell::ResizeEdge::none());
+            shsurf.borrow_mut().set_resizing(shell::ResizeEdge::none());
         }
 
         // xxx unset shsurf resizing

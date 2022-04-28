@@ -254,7 +254,7 @@ impl Compositor {
         };
     }
 
-    pub fn launch_client(&mut self, path: &str) -> std::io::Result<*mut ffi::wl_client> {
+    pub fn create_client_stream(&mut self, path: &str) -> std::io::Result<UnixStream> {
         let (client_stream, server_stream) = UnixStream::pair()?;
         let fd = client_stream.as_raw_fd();
 
@@ -262,6 +262,7 @@ impl Compositor {
             use nix::fcntl::{fcntl, FdFlag, F_GETFD, F_SETFD};
 
             Command::new(path)
+                // TODO: figure out why socket doesn't work
                 .env("WAYLAND_SOCKET", fd.to_string())
                 .pre_exec(move || {
                     sigprocmask(SigmaskHow::SIG_UNBLOCK, Some(&SigSet::all()), None)
@@ -274,7 +275,12 @@ impl Compositor {
                 .spawn()?;
         }
 
-        Ok(self.server.create_client(server_stream.into_raw_fd()))
+        Ok(server_stream)
+    }
+
+    pub fn launch_client(&mut self, path: &str) -> std::io::Result<*mut ffi::wl_client> {
+        let stream = self.create_client_stream(path);
+        Ok(self.server.create_client(stream.unwrap().into_raw_fd()))
     }
 
     pub fn wake(&mut self) {

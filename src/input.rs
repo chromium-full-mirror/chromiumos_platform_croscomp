@@ -5,8 +5,8 @@
 use std::ptr::NonNull;
 
 use crate::ffi;
-use crate::protocol::wl_pointer::ButtonState;
 use crate::protocol::wl_keyboard::KeyState;
+use crate::protocol::wl_pointer::ButtonState;
 
 pub trait PointerGrabHandler {
     fn focus(&mut self, _pointer: &mut ffi::weston_pointer) {}
@@ -90,7 +90,7 @@ impl PointerGrab {
         let (pointer, handler) = Self::cast(grab);
         let time = unsafe { &*time };
 
-        handler.button(pointer, time, button, ButtonState::from_raw(state).unwrap() )
+        handler.button(pointer, time, button, ButtonState::from_raw(state).unwrap())
     }
 
     extern "C" fn axis(

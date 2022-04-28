@@ -3902,3 +3902,7 @@ WL_EXPORT struct gl_renderer_interface gl_renderer_interface = {
 	.create_fence_fd = gl_renderer_create_fence_fd,
 	.set_front = gl_renderer_set_front,
 };
+
+struct gl_renderer_interface* gl_renderer_init() {
+	return &gl_renderer_interface;
+}

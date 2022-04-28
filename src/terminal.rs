@@ -45,7 +45,6 @@ impl Terminal {
 
         match (self.client_surface, self.client) {
             (Some(surface), _) => unsafe {
-
                 if let Some(rc) = shell::Surface::get(self.client_surface.unwrap_or(0 as *mut _)) {
                     let mut shsurf = rc.borrow_mut();
                     let view = &mut *shsurf.view;

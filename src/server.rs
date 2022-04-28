@@ -345,9 +345,7 @@ impl Server {
     pub fn new() -> Self {
         let native_display = unsafe { ffi::wl_display_create() };
 
-        Server {
-            native: native_display,
-        }
+        Server { native: native_display }
     }
 
     pub fn create_client(&mut self, fd: RawFd) -> *mut ffi::wl_client {

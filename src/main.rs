@@ -114,19 +114,28 @@ extern "C" fn flush_client(client: *mut ffi::wl_client) {
 
 fn serve_client(display: *mut ffi::wl_display, stream: UnixStream) {
     let fd = stream.into_std().unwrap().into_raw_fd();
+    serve_client_fd(display, fd);
+}
 
+fn serve_client_fd(display: *mut ffi::wl_display, fd: RawFd) {
     let client = unsafe { ffi::wl_client_create(display, fd) };
 
     tokio::task::spawn_local(async move {
         loop {
-            let fd = tokio::io::unix::AsyncFd::new(fd).unwrap();
-            let mut guard = fd.readable().await.unwrap();
+            let fd = tokio::io::unix::AsyncFd::new(fd);
+            match fd {
+                Ok(fd) => {
+                    let mut guard = fd.readable().await.unwrap();
 
-            unsafe {
-                ffi::wl_client_read(client);
+                    unsafe {
+                        ffi::wl_client_read(client);
+                    }
+
+                    guard.clear_ready();
+                }
+                // probably should kill the  client if not already disconected.
+                Err(_would_block) => return,
             }
-
-            guard.clear_ready();
         }
     });
 }
@@ -243,10 +252,7 @@ fn load_drm_backend(compositor: Rc<RefCell<Compositor>>) -> Result<ffi::wl_liste
     };
 
     let _ret = unsafe {
-        ffi::weston_backend_drm_init(
-            &mut compositor.borrow_mut().native,
-            &mut config.base,
-        )
+        ffi::weston_backend_drm_init(&mut compositor.borrow_mut().native, &mut config.base)
     };
 
     Ok(ffi::wl_listener::new(drm_head_notify))
@@ -256,7 +262,6 @@ fn load_drm_backend(compositor: Rc<RefCell<Compositor>>) -> Result<ffi::wl_liste
 fn load_drm_backend(_compositor: Rc<RefCell<Compositor>>) -> Result<ffi::wl_listener, ()> {
     Err(())
 }
-
 
 #[cfg(feature = "wayland-backend")]
 fn load_wayland_backend(compositor: Rc<RefCell<Compositor>>) -> Result<ffi::wl_listener, ()> {
@@ -370,9 +375,7 @@ async fn main() -> std::io::Result<()> {
         async move {
             loop {
                 match sock.accept().await {
-                    Ok((stream, _addr)) => {
-                        serve_client(display, stream)
-                    }
+                    Ok((stream, _addr)) => serve_client(display, stream),
                     Err(_) => {
                         warn!("accept failed");
                         break;
@@ -388,9 +391,7 @@ async fn main() -> std::io::Result<()> {
 
     terminal::init(&shell);
 
-    if !opt.no_splash {
-        splash::init(&shell);
-    }
+    splash::init(&shell);
 
     switcher::init(&shell);
 
@@ -401,6 +402,22 @@ async fn main() -> std::io::Result<()> {
     screenshooter::init(&shell);
 
     xdg_shell::init(&shell);
+
+    if !opt.no_splash {
+        // TODO: not croscomp's job
+        local.spawn_local({
+            let compositor = Rc::clone(&compositor);
+            let display = compositor.borrow_mut().server.native;
+            let path = "/usr/bin/weston-simple-splash";
+            let stream = compositor.borrow_mut().create_client_stream(path);
+            async move {
+                serve_client_fd(display, stream.unwrap().into_raw_fd());
+            }
+        });
+    } else {
+        let shell = Rc::clone(&shell);
+        Shell::finish_init(&shell);
+    }
 
     compositor.borrow_mut().wake();
 

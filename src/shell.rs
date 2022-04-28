@@ -14,7 +14,7 @@ use crate::protocol;
 use crate::remote_shell;
 use crate::server;
 use crate::Compositor;
-use crate::{Position, Size, Geometry};
+use crate::{Geometry, Position, Size};
 
 use nix::sys::signal;
 
@@ -30,7 +30,6 @@ pub struct Shell {
     // when the Shell is dropped.  Silence the warning about never
     // reading for now, but eventually we'll want signals to be a
     // little more rust friendly.
-
     #[allow(unused)]
     idle_listener: Box<dyn Any>,
     #[allow(unused)]
@@ -208,7 +207,7 @@ impl Shell {
                     left: x < hmargin,
                     right: x > surface.width - hmargin,
                     top: y < vmargin,
-                    bottom: y > surface.height - vmargin
+                    bottom: y > surface.height - vmargin,
                 };
 
                 Surface::from_view(pointer.focus)
@@ -220,10 +219,7 @@ impl Shell {
         compositor.bind_button(BTN_RIGHT, mods, resize_binding);
         compositor.bind_button(BTN_LEFT, mods_with_shift, resize_binding);
 
-        unsafe {
-            ffi::weston_install_debug_key_binding(&mut compositor.native as *mut _, mods.0)
-        }
-
+        unsafe { ffi::weston_install_debug_key_binding(&mut compositor.native as *mut _, mods.0) }
     }
 
     fn init(&mut self) {
@@ -338,7 +334,12 @@ pub struct ResizeEdge {
 
 impl ResizeEdge {
     pub fn none() -> ResizeEdge {
-        ResizeEdge { top: false, bottom: false, left: false, right: false }
+        ResizeEdge {
+            top: false,
+            bottom: false,
+            left: false,
+            right: false,
+        }
     }
 
     pub fn from_u32(bits: u32) -> Option<ResizeEdge> {
@@ -399,11 +400,12 @@ impl SurfaceState {
     }
 }
 
-pub fn lower_fullscreen_layer(
-    shell: &mut Shell,
-    _lowering_output: *mut ffi::weston_output,
-) {
-    for view in wl_list_iter_mut!(&mut shell.fullscreen_layer.view_list.link, ffi::weston_view, layer_link.link) {
+pub fn lower_fullscreen_layer(shell: &mut Shell, _lowering_output: *mut ffi::weston_output) {
+    for view in wl_list_iter_mut!(
+        &mut shell.fullscreen_layer.view_list.link,
+        ffi::weston_view,
+        layer_link.link
+    ) {
         unsafe {
             ffi::weston_layer_entry_remove(&mut view.layer_link);
 
@@ -412,11 +414,11 @@ pub fn lower_fullscreen_layer(
                 &mut view.layer_link,
             );
 
-	    view.damage_below();
+            view.damage_below();
 
-	    let surface = &mut *view.surface;
-	    surface.damage();
-	}
+            let surface = &mut *view.surface;
+            surface.damage();
+        }
     }
 }
 
@@ -529,7 +531,7 @@ impl Surface {
 
         // todo: random placement within work area.
 
-        view.set_position(origin.0 + 20.0, origin.1 + 20.0);
+        view.set_position(origin.0, origin.1);
     }
 
     #[allow(dead_code)]
@@ -558,22 +560,22 @@ impl Surface {
     fn raise_or_insert(&mut self) {
         unsafe {
             let shell = &mut *self.shell;
-	    let view = &mut *self.view;
+            let view = &mut *self.view;
 
             ffi::weston_layer_entry_remove(&mut view.layer_link);
 
-	    if self.state.fullscreen {
-		ffi::weston_layer_entry_insert(
+            if self.state.fullscreen {
+                ffi::weston_layer_entry_insert(
                     &mut shell.fullscreen_layer.view_list,
                     &mut view.layer_link,
-		);
-	    } else {
-		ffi::weston_layer_entry_insert(
+                );
+            } else {
+                ffi::weston_layer_entry_insert(
                     &mut shell.workspace_layer.view_list,
                     &mut view.layer_link,
-		);
-	    }
-	}
+                );
+            }
+        }
     }
 
     fn activate(&mut self, _seat: *mut ffi::weston_seat, prev: *mut ffi::weston_surface) {
@@ -582,7 +584,7 @@ impl Surface {
         }
 
         if !self.output.is_null() {
-	    let shell = unsafe { &mut *self.shell };
+            let shell = unsafe { &mut *self.shell };
             lower_fullscreen_layer(shell, self.output);
         }
 
@@ -601,7 +603,7 @@ impl Surface {
             self.emit_state_changed();
         }
 
-	self.raise_or_insert()
+        self.raise_or_insert()
     }
 
     pub fn map(&mut self, _sx: i32, _sy: i32) {
@@ -617,7 +619,7 @@ impl Surface {
             self.set_initial_position()
         }
 
-	self.raise_or_insert();
+        self.raise_or_insert();
 
         view.update_transform();
         view.is_mapped = true;
@@ -626,17 +628,22 @@ impl Surface {
             view.set_output(self.output);
         }
 
-	// This is terrible, but the problem was always here. Before
-	// we'd get away with it as we got a compositor reference form
-	// a pointer. Now that we're using the RefCell, we get an
-	// "already borrowed" as the activate callback tries to borrow
-	// the compositor again to schedule an idle callback.
-	//
-	// For now, map the seats into an array of seat pointers, then
-	// loop through that and call activate.
-	let seats: Vec<_> =
-            shell.compositor.borrow_mut().native.seat_iter_mut().map(|seat| seat as *mut _).collect();
-	for seat in seats {
+        // This is terrible, but the problem was always here. Before
+        // we'd get away with it as we got a compositor reference form
+        // a pointer. Now that we're using the RefCell, we get an
+        // "already borrowed" as the activate callback tries to borrow
+        // the compositor again to schedule an idle callback.
+        //
+        // For now, map the seats into an array of seat pointers, then
+        // loop through that and call activate.
+        let seats: Vec<_> = shell
+            .compositor
+            .borrow_mut()
+            .native
+            .seat_iter_mut()
+            .map(|seat| seat as *mut _)
+            .collect();
+        for seat in seats {
             view.activate(seat, 0)
         }
     }
@@ -682,7 +689,7 @@ impl Surface {
         }
 
         if was_maximized {
-	    let shell = unsafe { &mut *shsurf.shell };
+            let shell = unsafe { &mut *shsurf.shell };
             shsurf.set_output(get_focused_output(&mut shell.compositor.borrow_mut()));
             if let Some(pos) = shsurf.saved_position.take() {
                 view.set_position(pos.x as f32, pos.y as f32);
@@ -692,10 +699,10 @@ impl Surface {
         }
 
         if shsurf.state.fullscreen || shsurf.state.maximized {
-	    shsurf.saved_position.get_or_insert(Position {
-		x: view.geometry.x as i32,
-		y: view.geometry.y as i32
-	    });
+            shsurf.saved_position.get_or_insert(Position {
+                x: view.geometry.x as i32,
+                y: view.geometry.y as i32,
+            });
         }
 
         if shsurf.state.fullscreen {
@@ -722,7 +729,10 @@ impl Surface {
             view.set_position(x, y);
         }
 
-        shsurf.last_size = Size { width: surface.width, height: surface.height };
+        shsurf.last_size = Size {
+            width: surface.width,
+            height: surface.height,
+        };
 
         if !surface.output.is_null() {
             for view in surface.view_iter_mut() {
@@ -732,13 +742,13 @@ impl Surface {
     }
 
     pub fn set_output(&mut self, output: *mut ffi::weston_output) {
-	// todo: We need to use weak references in places like this
-	// where the C code hooks the destroy listener.  We need to
-	// handle an output going away at a higher level and then move
-	// the surfaces, but each surface doesn't need to hook the
-	// output destroy signal.
+        // todo: We need to use weak references in places like this
+        // where the C code hooks the destroy listener.  We need to
+        // handle an output going away at a higher level and then move
+        // the surfaces, but each surface doesn't need to hook the
+        // output destroy signal.
 
-	self.output = output;
+        self.output = output;
     }
 
     pub fn get(surface: *mut ffi::weston_surface) -> Option<Rc<RefCell<Surface>>> {
@@ -758,11 +768,7 @@ impl Surface {
         MoveGrab::start(pointer, self)
     }
 
-    pub fn resize(
-        &mut self,
-        pointer: &mut ffi::weston_pointer,
-        edges: ResizeEdge,
-    ) {
+    pub fn resize(&mut self, pointer: &mut ffi::weston_pointer, edges: ResizeEdge) {
         ResizeGrab::start(pointer, self, edges);
     }
 
@@ -798,7 +804,7 @@ impl Surface {
             let output = if surface.is_mapped() {
                 surface.output
             } else {
-		let shell = unsafe { &mut *self.shell };
+                let shell = unsafe { &mut *self.shell };
                 get_focused_output(&mut shell.compositor.borrow_mut())
             };
 
@@ -816,7 +822,7 @@ impl Surface {
         self.pending_size = if enable {
             let surface = unsafe { &mut *self.surface };
             let output = if output.is_null() && !surface.is_mapped() {
-		let shell = unsafe { &mut *self.shell };
+                let shell = unsafe { &mut *self.shell };
                 get_focused_output(&mut shell.compositor.borrow_mut())
             } else {
                 output
@@ -855,11 +861,16 @@ impl Surface {
             );
         }
 
-        for keyboard in shell.compositor.borrow_mut().native.seat_iter_mut()
+        for keyboard in shell
+            .compositor
+            .borrow_mut()
+            .native
+            .seat_iter_mut()
             .filter_map(|seat| seat.get_keyboard())
-            .filter(|keyboard| keyboard.focus == self.surface) {
-                keyboard.set_focus(0 as *mut _)
-            }
+            .filter(|keyboard| keyboard.focus == self.surface)
+        {
+            keyboard.set_focus(0 as *mut _)
+        }
 
         view.damage_below();
     }

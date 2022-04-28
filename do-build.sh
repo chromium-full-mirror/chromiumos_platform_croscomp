@@ -100,18 +100,14 @@ cargo build -v --manifest-path $d/Cargo.toml --target="${CHOST}"
 DUT=${DUT:-192.168.86.226}
 
 ssh $DUT mkdir -p /usr/$LIBDIR/libweston-9 /usr/share/weston
+
 rsync -lav --progress \
-      $out/weston/libweston/libweston-9.so{,*[0-9]} \
-      $DUT:/usr/$LIBDIR
+    $out/weston/libweston/libweston-9.so{,*[0-9]} \
+    $DUT:/usr/$LIBDIR
 
 rsync -lav --progress \
       $d/weston/data/*.png \
       $DUT:/usr/share/weston
-
-rsync -lav --progress \
-      $out/weston/libweston/renderer-gl/gl-renderer.so \
-      $out/weston/libweston/backend-drm/drm-backend.so \
-      $DUT:/usr/$LIBDIR/libweston-9
 
 rsync -lav --progress $out/croscomp \
       $out/weston/clients/weston-{simple-splash,terminal} \

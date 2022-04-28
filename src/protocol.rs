@@ -63,8 +63,6 @@ mod anonymous_object {
     }
 }
 
-
-
 include!(concat!(env!("OUT_DIR"), "/wayland.rs"));
 include!(concat!(env!("OUT_DIR"), "/weston-screenshooter.rs"));
 include!(concat!(env!("OUT_DIR"), "/xdg-shell.rs"));

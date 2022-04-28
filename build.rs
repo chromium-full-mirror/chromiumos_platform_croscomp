@@ -72,15 +72,36 @@ impl ConfigHeader {
 }
 
 fn generate_header_files(config: &Config) {
-    ConfigHeader::new()
-        .define("HAVE_ACCEPT4", 1)
-        .define("HAVE_MEMFD_CREATE", 1)
-        .define_escaped("LIBWESTON_MODULEDIR", "/dev/null")
-        .define_escaped("DATADIR", &config.data_dir)
-        .define("_GNU_SOURCE", 1)
-        .define("_ALL_SOURCE", 1)
-        .define("MAJOR_IN_SYSMACROS", 1)
-        .build(&config.out_path, "config.h");
+    #[cfg(feature = "wayland-backend")]
+    {
+        ConfigHeader::new()
+            .define("HAVE_ACCEPT4", 1)
+            .define("HAVE_MEMFD_CREATE", 1)
+            .define_escaped("LIBWESTON_MODULEDIR", "/dev/null")
+            .define_escaped("DATADIR", &config.data_dir)
+            .define("_GNU_SOURCE", 1)
+            .define("_ALL_SOURCE", 1)
+            .define("MAJOR_IN_SYSMACROS", 1)
+            .build(&config.out_path, "config.h");
+    }
+    #[cfg(feature = "drm-backend")]
+    {
+        // TODO: some DRM GBM config might not be compatible with older version.
+        ConfigHeader::new()
+            .define("HAVE_ACCEPT4", 1)
+            .define("BUILD_DRM_COMPOSITOR", 1)
+            .define("BUILD_DRM_GBM", 1)
+            .define("HAVE_GBM_MODIFIERS", 1)
+            .define("HAVE_GBM_FD_IMPORT", 1)
+            .define("ENABLE_EGL", 1)
+            .define("HAVE_MEMFD_CREATE", 1)
+            .define_escaped("LIBWESTON_MODULEDIR", "/usr/lib64/libweston-9")
+            .define_escaped("DATADIR", &config.data_dir)
+            .define("_GNU_SOURCE", 1)
+            .define("_ALL_SOURCE", 1)
+            .define("MAJOR_IN_SYSMACROS", 1)
+            .build(&config.out_path, "config.h");
+    }
 
     ConfigHeader::new()
         .define("BUILD_ID", "c001bead")
@@ -206,7 +227,7 @@ fn generate_protocol_code(config: &Config) -> Vec<String> {
 }
 
 struct Files {
-    files: Vec<String>
+    files: Vec<String>,
 }
 
 impl Files {
@@ -215,9 +236,8 @@ impl Files {
     }
 
     fn subdir<A: std::fmt::Display>(&mut self, prefix: &str, iter: impl IntoIterator<Item = A>) {
-        self.files.extend(
-            iter.into_iter()
-                .map(|f| format!("{}/{}", prefix, f)));
+        self.files
+            .extend(iter.into_iter().map(|f| format!("{}/{}", prefix, f)));
     }
 
     fn metadata(&self) {
@@ -265,7 +285,8 @@ fn build_libweston(config: &Config) {
             "weston-log.c",
             "weston-direct-display.c",
             "zoom.c",
-        ]);
+        ],
+    );
     files.subdir(
         "weston/shared",
         [
@@ -273,7 +294,8 @@ fn build_libweston(config: &Config) {
             "image-loader.c",
             "matrix.c",
             "os-compatibility.c",
-        ]);
+        ],
+    );
 
     // Internal wayland-server
     files.subdir(
@@ -285,7 +307,8 @@ fn build_libweston(config: &Config) {
             "connection.c",
             "wayland-os.c",
             "wayland-util.c",
-        ]);
+        ],
+    );
 
     #[cfg(feature = "wayland-backend")]
     {
@@ -300,13 +323,15 @@ fn build_libweston(config: &Config) {
             "weston/libweston/backend-drm",
             &[
                 "drm.c",
+                "drm-gbm.c",
                 "fb.c",
                 "modes.c",
                 "kms.c",
                 "state-helpers.c",
                 "state-propose.c",
                 "libbacklight.c",
-            ]);
+            ],
+        );
         files.subdir(
             "weston/libweston",
             &[
@@ -315,9 +340,15 @@ fn build_libweston(config: &Config) {
                 "launcher-weston-launch.c",
                 "libinput-device.c",
                 "libinput-seat.c",
-            ]);
+                "vertex-clipping.c",
+            ],
+        );
+        files.subdir(
+            "weston/libweston/renderer-gl",
+            &["egl-glue.c", "gl-renderer.c"],
+        );
 
-        deps.extend(["libinput", "libevdev", "libudev"]);
+        deps.extend(["libinput", "libevdev", "libudev", "gbm", "egl", "glesv2"]);
     }
 
     files.metadata();
@@ -341,7 +372,12 @@ fn build_libweston(config: &Config) {
 
     for d in deps {
         let lib = pkg_config::probe_library(d).unwrap();
-        builder.includes(&lib.include_paths);
+        lib.include_paths.iter().for_each(|item| {
+            builder.include(&item);
+        });
+
+        // TODO: fix ebuild and includes instead of loop above
+        //builder.includes(&lib.include_paths);
     }
 
     builder.compile("croscomp-libweston");

@@ -5,7 +5,7 @@
 option(
 	'backend-drm',
 	type: 'boolean',
-	value: true,
+	value: false,
 	description: 'Weston backend: DRM/KMS'
 )
 option(
@@ -17,7 +17,7 @@ option(
 option(
 	'backend-headless',
 	type: 'boolean',
-	value: true,
+	value: false,
 	description: 'Weston backend: headless (testing)'
 )
 option(
@@ -54,7 +54,7 @@ option(
 	'backend-default',
 	type: 'combo',
 	choices: [ 'auto', 'drm', 'wayland', 'x11', 'fbdev', 'headless' ],
-	value: 'drm',
+	value: 'wayland',
 	description: 'Default backend when no parent display server detected'
 )
 

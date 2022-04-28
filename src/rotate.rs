@@ -97,7 +97,7 @@ pub fn init(shell: &Rc<RefCell<shell::Shell>>) {
             let mut shsurf = shsurf.borrow_mut();
 
             key_rotate(&mut shsurf)
-	}
+        }
     });
 
     compositor.bind_key(KEY_ESC, mods, move |keyboard, _, _| {
@@ -111,7 +111,7 @@ pub fn init(shell: &Rc<RefCell<shell::Shell>>) {
 
             view.geometry_dirty();
             compositor.schedule_repaint();
-	}
+        }
     });
 
     compositor.bind_button(BTN_LEFT, mods, |pointer: &mut ffi::weston_pointer, _, _| {

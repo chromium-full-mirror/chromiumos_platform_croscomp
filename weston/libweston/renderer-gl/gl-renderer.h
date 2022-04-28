@@ -244,3 +244,5 @@ struct gl_renderer_interface {
 
 	void (*set_front)(struct weston_output *output, int front);
 };
+
+struct gl_renderer_interface* gl_renderer_init();

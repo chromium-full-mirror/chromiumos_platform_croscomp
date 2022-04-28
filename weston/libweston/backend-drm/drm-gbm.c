@@ -51,8 +51,7 @@ create_gbm_device(int fd)
 {
 	struct gbm_device *gbm;
 
-	gl_renderer = weston_load_module("gl-renderer.so",
-					 "gl_renderer_interface");
+	gl_renderer = gl_renderer_init();
 	if (!gl_renderer)
 		return NULL;
 
