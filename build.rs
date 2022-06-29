@@ -256,7 +256,7 @@ fn build_libweston(config: &Config) {
 
     let mut files = Files::new();
 
-    let mut deps = vec!["libdrm", "pixman-1", "xkbcommon", "libffi"];
+    let mut deps = vec!["libdrm", "pixman-1", "xkbcommon", "libffi", "libpng"];
 
     files.subdir(
         "weston/libweston",
@@ -314,7 +314,7 @@ fn build_libweston(config: &Config) {
     {
         files.subdir("weston/libweston/backend-wayland", ["wayland.c"]);
         files.subdir("weston/shared", ["frame.c", "cairo-util.c"]);
-        deps.extend(["wayland-client", "wayland-cursor", "cairo", "libpng"])
+        deps.extend(["wayland-client", "wayland-cursor", "cairo"])
     }
 
     #[cfg(feature = "drm-backend")]
