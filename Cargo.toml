@@ -18,7 +18,7 @@ nix = "*"
 log = "*"
 env_logger = "*"
 structopt = "0.3"
-tokio = { version = "*", features = ["full"] }
+tokio = { version = "*", features = ["macros", "net", "signal", "rt"] }
 tokio-macros = "*"
 jobserver = "*"
 
