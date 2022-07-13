@@ -62,6 +62,7 @@ struct wl_client {
 	int error;
 	struct wl_priv_signal resource_created_signal;
 	bool needs_flush;
+	bool pending_destroy;
 };
 
 struct wl_display {
@@ -215,7 +216,8 @@ wl_resource_post_event_array(struct wl_resource *resource, uint32_t opcode,
 
 	handle_array(resource, opcode, args);
 
-	if (!client->needs_flush) {
+	// Do not flush client that are pending destroy to avoid race condition.
+ 	if (!client->pending_destroy && !client->needs_flush) {
 		client->needs_flush = true;
 		flush_client(client);
 	}
@@ -426,8 +428,10 @@ WL_EXPORT int
 wl_client_flush(struct wl_client *client)
 {
 	int ret;
+	if (client->pending_destroy)
+		return 0;
 
-        ret = wl_connection_flush(client->connection);
+	ret = wl_connection_flush(client->connection);
 	if (ret < 0)
 		return ret;
 
@@ -838,6 +842,8 @@ WL_EXPORT void
 wl_client_destroy(struct wl_client *client)
 {
 	uint32_t serial = 0;
+
+	client->pending_destroy = true;
 
 	wl_priv_signal_final_emit(&client->destroy_signal, client);
 
