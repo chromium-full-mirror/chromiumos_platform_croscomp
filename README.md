@@ -50,10 +50,12 @@ Croscomp may be missing libinput that may require libevdev
 	$ cros deploy $DUT libinput
 
 When running the ./do-build.sh script if you get the following error
-	$ ninja: error: loading 'build.ninja': No such file or directory`
-It means menson generation failed to generate the build.ninja file, the easiest work around is to delete weston out folder and retry the script
-	$ rm /mnt/host/source/src/platform/croscomp/target/x86_64-cros-linux-gnu/debug/weston 
 
+	$ ninja: error: loading 'build.ninja': No such file or directory`
+
+It means meson generation failed to generate the build.ninja file, the easiest work around is to delete weston out folder and retry the script
+
+	$ rm /mnt/host/source/src/platform/croscomp/target/x86_64-cros-linux-gnu/debug/weston
 	$ ./do-build.sh
 
 Running chrome under croscomp
