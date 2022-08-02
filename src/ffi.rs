@@ -182,6 +182,20 @@ mod tests {
         }
     }
 
+    fn drop(head: &mut wl_list) {
+        unsafe {
+            use crate::ffi::wl_list_empty;
+            use std::convert::TryFrom;
+            while wl_list_empty(head) != 1 {
+                let current = head.next;
+                wl_list::remove(&mut *head.next);
+                let offset : isize = unsafe { isize::try_from(offset_of!(Element<i32>,  link)).unwrap() };
+                // Move back to from raw for garbage collection.
+                Box::from_raw(&mut *(((current as isize) - offset) as *mut Element<i32>));
+            }
+        }
+    }
+
     fn compare<'a, I, T>(iter: I, array: &'a [T])
     where
         T: std::fmt::Debug + Copy + Eq,
@@ -210,6 +224,9 @@ mod tests {
         iter.next();
         let iter = iter.rev();
         compare(iter, &[3, 2]);
+
+        // clean up to avoid memory leaks
+        drop(&mut list);
     }
 }
 
